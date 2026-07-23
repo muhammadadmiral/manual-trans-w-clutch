@@ -3,9 +3,9 @@
 #include <windows.h>
 
 void ShowNotification(const char *message) {
-  HUD::BEGIN_TEXT_COMMAND_THEFEED_POST("STRING");
-  HUD::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME(message);
-  HUD::END_TEXT_COMMAND_THEFEED_POST_TICKER(false, false);
+  UI::_SET_NOTIFICATION_TEXT_ENTRY((char*)"STRING");
+  UI::_ADD_TEXT_COMPONENT_STRING((char*)message);
+  UI::_DRAW_NOTIFICATION(FALSE, FALSE);
 }
 
 void ScriptMain() {
@@ -22,7 +22,7 @@ void ScriptMain() {
 
 BOOL APIENTRY DllMain(HMODULE hInstance, DWORD reason, LPVOID lpReserved) {
   switch (reason) {
-  case DLL_PROCESS_ATTACH:
+  case DLL_PROCESS_ATTACH: 
     DisableThreadLibraryCalls(hInstance);
     scriptRegister(hInstance, ScriptMain);
     break;
