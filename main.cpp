@@ -1,103 +1,199 @@
 #include "sdk/inc/main.h"
 #include "sdk/inc/natives.h"
 #include "src/VehicleData.h"
-#include <stdio.h>
-#include <windows.h>
 
-void ShowNotification(const char *message) {
-  HUD::BEGIN_TEXT_COMMAND_THEFEED_POST("STRING");
-  HUD::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME(message);
-  HUD::END_TEXT_COMMAND_THEFEED_POST_TICKER(false, false);
+#include <Windows.h>
+#include <algorithm>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+namespace {
+
+HMODULE g_pluginModule = nullptr;
+
+void ShowNotification(const char* message) {
+    HUD::BEGIN_TEXT_COMMAND_THEFEED_POST("STRING");
+    HUD::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME(message);
+    HUD::END_TEXT_COMMAND_THEFEED_POST_TICKER(false, false);
 }
 
-void DrawTextOverlay(const char *text, float x, float y) {
-  HUD::SET_TEXT_FONT(0);
-  HUD::SET_TEXT_SCALE(0.5f, 0.5f);
-  HUD::SET_TEXT_COLOUR(255, 255, 255, 255);
-  HUD::SET_TEXT_OUTLINE();
-  HUD::BEGIN_TEXT_COMMAND_DISPLAY_TEXT("STRING");
-  HUD::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME(text);
-  HUD::END_TEXT_COMMAND_DISPLAY_TEXT(x, y, 0);
+void DrawTextOverlay(const char* text, float x, float y) {
+    HUD::SET_TEXT_FONT(0);
+    HUD::SET_TEXT_SCALE(0.42f, 0.42f);
+    HUD::SET_TEXT_COLOUR(255, 255, 255, 255);
+    HUD::SET_TEXT_OUTLINE();
+    HUD::BEGIN_TEXT_COMMAND_DISPLAY_TEXT("STRING");
+    HUD::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME(text);
+    HUD::END_TEXT_COMMAND_DISPLAY_TEXT(x, y, 0);
 }
 
-bool IsValidVehicle(Vehicle veh) {
-  int vehClass = VEHICLE::GET_VEHICLE_CLASS(veh);
-  if (vehClass == 14 || vehClass == 15 || vehClass == 16 || vehClass == 21) {
-    return false;
-  }
-  int maxGear = VEHICLE::_GET_VEHICLE_MAX_DRIVE_GEAR_COUNT(veh);
-  if (maxGear <= 1) {
-    return false;
-  }
-  return true;
+bool BuildIniPath(char (&path)[MAX_PATH]) {
+    DWORD length = GetModuleFileNameA(g_pluginModule, path, MAX_PATH);
+    if (length == 0 || length >= MAX_PATH) return false;
+
+    char* slash = std::strrchr(path, '\\');
+    if (slash == nullptr) slash = std::strrchr(path, '/');
+    if (slash == nullptr) return false;
+    *slash = '\0';
+
+    return strcat_s(path, "\\manual-trans.ini") == 0;
 }
+
+bool IsValidVehicle(Vehicle vehicle) {
+    const int vehicleClass = VEHICLE::GET_VEHICLE_CLASS(vehicle);
+    if (vehicleClass == 14 || vehicleClass == 15 ||
+        vehicleClass == 16 || vehicleClass == 21) {
+        return false;
+    }
+
+    return VEHICLE::_GET_VEHICLE_MAX_DRIVE_GEAR_COUNT(vehicle) > 1;
+}
+
+bool IsPlayerDriving(Ped playerPed, Vehicle vehicle) {
+    return VEHICLE::GET_PED_IN_VEHICLE_SEAT(vehicle, -1, 0) == playerPed;
+}
+
+void ResetInputEdges(bool& shiftUpPressed, bool& shiftDownPressed) {
+    shiftUpPressed = false;
+    shiftDownPressed = false;
+}
+
+} // namespace
 
 void ScriptMain() {
-  scriptWait(2000);
-  ShowNotification("Manual Transmission Mod Loaded!");
+    scriptWait(2000);
 
-  char iniPath[MAX_PATH];
-  GetCurrentDirectoryA(MAX_PATH, iniPath);
-  strcat_s(iniPath, "\\manual-trans.ini");
-
-  int keyShiftUp =
-      GetPrivateProfileIntA("Controls", "ShiftUp", VK_LSHIFT, iniPath);
-  int keyShiftDown =
-      GetPrivateProfileIntA("Controls", "ShiftDown", VK_LCONTROL, iniPath);
-
-  uint8_t manualGear = 1;
-  bool shiftUpPressed = false;
-  bool shiftDownPressed = false;
-
-  while (true) {
-    scriptWait(0);
-    Ped playerPed = PLAYER::PLAYER_PED_ID();
-
-    if (PED::IS_PED_IN_ANY_VEHICLE(playerPed, FALSE)) {
-      Vehicle veh = PED::GET_VEHICLE_PED_IS_IN(playerPed, FALSE);
-
-      if (IsValidVehicle(veh)) {
-        VehicleData vData(veh);
-        if (vData.IsValid()) {
-          int maxGear = VEHICLE::_GET_VEHICLE_MAX_DRIVE_GEAR_COUNT(veh);
-
-          bool isUp = (GetAsyncKeyState(keyShiftUp) & 0x8000) != 0;
-          bool isDown = (GetAsyncKeyState(keyShiftDown) & 0x8000) != 0;
-
-          if (isUp && !shiftUpPressed) {
-            if (manualGear < maxGear)
-              manualGear++;
-          }
-          if (isDown && !shiftDownPressed) {
-            if (manualGear > 0)
-              manualGear--;
-          }
-
-          shiftUpPressed = isUp;
-          shiftDownPressed = isDown;
-
-          vData.SetGear(manualGear);
-          vData.SetNextGear(manualGear);
-
-          char debugText[128];
-          sprintf_s(debugText, "Gear: %d | RPM: %.2f", manualGear,
-                    vData.GetRPM());
-          DrawTextOverlay(debugText, 0.1f, 0.8f);
-        }
-      }
+    if (!VehicleData::Initialize(g_pluginModule)) {
+        ShowNotification(
+            "Manual transmission disabled: CVehicle offsets unresolved.");
+        return;
     }
-  }
+
+    const VehicleOffsets& offsets = VehicleData::GetResolvedOffsets();
+    char loadedMessage[192]{};
+    sprintf_s(loadedMessage,
+              "Manual transmission: %s | G:%X N:%X R:%X C:%X",
+              VehicleData::GetOffsetSourceName(), offsets.Gear,
+              offsets.NextGear, offsets.RPM, offsets.Clutch);
+    ShowNotification(loadedMessage);
+
+    char iniPath[MAX_PATH]{};
+    const bool hasIniPath = BuildIniPath(iniPath);
+    const int keyShiftUp = hasIniPath
+        ? GetPrivateProfileIntA("Controls", "ShiftUp", VK_LSHIFT, iniPath)
+        : VK_LSHIFT;
+    const int keyShiftDown = hasIniPath
+        ? GetPrivateProfileIntA("Controls", "ShiftDown", VK_LCONTROL,
+                                iniPath)
+        : VK_LCONTROL;
+    const bool debugOverlay = !hasIniPath ||
+        GetPrivateProfileIntA("Debug", "Overlay", 1, iniPath) != 0;
+
+    Vehicle activeVehicle = 0;
+    uint8_t manualGear = 1;
+    bool activeLayoutValidated = false;
+    bool shiftUpPressed = false;
+    bool shiftDownPressed = false;
+
+    while (true) {
+        scriptWait(0);
+
+        const Ped playerPed = PLAYER::PLAYER_PED_ID();
+        if (!PED::IS_PED_IN_ANY_VEHICLE(playerPed, FALSE)) {
+            activeVehicle = 0;
+            activeLayoutValidated = false;
+            ResetInputEdges(shiftUpPressed, shiftDownPressed);
+            continue;
+        }
+
+        const Vehicle vehicle =
+            PED::GET_VEHICLE_PED_IS_IN(playerPed, FALSE);
+        if (!IsValidVehicle(vehicle) ||
+            !IsPlayerDriving(playerPed, vehicle)) {
+            activeVehicle = 0;
+            activeLayoutValidated = false;
+            ResetInputEdges(shiftUpPressed, shiftDownPressed);
+            continue;
+        }
+
+        const int maxGear =
+            VEHICLE::_GET_VEHICLE_MAX_DRIVE_GEAR_COUNT(vehicle);
+        VehicleData data(vehicle);
+
+        if (vehicle != activeVehicle) {
+            activeVehicle = vehicle;
+            activeLayoutValidated = data.HasPlausibleLayout(maxGear);
+
+            if (!activeLayoutValidated) {
+                ShowNotification(
+                    "CVehicle validation failed. Memory writes blocked.");
+                ResetInputEdges(shiftUpPressed, shiftDownPressed);
+                continue;
+            }
+
+            const uint8_t detectedGear = data.GetGear();
+            manualGear = detectedGear >= 1 && detectedGear <= maxGear
+                ? detectedGear
+                : 1;
+
+            shiftUpPressed =
+                (GetAsyncKeyState(keyShiftUp) & 0x8000) != 0;
+            shiftDownPressed =
+                (GetAsyncKeyState(keyShiftDown) & 0x8000) != 0;
+        }
+
+        if (!activeLayoutValidated || !data.IsValid()) continue;
+
+        const bool isUp =
+            (GetAsyncKeyState(keyShiftUp) & 0x8000) != 0;
+        const bool isDown =
+            (GetAsyncKeyState(keyShiftDown) & 0x8000) != 0;
+
+        if (isUp && !shiftUpPressed && manualGear < maxGear) {
+            ++manualGear;
+        }
+        if (isDown && !shiftDownPressed && manualGear > 0) {
+            --manualGear;
+        }
+
+        shiftUpPressed = isUp;
+        shiftDownPressed = isDown;
+
+        const bool writeSucceeded =
+            data.SetGear(manualGear) && data.SetNextGear(manualGear);
+        if (!writeSucceeded) {
+            activeLayoutValidated = false;
+            ShowNotification("CVehicle write failed. Writes stopped.");
+            continue;
+        }
+
+        if (debugOverlay) {
+            char debugText[192]{};
+            sprintf_s(debugText,
+                      "Gear %u/%d | game %u -> %u | RPM %.3f | %s",
+                      static_cast<unsigned>(manualGear), maxGear,
+                      static_cast<unsigned>(data.GetGear()),
+                      static_cast<unsigned>(data.GetNextGear()),
+                      data.GetRPM(), VehicleData::GetOffsetSourceName());
+            DrawTextOverlay(debugText, 0.02f, 0.80f);
+        }
+    }
 }
 
-BOOL APIENTRY DllMain(HMODULE hInstance, DWORD reason, LPVOID lpReserved) {
-  switch (reason) {
-  case DLL_PROCESS_ATTACH:
-    DisableThreadLibraryCalls(hInstance);
-    scriptRegister(hInstance, ScriptMain);
-    break;
-  case DLL_PROCESS_DETACH:
-    scriptUnregister(hInstance);
-    break;
-  }
-  return TRUE;
+BOOL APIENTRY DllMain(HMODULE instance, DWORD reason, LPVOID) {
+    switch (reason) {
+    case DLL_PROCESS_ATTACH:
+        g_pluginModule = instance;
+        DisableThreadLibraryCalls(instance);
+        scriptRegister(instance, ScriptMain);
+        break;
+    case DLL_PROCESS_DETACH:
+        scriptUnregister(instance);
+        break;
+    default:
+        break;
+    }
+
+    return TRUE;
 }
