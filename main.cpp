@@ -3,9 +3,9 @@
 #include <windows.h>
 
 void ShowNotification(const char *message) {
-  UI::_SET_NOTIFICATION_TEXT_ENTRY((char*)"STRING");
-  UI::_ADD_TEXT_COMPONENT_STRING((char*)message);
-  UI::_DRAW_NOTIFICATION(FALSE, FALSE);
+  HUD::BEGIN_TEXT_COMMAND_THEFEED_POST("STRING");
+  HUD::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME(message);
+  HUD::END_TEXT_COMMAND_THEFEED_POST_TICKER(false, false);
 }
 
 void ScriptMain() {
