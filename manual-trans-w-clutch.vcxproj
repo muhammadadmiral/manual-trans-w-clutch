@@ -17,6 +17,7 @@
       <Configuration>Release</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+  </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="src\Memory\AOBScanner.cpp" />
@@ -26,7 +27,7 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{66a04ec1-d16c-491a-878e-026b3e8cb40d}</ProjectGuid>
+    <ProjectGuid>{9F2C5C29-C5C5-1D9A-4345-9AF8EC5ACA35}</ProjectGuid>
     <RootNamespace>manualtranswclutch</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
