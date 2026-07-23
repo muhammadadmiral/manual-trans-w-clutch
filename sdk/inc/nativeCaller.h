@@ -21,10 +21,27 @@ static inline void nativePush(T val)
 }
 
 template <typename R, typename... Args>
+struct invoke_helper {
+	static inline R call(UINT64 hash, Args... args) {
+		nativeInit(hash);
+		int dummy[] = { 0, (nativePush(args), 0)... };
+		(void)dummy;
+		return *reinterpret_cast<R *>(nativeCall());
+	}
+};
+
+template <typename... Args>
+struct invoke_helper<void, Args...> {
+	static inline void call(UINT64 hash, Args... args) {
+		nativeInit(hash);
+		int dummy[] = { 0, (nativePush(args), 0)... };
+		(void)dummy;
+		nativeCall();
+	}
+};
+
+template <typename R, typename... Args>
 static inline R invoke(UINT64 hash, Args... args)
 {
-	nativeInit(hash);
-	int dummy[] = { 0, (nativePush(args), 0)... };
-	(void)dummy;
-	return *reinterpret_cast<R *>(nativeCall());
+	return invoke_helper<R, Args...>::call(hash, args...);
 }
