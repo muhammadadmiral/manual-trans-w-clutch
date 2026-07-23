@@ -1,10 +1,8 @@
 #include "sdk/inc/main.h"
 #include "sdk/inc/natives.h"
-#include "src/AOBScanner.h"
 #include "src/VehicleData.h"
 #include <stdio.h>
 #include <windows.h>
-
 
 void ShowNotification(const char *message) {
   HUD::BEGIN_TEXT_COMMAND_THEFEED_POST("STRING");
@@ -23,15 +21,15 @@ void DrawTextOverlay(const char *text, float x, float y) {
 }
 
 bool IsValidVehicle(Vehicle veh) {
-    int vehClass = VEHICLE::GET_VEHICLE_CLASS(veh);
-    if (vehClass == 14 || vehClass == 15 || vehClass == 16 || vehClass == 21) {
-        return false;
-    }
-    int maxGear = VEHICLE::_GET_VEHICLE_MAX_DRIVE_GEAR_COUNT(veh);
-    if (maxGear <= 1) {
-        return false;
-    }
-    return true;
+  int vehClass = VEHICLE::GET_VEHICLE_CLASS(veh);
+  if (vehClass == 14 || vehClass == 15 || vehClass == 16 || vehClass == 21) {
+    return false;
+  }
+  int maxGear = VEHICLE::_GET_VEHICLE_MAX_DRIVE_GEAR_COUNT(veh);
+  if (maxGear <= 1) {
+    return false;
+  }
+  return true;
 }
 
 void ScriptMain() {
@@ -41,9 +39,11 @@ void ScriptMain() {
   char iniPath[MAX_PATH];
   GetCurrentDirectoryA(MAX_PATH, iniPath);
   strcat_s(iniPath, "\\manual-trans.ini");
-  
-  int keyShiftUp = GetPrivateProfileIntA("Controls", "ShiftUp", VK_LSHIFT, iniPath);
-  int keyShiftDown = GetPrivateProfileIntA("Controls", "ShiftDown", VK_LCONTROL, iniPath);
+
+  int keyShiftUp =
+      GetPrivateProfileIntA("Controls", "ShiftUp", VK_LSHIFT, iniPath);
+  int keyShiftDown =
+      GetPrivateProfileIntA("Controls", "ShiftDown", VK_LCONTROL, iniPath);
 
   uint8_t manualGear = 1;
   bool shiftUpPressed = false;
@@ -65,10 +65,12 @@ void ScriptMain() {
           bool isDown = (GetAsyncKeyState(keyShiftDown) & 0x8000) != 0;
 
           if (isUp && !shiftUpPressed) {
-              if (manualGear < maxGear) manualGear++;
+            if (manualGear < maxGear)
+              manualGear++;
           }
           if (isDown && !shiftDownPressed) {
-              if (manualGear > 0) manualGear--;
+            if (manualGear > 0)
+              manualGear--;
           }
 
           shiftUpPressed = isUp;
@@ -78,7 +80,8 @@ void ScriptMain() {
           vData.SetNextGear(manualGear);
 
           char debugText[128];
-          sprintf_s(debugText, "Gear: %d | RPM: %.2f", manualGear, vData.GetRPM());
+          sprintf_s(debugText, "Gear: %d | RPM: %.2f", manualGear,
+                    vData.GetRPM());
           DrawTextOverlay(debugText, 0.1f, 0.8f);
         }
       }
