@@ -17,11 +17,11 @@
       <Configuration>Release</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-  </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="src\AOBScanner.cpp" />
-    <ClCompile Include="src\VehicleData.cpp" />
+    <ClCompile Include="src\Memory\AOBScanner.cpp" />
+    <ClCompile Include="src\Vehicle\VehicleData.cpp" />
+    <ClCompile Include="src\Core\Config.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>

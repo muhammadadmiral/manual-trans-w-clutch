@@ -1,9 +1,9 @@
 #include "sdk/inc/main.h"
 #include "sdk/inc/natives.h"
-#include "src/VehicleData.h"
+#include "src/Vehicle/VehicleData.h"
+#include "src/Core/Config.h"
 
 #include <Windows.h>
-#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -26,18 +26,6 @@ void DrawTextOverlay(const char* text, float x, float y) {
     HUD::BEGIN_TEXT_COMMAND_DISPLAY_TEXT("STRING");
     HUD::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME(text);
     HUD::END_TEXT_COMMAND_DISPLAY_TEXT(x, y, 0);
-}
-
-bool BuildIniPath(char (&path)[MAX_PATH]) {
-    DWORD length = GetModuleFileNameA(g_pluginModule, path, MAX_PATH);
-    if (length == 0 || length >= MAX_PATH) return false;
-
-    char* slash = std::strrchr(path, '\\');
-    if (slash == nullptr) slash = std::strrchr(path, '/');
-    if (slash == nullptr) return false;
-    *slash = '\0';
-
-    return strcat_s(path, "\\manual-trans.ini") == 0;
 }
 
 bool IsValidVehicle(Vehicle vehicle) {
@@ -69,6 +57,8 @@ void ScriptMain() {
             "Manual transmission disabled: CVehicle offsets unresolved.");
         return;
     }
+    
+    Config::ReadConfig(g_pluginModule);
 
     const VehicleOffsets& offsets = VehicleData::GetResolvedOffsets();
     char loadedMessage[192]{};
@@ -77,18 +67,6 @@ void ScriptMain() {
               VehicleData::GetOffsetSourceName(), offsets.Gear,
               offsets.NextGear, offsets.RPM, offsets.Clutch);
     ShowNotification(loadedMessage);
-
-    char iniPath[MAX_PATH]{};
-    const bool hasIniPath = BuildIniPath(iniPath);
-    const int keyShiftUp = hasIniPath
-        ? GetPrivateProfileIntA("Controls", "ShiftUp", VK_LSHIFT, iniPath)
-        : VK_LSHIFT;
-    const int keyShiftDown = hasIniPath
-        ? GetPrivateProfileIntA("Controls", "ShiftDown", VK_LCONTROL,
-                                iniPath)
-        : VK_LCONTROL;
-    const bool debugOverlay = !hasIniPath ||
-        GetPrivateProfileIntA("Debug", "Overlay", 1, iniPath) != 0;
 
     Vehicle activeVehicle = 0;
     uint8_t manualGear = 1;
@@ -138,17 +116,19 @@ void ScriptMain() {
                 : 1;
 
             shiftUpPressed =
-                (GetAsyncKeyState(keyShiftUp) & 0x8000) != 0;
+                (GetAsyncKeyState(Config::KeyShiftUp) & 0x8000) != 0;
             shiftDownPressed =
-                (GetAsyncKeyState(keyShiftDown) & 0x8000) != 0;
+                (GetAsyncKeyState(Config::KeyShiftDown) & 0x8000) != 0;
         }
 
         if (!activeLayoutValidated || !data.IsValid()) continue;
 
         const bool isUp =
-            (GetAsyncKeyState(keyShiftUp) & 0x8000) != 0;
+            (GetAsyncKeyState(Config::KeyShiftUp) & 0x8000) != 0;
         const bool isDown =
-            (GetAsyncKeyState(keyShiftDown) & 0x8000) != 0;
+            (GetAsyncKeyState(Config::KeyShiftDown) & 0x8000) != 0;
+        const bool isClutch =
+            (GetAsyncKeyState(Config::KeyClutch) & 0x8000) != 0;
 
         if (isUp && !shiftUpPressed && manualGear < maxGear) {
             ++manualGear;
@@ -160,6 +140,13 @@ void ScriptMain() {
         shiftUpPressed = isUp;
         shiftDownPressed = isDown;
 
+        // --- Clutch Logic ---
+        if (isClutch) {
+            VEHICLE::_SET_VEHICLE_ENGINE_TORQUE_MULTIPLIER(vehicle, 0.0f);
+        } else {
+            VEHICLE::_SET_VEHICLE_ENGINE_TORQUE_MULTIPLIER(vehicle, 1.0f);
+        }
+
         const bool writeSucceeded =
             data.SetGear(manualGear) && data.SetNextGear(manualGear);
         if (!writeSucceeded) {
@@ -168,14 +155,14 @@ void ScriptMain() {
             continue;
         }
 
-        if (debugOverlay) {
+        if (Config::DebugOverlay) {
             char debugText[192]{};
             sprintf_s(debugText,
-                      "Gear %u/%d | game %u -> %u | RPM %.3f | %s",
+                      "Gear %u/%d | game %u -> %u | RPM %.3f | Clutch: %s",
                       static_cast<unsigned>(manualGear), maxGear,
                       static_cast<unsigned>(data.GetGear()),
                       static_cast<unsigned>(data.GetNextGear()),
-                      data.GetRPM(), VehicleData::GetOffsetSourceName());
+                      data.GetRPM(), isClutch ? "ON" : "OFF");
             DrawTextOverlay(debugText, 0.02f, 0.80f);
         }
     }

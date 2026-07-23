@@ -1,7 +1,7 @@
 #include "VehicleData.h"
 
-#include "AOBScanner.h"
-#include "../sdk/inc/main.h"
+#include "../Memory/AOBScanner.h"
+#include "../../sdk/inc/main.h"
 
 #define NOMINMAX
 #include <Windows.h>
@@ -94,7 +94,7 @@ uint32_t ReadHexOffset(const char* iniPath, const char* key) {
     char* end = nullptr;
     const unsigned long value = std::strtoul(buffer, &end, 0);
     if (end == buffer || *end != '\0' ||
-        value > std::numeric_limits<uint32_t>::max()) {
+        value > (std::numeric_limits<uint32_t>::max)()) {
         return 0;
     }
 
