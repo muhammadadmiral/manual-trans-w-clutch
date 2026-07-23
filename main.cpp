@@ -29,12 +29,25 @@ void DrawTextOverlay(const char *text, float x, float y) {
 }
 
 bool IsValidVehicle(Vehicle vehicle) {
-  const int vehicleClass = VEHICLE::GET_VEHICLE_CLASS(vehicle);
-  if (vehicleClass == 14 || vehicleClass == 15 || vehicleClass == 16 ||
-      vehicleClass == 21) {
+  const Hash model = ENTITY::GET_ENTITY_MODEL(vehicle);
+
+  // Vehicle types that never have a player-shiftable manual gearbox.
+  if (VEHICLE::IS_THIS_MODEL_A_PLANE(model) ||
+      VEHICLE::IS_THIS_MODEL_A_HELI(model) ||
+      VEHICLE::IS_THIS_MODEL_A_BOAT(model) ||
+      VEHICLE::IS_THIS_MODEL_A_JETSKI(model) ||
+      VEHICLE::IS_THIS_MODEL_A_TRAIN(model) ||
+      VEHICLE::IS_THIS_MODEL_A_BICYCLE(model)) {
     return false;
   }
 
+  if (!Config::AllowQuadbikes && VEHICLE::IS_THIS_MODEL_A_QUADBIKE(model)) {
+    return false;
+  }
+
+  // Vehicles that only have a single drive gear are effectively automatic
+  // (scooters, some quads, etc.) - there's nothing to shift manually, so
+  // this is what actually auto-detects "matic" cars/bikes.
   return VEHICLE::_GET_VEHICLE_MAX_DRIVE_GEAR_COUNT(vehicle) > 1;
 }
 
@@ -53,8 +66,10 @@ void ScriptMain() {
   scriptWait(2000);
 
   if (!VehicleData::Initialize(g_pluginModule)) {
-    ShowNotification(
-        "Manual transmission disabled: CVehicle offsets unresolved.");
+    char failMessage[256]{};
+    sprintf_s(failMessage, "Manual transmission disabled: %s",
+              VehicleData::GetLastFailureReason());
+    ShowNotification(failMessage);
     return;
   }
 
@@ -131,7 +146,14 @@ void ScriptMain() {
     shiftDownPressed = isDown;
 
     // --- Clutch Logic ---
-    if (isClutch) {
+    // Prefer writing the real clutch value (0 = engaged, 1 = disengaged) so
+    // RPM/wheelspin behaves like an actual clutch. If that offset isn't
+    // writable for some reason, fall back to the power-cheat trick, which is
+    // cruder (kills power outright) but still stops the car from lurching.
+    const float clutchTarget = isClutch ? 1.0f : 0.0f;
+    if (Config::UseRealClutch && data.SetClutch(clutchTarget)) {
+      VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, 1.0f);
+    } else if (isClutch) {
       VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, 0.0f);
     } else {
       VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, 1.0f);
@@ -146,12 +168,15 @@ void ScriptMain() {
     }
 
     if (Config::DebugOverlay) {
-      char debugText[192]{};
-      sprintf_s(debugText, "Gear %u/%d | game %u -> %u | RPM %.3f | Clutch: %s",
-                static_cast<unsigned>(manualGear), maxGear,
-                static_cast<unsigned>(data.GetGear()),
-                static_cast<unsigned>(data.GetNextGear()), data.GetRPM(),
-                isClutch ? "ON" : "OFF");
+      char debugText[256]{};
+      sprintf_s(
+          debugText,
+          "Gear %u/%d | game %u -> %u | RPM %.3f | Clutch %.2f (%s) | Src: %s",
+          static_cast<unsigned>(manualGear), maxGear,
+          static_cast<unsigned>(data.GetGear()),
+          static_cast<unsigned>(data.GetNextGear()), data.GetRPM(),
+          data.GetClutch(), isClutch ? "held" : "released",
+          VehicleData::GetOffsetSourceName());
       DrawTextOverlay(debugText, 0.02f, 0.80f);
     }
   }

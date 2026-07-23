@@ -2,26 +2,36 @@
 #include <cstring>
 
 namespace Config {
-    int KeyShiftUp = VK_LSHIFT;
-    int KeyShiftDown = VK_LCONTROL;
-    int KeyClutch = 0x58; // 'X' key
-    bool DebugOverlay = true;
+int KeyShiftUp = VK_LSHIFT;
+int KeyShiftDown = VK_LCONTROL;
+int KeyClutch = 0x58; // 'X' key
+bool DebugOverlay = true;
+bool AllowQuadbikes = true;
+bool UseRealClutch = true;
 
-    void ReadConfig(HMODULE module) {
-        char iniPath[MAX_PATH];
-        DWORD length = GetModuleFileNameA(module, iniPath, MAX_PATH);
-        if (length == 0 || length >= MAX_PATH) return;
+void ReadConfig(HMODULE module) {
+  char iniPath[MAX_PATH];
+  DWORD length = GetModuleFileNameA(module, iniPath, MAX_PATH);
+  if (length == 0 || length >= MAX_PATH)
+    return;
 
-        char* slash = std::strrchr(iniPath, '\\');
-        if (!slash) slash = std::strrchr(iniPath, '/');
-        if (!slash) return;
-        *slash = '\0';
-        
-        strcat_s(iniPath, "\\manual-trans.ini");
+  char *slash = std::strrchr(iniPath, '\\');
+  if (!slash)
+    slash = std::strrchr(iniPath, '/');
+  if (!slash)
+    return;
+  *slash = '\0';
 
-        KeyShiftUp = GetPrivateProfileIntA("Controls", "ShiftUp", VK_LSHIFT, iniPath);
-        KeyShiftDown = GetPrivateProfileIntA("Controls", "ShiftDown", VK_LCONTROL, iniPath);
-        KeyClutch = GetPrivateProfileIntA("Controls", "ClutchKey", 0x58, iniPath);
-        DebugOverlay = GetPrivateProfileIntA("Debug", "Overlay", 1, iniPath) != 0;
-    }
+  strcat_s(iniPath, "\\manual-trans.ini");
+
+  KeyShiftUp = GetPrivateProfileIntA("Controls", "ShiftUp", VK_LSHIFT, iniPath);
+  KeyShiftDown =
+      GetPrivateProfileIntA("Controls", "ShiftDown", VK_LCONTROL, iniPath);
+  KeyClutch = GetPrivateProfileIntA("Controls", "ClutchKey", 0x58, iniPath);
+  DebugOverlay = GetPrivateProfileIntA("Debug", "Overlay", 1, iniPath) != 0;
+  AllowQuadbikes =
+      GetPrivateProfileIntA("Vehicles", "AllowQuadbikes", 1, iniPath) != 0;
+  UseRealClutch =
+      GetPrivateProfileIntA("Vehicles", "UseRealClutch", 1, iniPath) != 0;
 }
+} // namespace Config
