@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="src\AOBScanner.cpp" />
     <ClCompile Include="src\VehicleData.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
