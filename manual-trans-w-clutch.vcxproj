@@ -23,6 +23,10 @@
     <ClCompile Include="src\Memory\AOBScanner.cpp" />
     <ClCompile Include="src\Vehicle\VehicleData.cpp" />
     <ClCompile Include="src\Core\Config.cpp" />
+    <ClCompile Include="src\Core\Menu.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\Core\Menu.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>

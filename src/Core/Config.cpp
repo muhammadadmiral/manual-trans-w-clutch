@@ -73,11 +73,16 @@ void ReadConfig(HMODULE module) {
   KeyShiftDown =
       GetPrivateProfileIntA("Controls", "ShiftDown", VK_LCONTROL, iniPath);
   KeyClutch = GetPrivateProfileIntA("Controls", "ClutchKey", 0x58, iniPath);
+  KeyEngine = GetPrivateProfileIntA("Controls", "EngineKey", 90, iniPath);
+  KeyMenu = GetPrivateProfileIntA("Controls", "MenuKey", 219, iniPath);
+
   DebugOverlay = GetPrivateProfileIntA("Debug", "Overlay", 1, iniPath) != 0;
   AllowQuadbikes =
       GetPrivateProfileIntA("Vehicles", "AllowQuadbikes", 1, iniPath) != 0;
   UseRealClutch =
       GetPrivateProfileIntA("Vehicles", "UseRealClutch", 1, iniPath) != 0;
+  RequireColdStart =
+      GetPrivateProfileIntA("Vehicles", "RequireColdStart", 1, iniPath) != 0;
 
   char excludedClassesBuffer[128]{};
   GetPrivateProfileStringA("Vehicles", "ExcludedClasses", "",

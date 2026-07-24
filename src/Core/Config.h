@@ -7,6 +7,8 @@ namespace Config {
 extern int KeyShiftUp;
 extern int KeyShiftDown;
 extern int KeyClutch;
+extern int KeyEngine;
+extern int KeyMenu;
 extern bool DebugOverlay;
 
 // Set false to disable manual shifting on quadbikes even if they report
@@ -18,6 +20,9 @@ extern bool AllowQuadbikes;
 // SET_VEHICLE_CHEAT_POWER_INCREASE trick if the offset isn't writable.
 // Set false to always use the cheat-power trick.
 extern bool UseRealClutch;
+
+// Require turning on the engine (via KeyEngine) when entering a vehicle.
+extern bool RequireColdStart;
 
 // Extra VEHICLE::GET_VEHICLE_CLASS() ids to treat as automatic-only, on
 // top of the hard-coded plane/heli/boat/jetski/train/bicycle checks in

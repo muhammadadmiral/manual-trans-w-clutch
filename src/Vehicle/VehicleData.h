@@ -3,6 +3,7 @@
 #include <Windows.h>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 struct VehicleOffsets {
   uint32_t Gear = 0;
@@ -13,12 +14,27 @@ struct VehicleOffsets {
   bool IsComplete() const;
 };
 
-enum class VehicleOffsetSource { Uninitialized, PatternScan, IniFallback };
+enum class VehicleOffsetSource { Uninitialized, PatternScan, IniFallback, Calibration };
+
+enum class CalibrationState {
+    None,
+    WaitingForEngineOff,
+    ScanningEngineOff,
+    WaitingForEngineOn,
+    ScanningEngineOn,
+    WaitingForRev,
+    ScanningRev,
+    Done,
+    Failed
+};
 
 class VehicleData {
 public:
   // Call once after ScriptHookV has initialized the script thread.
   static bool Initialize(HMODULE pluginModule);
+  static void ResetCalibration();
+  static void UpdateCalibration(HMODULE pluginModule, int vehicleHandle, bool isEngineOn, bool isRevving);
+  static CalibrationState GetCalibrationState();
   static bool IsInitialized();
   static VehicleOffsetSource GetOffsetSource();
   static const char *GetOffsetSourceName();
@@ -61,7 +77,12 @@ private:
 
   static bool ResolveOffsetsByPattern(VehicleOffsets &result);
   static bool LoadOffsetsFromIni(HMODULE pluginModule, VehicleOffsets &result);
+  static void SaveOffsetsToIni(HMODULE pluginModule, const VehicleOffsets &offsets);
   static bool AreOffsetsSane(const VehicleOffsets &value);
+
+  // Calibration state
+  static CalibrationState calibState;
+  static std::vector<uint32_t> candidateOffsets;
 
   bool CanRead(uint32_t offset, size_t size) const;
   bool CanWrite(uint32_t offset, size_t size) const;

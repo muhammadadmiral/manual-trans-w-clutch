@@ -1,6 +1,8 @@
+#define NOMINMAX
 #include "sdk/inc/main.h"
 #include "sdk/inc/natives.h"
 #include "src/Core/Config.h"
+#include "src/Core/Menu.h"
 #include "src/Vehicle/VehicleData.h"
 
 #include <Windows.h>
@@ -166,14 +168,20 @@ void ScriptMain() {
   bool shiftUpPressed = false;
   bool shiftDownPressed = false;
 
+  bool engineOnEdges = false;
+  bool isEngineOn = true;
+
   while (true) {
     scriptWait(0);
+    Menu::Update();
 
     const Ped playerPed = PLAYER::PLAYER_PED_ID();
     if (!PED::IS_PED_IN_ANY_VEHICLE(playerPed, FALSE)) {
       activeVehicle = 0;
       activeLayoutValidated = false;
       ResetInputEdges(shiftUpPressed, shiftDownPressed);
+      engineOnEdges = false;
+      Menu::Draw();
       continue;
     }
 
@@ -182,32 +190,68 @@ void ScriptMain() {
       activeVehicle = 0;
       activeLayoutValidated = false;
       ResetInputEdges(shiftUpPressed, shiftDownPressed);
+      Menu::Draw();
       continue;
     }
 
     const int maxGear = VEHICLE::_GET_VEHICLE_MAX_DRIVE_GEAR_COUNT(vehicle);
     VehicleData data(vehicle);
+    isEngineOn = VEHICLE::GET_IS_VEHICLE_ENGINE_RUNNING(vehicle) != 0;
 
     if (vehicle != activeVehicle) {
       activeVehicle = vehicle;
       activeLayoutValidated = data.HasPlausibleLayout(maxGear);
-
-      if (!activeLayoutValidated) {
-        ShowNotification("CVehicle validation failed. Memory writes blocked.");
-        ResetInputEdges(shiftUpPressed, shiftDownPressed);
-        continue;
+      
+      if (Config::RequireColdStart) {
+          VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
+          isEngineOn = false;
       }
 
-      const uint8_t detectedGear = data.GetGear();
-      manualGear =
-          detectedGear >= 1 && detectedGear <= maxGear ? detectedGear : 1;
-
+      if (!activeLayoutValidated && VehicleData::IsInitialized()) {
+        ShowNotification("CVehicle validation failed. Memory writes blocked.");
+        ResetInputEdges(shiftUpPressed, shiftDownPressed);
+      } else {
+        const uint8_t detectedGear = data.GetGear();
+        manualGear = detectedGear >= 1 && detectedGear <= maxGear ? detectedGear : 1;
+      }
       shiftUpPressed = (GetAsyncKeyState(Config::KeyShiftUp) & 0x8000) != 0;
       shiftDownPressed = (GetAsyncKeyState(Config::KeyShiftDown) & 0x8000) != 0;
+      engineOnEdges = (GetAsyncKeyState(Config::KeyEngine) & 0x8000) != 0;
     }
 
-    if (!activeLayoutValidated || !data.IsValid())
+    const bool engineKey = (GetAsyncKeyState(Config::KeyEngine) & 0x8000) != 0;
+    if (engineKey && !engineOnEdges) {
+        isEngineOn = !isEngineOn;
+        VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, isEngineOn ? TRUE : FALSE, FALSE, TRUE);
+    }
+    engineOnEdges = engineKey;
+
+    if (!VehicleData::IsInitialized()) {
+        const bool isRevving = GetControlNormal(kInputGroupVehicle, kControlVehicleAccelerate) > 0.5f;
+        VehicleData::UpdateCalibration(g_pluginModule, vehicle, isEngineOn, isRevving);
+        
+        CalibrationState state = VehicleData::GetCalibrationState();
+        std::string calibMsg = "Calibration: ";
+        switch (state) {
+            case CalibrationState::WaitingForEngineOff: calibMsg += "Turn off engine (press " + std::string(1, (char)Config::KeyEngine) + ")"; break;
+            case CalibrationState::ScanningEngineOff: calibMsg += "Scanning..."; break;
+            case CalibrationState::WaitingForEngineOn: calibMsg += "Turn ON engine and idle"; break;
+            case CalibrationState::ScanningEngineOn: calibMsg += "Scanning..."; break;
+            case CalibrationState::WaitingForRev: calibMsg += "Rev the engine (Hold W)"; break;
+            case CalibrationState::ScanningRev: calibMsg += "Scanning..."; break;
+            case CalibrationState::Done: calibMsg += "Success! Offsets saved."; break;
+            case CalibrationState::Failed: calibMsg += "Failed. Try again."; break;
+            default: break;
+        }
+        DrawTextOverlay(calibMsg.c_str(), 0.5f, 0.1f, 0.6f);
+        Menu::Draw();
+        continue;
+    }
+
+    if (!activeLayoutValidated || !data.IsValid()) {
+      Menu::Draw();
       continue;
+    }
 
     const bool isUp = (GetAsyncKeyState(Config::KeyShiftUp) & 0x8000) != 0;
     const bool isDown = (GetAsyncKeyState(Config::KeyShiftDown) & 0x8000) != 0;
@@ -242,6 +286,7 @@ void ScriptMain() {
     if (!writeSucceeded) {
       activeLayoutValidated = false;
       ShowNotification("CVehicle write failed. Writes stopped.");
+      Menu::Draw();
       continue;
     }
 
@@ -286,6 +331,8 @@ void ScriptMain() {
       DrawBar(barX, y, barWidth, barHeight, brakeFraction, 220, 90, 220,
               "BRAKE");
     }
+    
+    Menu::Draw();
   }
 }
 

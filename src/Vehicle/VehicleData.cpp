@@ -21,6 +21,9 @@ VehicleOffsetSource VehicleData::offsetSource =
 bool VehicleData::initialized = false;
 const char *VehicleData::lastFailureReason = "not initialized";
 
+CalibrationState VehicleData::calibState = CalibrationState::None;
+std::vector<uint32_t> VehicleData::candidateOffsets;
+
 namespace {
 
 constexpr char kGearPattern[] = "A8 02 0F 84 ? ? ? ? 0F B7 86";
@@ -274,8 +277,36 @@ bool VehicleData::LoadOffsetsFromIni(HMODULE pluginModule,
 
   if (!AreOffsetsSane(candidate))
     return false;
+
   result = candidate;
   return true;
+}
+
+void VehicleData::SaveOffsetsToIni(HMODULE pluginModule, const VehicleOffsets &offsets) {
+  char iniPath[MAX_PATH]{};
+  if (!BuildIniPath(pluginModule, iniPath))
+    return;
+
+  const std::string buildVersion = GetGameBuildVersion();
+  std::string sectionName = "Offsets";
+  if (!buildVersion.empty()) {
+    sectionName += "." + buildVersion;
+  }
+
+  char buffer[32]{};
+  sprintf_s(buffer, "0x%X", offsets.Gear);
+  WritePrivateProfileStringA(sectionName.c_str(), "Gear", buffer, iniPath);
+
+  sprintf_s(buffer, "0x%X", offsets.NextGear);
+  WritePrivateProfileStringA(sectionName.c_str(), "NextGear", buffer, iniPath);
+
+  sprintf_s(buffer, "0x%X", offsets.Clutch);
+  WritePrivateProfileStringA(sectionName.c_str(), "Clutch", buffer, iniPath);
+
+  sprintf_s(buffer, "0x%X", offsets.RPM);
+  WritePrivateProfileStringA(sectionName.c_str(), "RPM", buffer, iniPath);
+  
+  WritePrivateProfileStringA("Memory", "AllowIniFallback", "1", iniPath);
 }
 
 bool VehicleData::Initialize(HMODULE pluginModule) {
@@ -304,19 +335,105 @@ bool VehicleData::Initialize(HMODULE pluginModule) {
         hasIniPath
             ? "AOB failed; INI fallback disabled (set AllowIniFallback=1)"
             : "AOB failed; INI path unresolved";
-  } else if (LoadOffsetsFromIni(pluginModule, candidate)) {
-    resolvedOffsets = candidate;
-    offsetSource = VehicleOffsetSource::IniFallback;
-    initialized = true;
-    return true;
-  } else {
-    lastFailureReason = "AOB failed; INI offsets missing/invalid";
+    if (allowFallback && LoadOffsetsFromIni(pluginModule, candidate)) {
+      resolvedOffsets = candidate;
+      offsetSource = VehicleOffsetSource::IniFallback;
+      initialized = true;
+      return true;
+    }
   }
 
   resolvedOffsets = {};
   offsetSource = VehicleOffsetSource::Uninitialized;
   initialized = false;
+  
+  if (calibState == CalibrationState::None) {
+      calibState = CalibrationState::WaitingForEngineOff;
+  }
   return false;
+}
+
+void VehicleData::ResetCalibration() {
+    calibState = CalibrationState::WaitingForEngineOff;
+    candidateOffsets.clear();
+    resolvedOffsets = {};
+    initialized = false;
+    offsetSource = VehicleOffsetSource::Uninitialized;
+}
+
+CalibrationState VehicleData::GetCalibrationState() {
+    return calibState;
+}
+
+void VehicleData::UpdateCalibration(HMODULE pluginModule, int vehicleHandle, bool isEngineOn, bool isRevving) {
+    if (initialized || calibState == CalibrationState::None || calibState == CalibrationState::Done || calibState == CalibrationState::Failed) return;
+
+    BYTE* base = getScriptHandleBaseAddress(vehicleHandle);
+    if (!base) return;
+
+    if (calibState == CalibrationState::WaitingForEngineOff) {
+        if (!isEngineOn) {
+            calibState = CalibrationState::ScanningEngineOff;
+        }
+    } else if (calibState == CalibrationState::ScanningEngineOff) {
+        candidateOffsets.clear();
+        for (uint32_t offset = 0x700; offset < 0xA00; offset += 4) {
+            if (AOBScanner::IsReadable(reinterpret_cast<uintptr_t>(base) + offset, 4)) {
+                float val = *reinterpret_cast<float*>(base + offset);
+                if (val == 0.0f) {
+                    candidateOffsets.push_back(offset);
+                }
+            }
+        }
+        calibState = CalibrationState::WaitingForEngineOn;
+    } else if (calibState == CalibrationState::WaitingForEngineOn) {
+        if (isEngineOn) {
+            calibState = CalibrationState::ScanningEngineOn;
+        }
+    } else if (calibState == CalibrationState::ScanningEngineOn) {
+        std::vector<uint32_t> nextCandidates;
+        for (uint32_t offset : candidateOffsets) {
+            float val = *reinterpret_cast<float*>(base + offset);
+            if (val > 0.1f && val < 0.3f) {
+                nextCandidates.push_back(offset);
+            }
+        }
+        candidateOffsets = nextCandidates;
+        calibState = CalibrationState::WaitingForRev;
+    } else if (calibState == CalibrationState::WaitingForRev) {
+        if (isRevving) {
+            calibState = CalibrationState::ScanningRev;
+        }
+    } else if (calibState == CalibrationState::ScanningRev) {
+        std::vector<uint32_t> nextCandidates;
+        for (uint32_t offset : candidateOffsets) {
+            float val = *reinterpret_cast<float*>(base + offset);
+            if (val > 0.4f && val <= 1.2f) { // RPM increases
+                nextCandidates.push_back(offset);
+            }
+        }
+        candidateOffsets = nextCandidates;
+        
+        if (candidateOffsets.size() == 1) {
+            resolvedOffsets.RPM = candidateOffsets[0];
+            resolvedOffsets.Clutch = resolvedOffsets.RPM + 12; // Typical GTA V memory layout
+            resolvedOffsets.Gear = resolvedOffsets.RPM - 36;
+            resolvedOffsets.NextGear = resolvedOffsets.Gear - 2;
+
+            if (AreOffsetsSane(resolvedOffsets)) {
+                SaveOffsetsToIni(pluginModule, resolvedOffsets);
+                offsetSource = VehicleOffsetSource::Calibration;
+                initialized = true;
+                calibState = CalibrationState::Done;
+            } else {
+                calibState = CalibrationState::Failed;
+                lastFailureReason = "Calibration found invalid offset layout";
+            }
+        } else if (candidateOffsets.empty()) {
+            calibState = CalibrationState::Failed;
+            lastFailureReason = "Calibration failed to find unique RPM offset";
+        }
+    }
 }
 
 bool VehicleData::IsInitialized() { return initialized; }
