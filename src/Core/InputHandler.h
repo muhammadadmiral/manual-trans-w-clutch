@@ -3,7 +3,7 @@
 namespace InputHandler {
 
 void Update();
-void ApplyGameControls();
+void ApplyGameControls(int manualGear);
 void ResetEdges();
 
 bool IsShiftUpJustPressed();

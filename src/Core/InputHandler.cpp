@@ -61,10 +61,17 @@ void Update() {
     s_smoothedClutch = (std::max)(0.0f, (std::min)(1.0f, s_smoothedClutch));
 }
 
-void ApplyGameControls() {
+void ApplyGameControls(int manualGear) {
     // 71 = Accelerate, 72 = Brake
-    PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, s_smoothedThrottle);
-    PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, s_smoothedBrake);
+    if (manualGear == -1) {
+        // In Reverse: W (Throttle) makes the car go backwards -> game needs Control 72
+        // S (Brake) stops the car -> game needs Control 71
+        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, s_smoothedBrake);
+        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, s_smoothedThrottle);
+    } else {
+        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, s_smoothedThrottle);
+        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, s_smoothedBrake);
+    }
 }
 
 void ResetEdges() {

@@ -150,6 +150,9 @@ void ScriptMain() {
                 isEngineOn = false;
             }
 
+            // Prevent automatic gearbox from shifting by setting a massive shift delay
+            VEHICLE::_SET_MINIMUM_TIME_BETWEEN_GEAR_SHIFTS(vehicle, 99999999);
+
             if (!activeLayoutValidated && VehicleData::IsInitialized()) {
                 Renderer::ShowNotification("CVehicle validation failed. Recalibrating...");
                 InputHandler::ResetEdges();
@@ -207,7 +210,7 @@ void ScriptMain() {
             continue;
         }
 
-        InputHandler::ApplyGameControls();
+        InputHandler::ApplyGameControls(manualGear);
 
         const float vehicleSpeed = ENTITY::GET_ENTITY_SPEED(vehicle);
         const float speedKmH = vehicleSpeed * 3.6f;
