@@ -24,9 +24,15 @@
     <ClCompile Include="src\Vehicle\VehicleData.cpp" />
     <ClCompile Include="src\Core\Config.cpp" />
     <ClCompile Include="src\Core\Menu.cpp" />
+    <ClCompile Include="src\Core\InputHandler.cpp" />
+    <ClCompile Include="src\Core\Renderer.cpp" />
+    <ClCompile Include="src\Vehicle\GearLogic.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Core\Menu.h" />
+    <ClInclude Include="src\Core\InputHandler.h" />
+    <ClInclude Include="src\Core\Renderer.h" />
+    <ClInclude Include="src\Vehicle\GearLogic.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>
