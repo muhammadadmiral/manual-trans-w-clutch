@@ -57,11 +57,11 @@ void DrawBar(float x, float y, float width, float height, float fraction, int r,
   fraction = (std::max)(0.0f, (std::min)(1.0f, fraction));
 
   GRAPHICS::DRAW_RECT(x + width * 0.5f, y + height * 0.5f, width, height, 20,
-                      20, 20, 180);
+                      20, 20, 180, 0);
   if (fraction > 0.0f) {
     const float fillWidth = width * fraction;
     GRAPHICS::DRAW_RECT(x + fillWidth * 0.5f, y + height * 0.5f, fillWidth,
-                        height, r, g, b, 230);
+                        height, r, g, b, 230, 0);
   }
   DrawTextOverlay(label, x, y - 0.018f, 0.28f);
 }
