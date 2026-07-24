@@ -363,6 +363,9 @@ void VehicleData::ResetCalibration() {
 }
 
 CalibrationState VehicleData::GetCalibrationState() { return calibState; }
+size_t VehicleData::GetCalibrationCandidateCount() {
+  return candidateOffsets.size();
+}
 
 void VehicleData::UpdateCalibration(HMODULE pluginModule, int vehicleHandle,
                                     bool isEngineOn, bool isRevving) {
@@ -386,7 +389,8 @@ void VehicleData::UpdateCalibration(HMODULE pluginModule, int vehicleHandle,
       calibState = CalibrationState::ScanningEngineOff;
   } else if (calibState == CalibrationState::ScanningEngineOff) {
     candidateOffsets.clear();
-    for (uint32_t offset = 0x600; offset < 0xC00; offset += 4) {
+    for (uint32_t offset = kCalibScanStart; offset < kCalibScanEnd;
+         offset += 4) {
       if (AOBScanner::IsReadable(calibVehicle.GetAddress() + offset, 4)) {
         float val =
             *reinterpret_cast<float *>(calibVehicle.GetAddress() + offset);
@@ -394,7 +398,17 @@ void VehicleData::UpdateCalibration(HMODULE pluginModule, int vehicleHandle,
           candidateOffsets.push_back(offset);
       }
     }
-    calibState = CalibrationState::WaitingForEngineOn;
+    if (candidateOffsets.empty()) {
+      calibState = CalibrationState::Failed;
+      char msg[160]{};
+      sprintf_s(msg,
+                "0 candidates in 0x%X-0x%X with engine off. Field is outside "
+                "this window - widen kCalibScanStart/End in VehicleData.h.",
+                kCalibScanStart, kCalibScanEnd);
+      lastFailureReason = msg;
+    } else {
+      calibState = CalibrationState::WaitingForEngineOn;
+    }
   } else if (calibState == CalibrationState::WaitingForEngineOn) {
     if (isEngineOn)
       calibState = CalibrationState::ScanningEngineOn;
@@ -412,6 +426,12 @@ void VehicleData::UpdateCalibration(HMODULE pluginModule, int vehicleHandle,
     if (foundIdle) {
       candidateOffsets = nextCandidates;
       calibState = CalibrationState::WaitingForRev;
+    } else {
+      calibState = CalibrationState::Failed;
+      lastFailureReason =
+          "None of the zero-candidates settled into an idle RPM range "
+          "(0.15-0.35) when engine turned on. Try recalibrating and make "
+          "sure the engine is idling steadily before it scans.";
     }
   } else if (calibState == CalibrationState::WaitingForRev) {
     if (isRevving)
@@ -433,66 +453,96 @@ void VehicleData::UpdateCalibration(HMODULE pluginModule, int vehicleHandle,
       if (!candidateOffsets.empty()) {
         resolvedOffsets.RPM = candidateOffsets[0];
         resolvedOffsets.Clutch = resolvedOffsets.RPM + 12;
-        
+
         bool foundGearLayout = false;
         // The gear offset is usually between 0x20 and 0x60 bytes before RPM.
         // We scan backwards to find a valid Gear structure.
-        for (uint32_t offset = resolvedOffsets.RPM - 0x10; offset >= resolvedOffsets.RPM - 0x80; --offset) {
-            if (!AOBScanner::IsReadable(calibVehicle.GetAddress() + offset - 8, 32)) continue;
-            
-            uint8_t gearVal = *reinterpret_cast<uint8_t*>(calibVehicle.GetAddress() + offset);
-            
-            // When revving from standstill, Gear is usually 1 (sometimes 0 if neutral)
-            if (gearVal == 1 || gearVal == 0) {
-                // 1. Test Legacy Layout: NextGear=offset-2, TopGear=offset+4, GearRatios=offset+6
-                uint8_t nextGearLegacy = *reinterpret_cast<uint8_t*>(calibVehicle.GetAddress() + offset - 2);
-                uint8_t topGearLegacy = *reinterpret_cast<uint8_t*>(calibVehicle.GetAddress() + offset + 4);
-                uintptr_t ratiosLegacy = *reinterpret_cast<uintptr_t*>(calibVehicle.GetAddress() + offset + 6);
+        for (uint32_t offset = resolvedOffsets.RPM - 0x10;
+             offset >= resolvedOffsets.RPM - 0x80; --offset) {
+          if (!AOBScanner::IsReadable(calibVehicle.GetAddress() + offset - 8,
+                                      32))
+            continue;
 
-                if ((nextGearLegacy == 0 || nextGearLegacy == 1 || nextGearLegacy == 2) &&
-                    (topGearLegacy >= 4 && topGearLegacy <= 9) &&
-                    ratiosLegacy > 0x10000000 &&
-                    AOBScanner::IsReadable(ratiosLegacy, 4)) {
-                    
-                    resolvedOffsets.Gear = offset;
-                    resolvedOffsets.NextGear = offset - 2;
-                    resolvedOffsets.TopGear = offset + 4;
-                    resolvedOffsets.GearRatios = offset + 6;
-                    foundGearLayout = true;
-                    break;
-                }
+          uint8_t gearVal =
+              *reinterpret_cast<uint8_t *>(calibVehicle.GetAddress() + offset);
 
-                // 2. Test Enhanced Layout: NextGear=offset+2, TopGear=offset+6, GearRatios=offset+8
-                uint8_t nextGearEnhanced = *reinterpret_cast<uint8_t*>(calibVehicle.GetAddress() + offset + 2);
-                uint8_t topGearEnhanced = *reinterpret_cast<uint8_t*>(calibVehicle.GetAddress() + offset + 6);
-                uintptr_t ratiosEnhanced = *reinterpret_cast<uintptr_t*>(calibVehicle.GetAddress() + offset + 8);
+          // When revving from standstill, Gear is usually 1 (sometimes 0 if
+          // neutral)
+          if (gearVal == 1 || gearVal == 0) {
+            // 1. Test Legacy Layout: NextGear=offset-2, TopGear=offset+4,
+            // GearRatios=offset+6
+            uint8_t nextGearLegacy = *reinterpret_cast<uint8_t *>(
+                calibVehicle.GetAddress() + offset - 2);
+            uint8_t topGearLegacy = *reinterpret_cast<uint8_t *>(
+                calibVehicle.GetAddress() + offset + 4);
+            uintptr_t ratiosLegacy = *reinterpret_cast<uintptr_t *>(
+                calibVehicle.GetAddress() + offset + 6);
 
-                if ((nextGearEnhanced == 0 || nextGearEnhanced == 1 || nextGearEnhanced == 2) &&
-                    (topGearEnhanced >= 4 && topGearEnhanced <= 9) &&
-                    ratiosEnhanced > 0x10000000 &&
-                    AOBScanner::IsReadable(ratiosEnhanced, 4)) {
-                    
-                    resolvedOffsets.Gear = offset;
-                    resolvedOffsets.NextGear = offset + 2;
-                    resolvedOffsets.TopGear = offset + 6;
-                    resolvedOffsets.GearRatios = offset + 8;
-                    foundGearLayout = true;
-                    break;
-                }
+            if ((nextGearLegacy == 0 || nextGearLegacy == 1 ||
+                 nextGearLegacy == 2) &&
+                (topGearLegacy >= 4 && topGearLegacy <= 9) &&
+                ratiosLegacy > 0x10000000 &&
+                AOBScanner::IsReadable(ratiosLegacy, 4)) {
+
+              resolvedOffsets.Gear = offset;
+              resolvedOffsets.NextGear = offset - 2;
+              resolvedOffsets.TopGear = offset + 4;
+              resolvedOffsets.GearRatios = offset + 6;
+              foundGearLayout = true;
+              break;
             }
+
+            // 2. Test Enhanced Layout: NextGear=offset+2, TopGear=offset+6,
+            // GearRatios=offset+8
+            uint8_t nextGearEnhanced = *reinterpret_cast<uint8_t *>(
+                calibVehicle.GetAddress() + offset + 2);
+            uint8_t topGearEnhanced = *reinterpret_cast<uint8_t *>(
+                calibVehicle.GetAddress() + offset + 6);
+            uintptr_t ratiosEnhanced = *reinterpret_cast<uintptr_t *>(
+                calibVehicle.GetAddress() + offset + 8);
+
+            if ((nextGearEnhanced == 0 || nextGearEnhanced == 1 ||
+                 nextGearEnhanced == 2) &&
+                (topGearEnhanced >= 4 && topGearEnhanced <= 9) &&
+                ratiosEnhanced > 0x10000000 &&
+                AOBScanner::IsReadable(ratiosEnhanced, 4)) {
+
+              resolvedOffsets.Gear = offset;
+              resolvedOffsets.NextGear = offset + 2;
+              resolvedOffsets.TopGear = offset + 6;
+              resolvedOffsets.GearRatios = offset + 8;
+              foundGearLayout = true;
+              break;
+            }
+          }
         }
 
-        if (foundGearLayout) {
-            calibState = CalibrationState::Done;
-            initialized = true;
-            SaveOffsetsToIni(pluginModule, resolvedOffsets);
+        if (foundGearLayout && AreOffsetsSane(resolvedOffsets)) {
+          calibState = CalibrationState::Done;
+          initialized = true;
+          SaveOffsetsToIni(pluginModule, resolvedOffsets);
+        } else if (foundGearLayout) {
+          // Layout matched the Legacy/Enhanced shape check, but the final
+          // numbers still don't pass the same sanity bounds AOB/INI offsets
+          // must pass. Treat it as a failure instead of silently arming a
+          // bad offset set that will just get rejected every frame by
+          // HasPlausibleLayout() later.
+          resolvedOffsets.Gear = 0;
+          resolvedOffsets.NextGear = 0;
+          calibState = CalibrationState::Failed;
+          lastFailureReason =
+              "Gear layout matched a known shape but failed the general "
+              "sanity check (offset too small/large or fields too far "
+              "apart). Recalibrate, or if it repeats, this build's layout "
+              "may need a 3rd pattern added to the Legacy/Enhanced test.";
         } else {
-            resolvedOffsets.Gear = 0;
-            resolvedOffsets.NextGear = 0;
-            calibState = CalibrationState::Failed;
-            lastFailureReason =
-                "RPM/Clutch located OK, but Gear/NextGear can't be safely "
-                "guessed. Tested Legacy & Enhanced memory structures but pointer validation failed. Add offsets to ini manually.";
+          resolvedOffsets.Gear = 0;
+          resolvedOffsets.NextGear = 0;
+          calibState = CalibrationState::Failed;
+          lastFailureReason =
+              "RPM/Clutch located OK, but Gear/NextGear can't be safely "
+              "guessed. Tested Legacy & Enhanced memory structures but pointer "
+              "validation failed. Add offsets to ini manually.";
         }
       } else {
         calibState = CalibrationState::Failed;

@@ -179,10 +179,11 @@ void ScriptMain() {
       TractionControl::Reset();
       TurboSystem::Reset();
       TurboSystem::InitializeForVehicle(vehicle);
-      
-      if (TelemetryLogger::IsLogging()) TelemetryLogger::StopSession();
+
+      if (TelemetryLogger::IsLogging())
+        TelemetryLogger::StopSession();
       TelemetryLogger::StartSession(std::to_string(vehicle));
-      
+
       s_vehicleEnterTime = GetTickCount64();
       activeSignal = 0;
     }
@@ -275,7 +276,10 @@ void ScriptMain() {
               std::string("Failed - ") + VehicleData::GetLastFailureReason();
           break;
         default:
-          calibMsg += "Scanning...";
+          calibMsg +=
+              "Scanning... (" +
+              std::to_string(VehicleData::GetCalibrationCandidateCount()) +
+              " candidates left)";
           break;
         }
         Renderer::DrawTextOverlay(calibMsg.c_str(), 0.5f, 0.1f, 0.6f);
@@ -317,47 +321,55 @@ void ScriptMain() {
     const float throttle = InputHandler::GetSmoothedThrottle();
 
     // — Clutch bite-point simulation (overrides raw clutch from InputHandler) —
-    float simulatedClutch = PhysicsEngine::UpdateClutch(clutch, throttle, data.GetRPM(), isEngineOn);
+    float simulatedClutch = PhysicsEngine::UpdateClutch(
+        clutch, throttle, data.GetRPM(), isEngineOn);
 
     // — Parking Brake (before gear logic so it can block throttle) —
-    const bool parkingBrakeOn = ParkingBrake::Update(vehicle, data, speedKmH,
-                                                     throttle, manualGear, isEngineOn);
+    const bool parkingBrakeOn = ParkingBrake::Update(
+        vehicle, data, speedKmH, throttle, manualGear, isEngineOn);
 
     // — Traction Control & ABS —
     float tcsThrottle = throttle;
     float absBrake = InputHandler::GetSmoothedBrake();
-    TractionControl::Update(vehicle, data, speedKmH, data.GetRPM(), manualGear, tcsThrottle, absBrake);
+    TractionControl::Update(vehicle, data, speedKmH, data.GetRPM(), manualGear,
+                            tcsThrottle, absBrake);
 
     // — Turbo System —
-    float turboMultiplier = TurboSystem::Update(vehicle, data, data.GetRPM(), tcsThrottle, isEngineOn);
+    float turboMultiplier = TurboSystem::Update(vehicle, data, data.GetRPM(),
+                                                tcsThrottle, isEngineOn);
     if (turboMultiplier > 1.05f) {
       // Cheat native to arbitrarily increase engine torque delivery
       VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, turboMultiplier);
     }
 
-    // Apply controls natively. Swap `throttle` for `tcsThrottle` and `brake` for `absBrake`
-    InputHandler::ApplyGameControls(manualGear, simulatedClutch, data.GetRPM(), maxGear,
-                                    forwardSpeed);
+    // Apply controls natively. Swap `throttle` for `tcsThrottle` and `brake`
+    // for `absBrake`
+    InputHandler::ApplyGameControls(manualGear, simulatedClutch, data.GetRPM(),
+                                    maxGear, forwardSpeed);
     // Overwrite the native brake/throttle with our modified ones if they differ
-    if (tcsThrottle < throttle) PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, tcsThrottle);
+    if (tcsThrottle < throttle)
+      PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, tcsThrottle);
     if (absBrake < InputHandler::GetSmoothedBrake()) {
-       if (forwardSpeed > 0.1f) PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, absBrake);
-       else PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 76, absBrake);
+      if (forwardSpeed > 0.1f)
+        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, absBrake);
+      else
+        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 76, absBrake);
     }
 
     const bool wasEngineOn = isEngineOn;
 
     manualGear = GearLogic::Update(
         vehicle, data, maxGear, InputHandler::IsShiftUpJustPressed(),
-        InputHandler::IsShiftDownJustPressed(), simulatedClutch, throttle, speedKmH,
-        isEngineOn, grindWarningTimer);
+        InputHandler::IsShiftDownJustPressed(), simulatedClutch, throttle,
+        speedKmH, isEngineOn, grindWarningTimer);
 
     if (wasEngineOn && !isEngineOn) {
       Renderer::ShowNotification(
           "Engine Stalled! (Depress clutch or shift to Neutral N)");
     }
 
-    // — Post-gear physics update (engine braking, wheel lockup, gearbox damage) —
+    // — Post-gear physics update (engine braking, wheel lockup, gearbox damage)
+    // —
     const bool physicsStall = PhysicsEngine::UpdatePostGear(
         vehicle, data, manualGear, maxGear, simulatedClutch, throttle, speedKmH,
         isEngineOn, grindWarningTimer);
@@ -368,8 +380,8 @@ void ScriptMain() {
     }
 
     // — Fuel System —
-    const bool fuelStall = FuelSystem::Update(vehicle, data, throttle, data.GetRPM(),
-                                              isEngineOn, speedKmH);
+    const bool fuelStall = FuelSystem::Update(
+        vehicle, data, throttle, data.GetRPM(), isEngineOn, speedKmH);
     if (fuelStall && isEngineOn) {
       isEngineOn = false;
       VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
@@ -398,34 +410,36 @@ void ScriptMain() {
       Renderer::DrawPedalsOverlay(data.GetRPM(), simulatedClutch, throttle,
                                   InputHandler::GetSmoothedBrake());
       Renderer::DrawSimulationOverlay(
-          FuelSystem::GetFuelLevel(),
-          FuelSystem::GetOilTemperature(),
-          PhysicsEngine::GetGearboxHealth(),
-          PhysicsEngine::GetClutchHeat(),
-          ParkingBrake::IsEngaged(),
-          PhysicsEngine::AreRearWheelsLocked(),
+          FuelSystem::GetFuelLevel(), FuelSystem::GetOilTemperature(),
+          PhysicsEngine::GetGearboxHealth(), PhysicsEngine::GetClutchHeat(),
+          ParkingBrake::IsEngaged(), PhysicsEngine::AreRearWheelsLocked(),
           PhysicsEngine::GetEngineBrakeForce());
-      
+
       Renderer::DrawTextOverlay(
-          (std::string("TCS: ") + (TractionControl::IsTCSActive() ? "~y~ACTIVE" : "~g~OK") +
-           " | ABS: " + (TractionControl::IsABSActive() ? "~y~ACTIVE" : "~g~OK") +
-           (TurboSystem::HasTurbo() ? (" | BOOST: " + std::to_string(TurboSystem::GetBoostPressure()).substr(0, 4)) : "")).c_str(),
-          Config::OverlayPosX, Config::OverlayPosY + Config::OverlayBarHeight * 5.0f, 0.35f);
+          (std::string("TCS: ") +
+           (TractionControl::IsTCSActive() ? "~y~ACTIVE" : "~g~OK") +
+           " | ABS: " +
+           (TractionControl::IsABSActive() ? "~y~ACTIVE" : "~g~OK") +
+           (TurboSystem::HasTurbo()
+                ? (" | BOOST: " +
+                   std::to_string(TurboSystem::GetBoostPressure()).substr(0, 4))
+                : ""))
+              .c_str(),
+          Config::OverlayPosX,
+          Config::OverlayPosY + Config::OverlayBarHeight * 5.0f, 0.35f);
     }
-    
+
     // — Telemetry Logging —
-    TelemetryLogger::LogFrame(vehicle, data, speedKmH, data.GetRPM(), tcsThrottle,
-                              absBrake, simulatedClutch, manualGear,
-                              InputHandler::GetSmoothedSteer(), 
-                              TractionControl::IsTCSActive() ? 1.0f : 0.0f,
-                              TractionControl::IsABSActive() ? 1.0f : 0.0f,
-                              TurboSystem::GetBoostPressure(),
-                              FuelSystem::GetOilTemperature());
+    TelemetryLogger::LogFrame(
+        vehicle, data, speedKmH, data.GetRPM(), tcsThrottle, absBrake,
+        simulatedClutch, manualGear, InputHandler::GetSmoothedSteer(),
+        TractionControl::IsTCSActive() ? 1.0f : 0.0f,
+        TractionControl::IsABSActive() ? 1.0f : 0.0f,
+        TurboSystem::GetBoostPressure(), FuelSystem::GetOilTemperature());
 
     Menu::Draw();
   }
 }
-
 
 BOOL APIENTRY DllMain(HMODULE instance, DWORD reason, LPVOID) {
   switch (reason) {
