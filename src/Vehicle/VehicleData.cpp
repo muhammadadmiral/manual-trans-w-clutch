@@ -439,20 +439,31 @@ void VehicleData::UpdateCalibration(HMODULE pluginModule, int vehicleHandle,
 
       if (!candidateOffsets.empty()) {
         resolvedOffsets.RPM = candidateOffsets[0];
-        resolvedOffsets.Clutch =
-            resolvedOffsets.RPM + 12; // Typical GTA V memory layout
-        resolvedOffsets.Gear = resolvedOffsets.RPM - 36;
-        resolvedOffsets.NextGear = resolvedOffsets.Gear - 2;
+        // Clutch really does sit 0xC (12 bytes) after RPM in CVehicle - this
+        // specific relationship is corroborated by community reverse
+        // engineering (e.g. the open-source "Manual Transmission" mod,
+        // github.com/E66666666/GTAVManualTransmission) and has held stable
+        // across many builds of both Legacy and Enhanced.
+        resolvedOffsets.Clutch = resolvedOffsets.RPM + 12;
 
-        if (AreOffsetsSane(resolvedOffsets)) {
-          calibState = CalibrationState::Done;
-          offsetSource = VehicleOffsetSource::Calibration;
-          initialized = true;
-          SaveOffsetsToIni(pluginModule, resolvedOffsets);
-        } else {
-          calibState = CalibrationState::Failed;
-          lastFailureReason = "Calibration found invalid offset layout";
-        }
+        // IMPORTANT: unlike Clutch, Gear/NextGear do NOT sit at a fixed
+        // distance from RPM - they live in a completely separate part of
+        // CVehicle, found through their own AOB pattern. The old code here
+        // guessed "Gear = RPM - 36", which was never actually verified
+        // against the real struct. That's exactly why gear writes used to
+        // land on unrelated fields (brake/reverse lights flipping, etc) -
+        // it wasn't bad luck, the formula was just wrong. We deliberately
+        // do not guess it anymore.
+        resolvedOffsets.Gear = 0;
+        resolvedOffsets.NextGear = 0;
+
+        calibState = CalibrationState::Failed;
+        lastFailureReason =
+            "RPM/Clutch located OK, but Gear/NextGear can't be safely "
+            "guessed from them. Add verified Gear/NextGear offsets under "
+            "[Offsets] in the ini manually (see notification/README), then "
+            "relaunch - RPM/Clutch calibration doesn't need to be redone "
+            "once Gear/NextGear are supplied.";
       } else {
         calibState = CalibrationState::Failed;
         lastFailureReason = "Calibration failed to isolate RPM offset";

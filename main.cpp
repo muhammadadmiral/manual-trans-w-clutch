@@ -254,7 +254,8 @@ void ScriptMain() {
           calibMsg += "Success! Offsets saved.";
           break;
         case CalibrationState::Failed:
-          calibMsg += "Failed. Try again.";
+          calibMsg +=
+              std::string("Failed - ") + VehicleData::GetLastFailureReason();
           break;
         default:
           calibMsg += "Scanning...";

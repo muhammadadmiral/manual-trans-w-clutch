@@ -19,7 +19,7 @@ private:
 
   struct MenuItem {
     std::string name;
-    enum Type { Bool, Float, Submenu, Action } type;
+    enum Type { Bool, Float, Submenu, Action, KeyBind } type;
 
     bool *boolVal = nullptr;
 
@@ -27,6 +27,8 @@ private:
     float floatStep = 0.01f;
     float floatMin = 0.0f;
     float floatMax = 1.0f;
+
+    int *keyVal = nullptr;
 
     int targetSubmenu = -1;
 
@@ -42,6 +44,10 @@ private:
              float maxV)
         : name(n), type(t), floatVal(f), floatStep(step), floatMin(minV),
           floatMax(maxV) {}
+
+    // Constructor for KeyBind. Pass the address of one of the Config::KeyXxx
+    // ints (e.g. &Config::KeyShiftUp) and it becomes rebindable in-menu.
+    MenuItem(std::string n, Type t, int *k) : name(n), type(t), keyVal(k) {}
   };
 
   struct Submenu {
@@ -53,6 +59,14 @@ private:
   static bool isOpen;
   static std::vector<Submenu> menus;
   static std::vector<int> menuStack;
+
+  // True while the menu is waiting for the next keypress to bind to the
+  // selected KeyBind item (Enter was pressed on it). Any key (including
+  // mouse-adjacent VKs) confirms the bind; Escape cancels without changing
+  // it.
+  static bool waitingForKeyBind;
+
+  static std::string VkName(int vk);
 
   static int GetCurrentMenuIndex();
   static Submenu &GetCurrentMenu();
