@@ -5,7 +5,6 @@
 
 #define NOMINMAX
 #include <Windows.h>
-#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
