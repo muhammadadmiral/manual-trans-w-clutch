@@ -516,34 +516,25 @@ void VehicleData::UpdateCalibration(HMODULE pluginModule, int vehicleHandle,
     if (foundRev) {
       candidateOffsets = nextCandidates;
       if (!candidateOffsets.empty()) {
-        resolvedOffsets.RPM = candidateOffsets[0];
-        resolvedOffsets.Clutch = resolvedOffsets.RPM + 12;
+        bool anyCandidateSucceeded = false;
 
-        bool foundGearLayout = false;
-        uint32_t foundGearOffset = 0, foundNextGearOffset = 0,
-                 foundTopGearOffset = 0, foundRatiosOffset = 0;
+        for (uint32_t rpmCandidate : candidateOffsets) {
+          resolvedOffsets.RPM = rpmCandidate;
+          resolvedOffsets.Clutch = rpmCandidate + 12;
 
-        // Gear-cluster search: instead of assuming one fixed historical
-        // byte layout (the old code only ever tried two exact patterns),
-        // scan a window around RPM for a byte that plausibly reads "Gear"
-        // (0 or 1, since we're revving from a standstill), then search its
-        // immediate neighborhood independently for a NextGear-like byte, a
-        // TopGear-like byte, and a pointer to something that actually looks
-        // like an array of gear ratios (finite floats in a sane range) -
-        // rather than just "a big-looking number". No fixed byte gap
-        // between the four fields is assumed, so this should survive
-        // layout differences across builds/game versions better than
-        // hardcoded deltas would.
-        const uint32_t rpmOff = resolvedOffsets.RPM;
-        const uint32_t searchLo =
-            rpmOff > kGearSearchBefore ? rpmOff - kGearSearchBefore : 0;
-        const uint32_t searchHi = rpmOff + kGearSearchAfter;
-        // One bulk readability check up front instead of one VirtualQuery
-        // per byte - keeps this from causing a frame hitch.
-        const bool regionReadable = AOBScanner::IsReadable(
-            calibVehicle.GetAddress() + searchLo, (searchHi - searchLo) + 32);
+          bool foundGearLayout = false;
+          uint32_t foundGearOffset = 0, foundNextGearOffset = 0,
+                   foundTopGearOffset = 0, foundRatiosOffset = 0;
 
-        if (regionReadable) {
+          const uint32_t rpmOff = resolvedOffsets.RPM;
+          const uint32_t searchLo =
+              rpmOff > kGearSearchBefore ? rpmOff - kGearSearchBefore : 0;
+          const uint32_t searchHi = rpmOff + kGearSearchAfter;
+          
+          const bool regionReadable = AOBScanner::IsReadable(
+              calibVehicle.GetAddress() + searchLo, (searchHi - searchLo) + 32);
+
+          if (regionReadable) {
           __try {
             for (uint32_t gearOff = searchLo;
                  gearOff <= searchHi && !foundGearLayout; ++gearOff) {
@@ -591,8 +582,9 @@ void VehicleData::UpdateCalibration(HMODULE pluginModule, int vehicleHandle,
                 const float *ratios = reinterpret_cast<const float *>(ptr);
                 bool plausible = true;
                 for (int g = 0; g < 4; ++g) {
-                  if (!std::isfinite(ratios[g]) || ratios[g] <= 0.0f ||
-                      ratios[g] > 20.0f) {
+                  float r = ratios[g];
+                  if (!std::isfinite(r) || r < -20.0f || r > 20.0f ||
+                      (r > -0.1f && r < 0.1f)) {
                     plausible = false;
                     break;
                   }
@@ -616,39 +608,30 @@ void VehicleData::UpdateCalibration(HMODULE pluginModule, int vehicleHandle,
           }
         }
 
-        if (foundGearLayout) {
-          resolvedOffsets.Gear = foundGearOffset;
-          resolvedOffsets.NextGear = foundNextGearOffset;
-          resolvedOffsets.TopGear = foundTopGearOffset;
-          resolvedOffsets.GearRatios = foundRatiosOffset;
-        }
+          if (foundGearLayout) {
+            resolvedOffsets.Gear = foundGearOffset;
+            resolvedOffsets.NextGear = foundNextGearOffset;
+            resolvedOffsets.TopGear = foundTopGearOffset;
+            resolvedOffsets.GearRatios = foundRatiosOffset;
+            
+            if (AreOffsetsSane(resolvedOffsets)) {
+              anyCandidateSucceeded = true;
+              break; // Found the right candidate!
+            }
+          }
+        } // end of for loop over candidates
 
-        if (foundGearLayout && AreOffsetsSane(resolvedOffsets)) {
+        if (anyCandidateSucceeded) {
           calibState = CalibrationState::Done;
           initialized = true;
           SaveOffsetsToIni(pluginModule, resolvedOffsets);
-        } else if (foundGearLayout) {
-          // Layout matched the Legacy/Enhanced shape check, but the final
-          // numbers still don't pass the same sanity bounds AOB/INI offsets
-          // must pass. Treat it as a failure instead of silently arming a
-          // bad offset set that will just get rejected every frame by
-          // HasPlausibleLayout() later.
-          resolvedOffsets.Gear = 0;
-          resolvedOffsets.NextGear = 0;
-          calibState = CalibrationState::Failed;
-          lastFailureReason =
-              "Gear layout matched a known shape but failed the general "
-              "sanity check (offset too small/large or fields too far "
-              "apart). Recalibrate, or if it repeats, this build's layout "
-              "may need a 3rd pattern added to the Legacy/Enhanced test.";
         } else {
           resolvedOffsets.Gear = 0;
           resolvedOffsets.NextGear = 0;
           calibState = CalibrationState::Failed;
           lastFailureReason =
-              "RPM/Clutch located OK, but Gear/NextGear can't be safely "
-              "guessed. Tested Legacy & Enhanced memory structures but pointer "
-              "validation failed. Add offsets to ini manually.";
+              "RPM/Clutch located OK, but Gear/NextGear can't be safely guessed "
+              "around ANY of the RPM candidates. Memory layout is unrecognized.";
         }
       } else {
         calibState = CalibrationState::Failed;

@@ -74,6 +74,8 @@ void Menu::Initialize() {
   // 1: Main Settings
   Submenu settings;
   settings.title = "MAIN SETTINGS";
+  settings.items.push_back(MenuItem("Recalibrate Transmission", MenuItem::Bool,
+                                    &Config::ForceRecalibrate));
   settings.items.push_back(MenuItem("Require Cold Start", MenuItem::Bool,
                                     &Config::RequireColdStart));
   settings.items.push_back(

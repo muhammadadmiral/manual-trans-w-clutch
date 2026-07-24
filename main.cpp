@@ -115,6 +115,12 @@ void ScriptMain() {
 
   while (true) {
     scriptWait(0);
+
+    if (Config::ForceRecalibrate) {
+      Config::ForceRecalibrate = false;
+      VehicleData::ResetCalibration();
+    }
+
     Menu::Update();
 
     const Ped playerPed = PLAYER::PLAYER_PED_ID();
@@ -254,38 +260,46 @@ void ScriptMain() {
         Renderer::ShowNotification(
             "Calibration complete! Manual transmission active.");
       } else {
+        static CalibrationState lastCalibState = CalibrationState::None;
         CalibrationState state = VehicleData::GetCalibrationState();
+        
+        if (state == CalibrationState::Failed && lastCalibState != CalibrationState::Failed) {
+            std::string failMsg = "~r~Calibration Failed:~w~\n" + VehicleData::GetLastFailureReason();
+            Renderer::ShowNotification(failMsg.c_str());
+        }
+        lastCalibState = state;
+
         std::string calibMsg = "Calibration: ";
-        switch (state) {
-        case CalibrationState::WaitingForEngineOff:
-          calibMsg += "Turn off engine (press " +
-                      std::string(1, (char)Config::KeyEngine) + ")";
-          break;
-        case CalibrationState::WaitingForEngineOn:
-          calibMsg += "Turn ON engine (press " +
-                      std::string(1, (char)Config::KeyEngine) + ") and idle";
-          break;
-        case CalibrationState::WaitingForRev:
-          calibMsg += "Rev the engine (Hold W)";
-          break;
-        case CalibrationState::Done:
-          calibMsg += "Success! Offsets saved.";
-          break;
-        case CalibrationState::Failed:
-          calibMsg +=
-              std::string("Failed - ") + VehicleData::GetLastFailureReason();
-          break;
-        default:
-          calibMsg +=
-              "Scanning... (" +
-              std::to_string(VehicleData::GetCalibrationCandidateCount()) +
-              " candidates left)";
-          break;
+        if (state == CalibrationState::Failed) {
+            calibMsg += "Failed. Check notification or Menu.";
+        } else {
+          switch (state) {
+          case CalibrationState::WaitingForEngineOff:
+            calibMsg += "Turn off engine (press " +
+                        std::string(1, (char)Config::KeyEngine) + ")";
+            break;
+          case CalibrationState::WaitingForEngineOn:
+            calibMsg += "Turn ON engine (press " +
+                        std::string(1, (char)Config::KeyEngine) + ") and idle";
+            break;
+          case CalibrationState::WaitingForRev:
+            calibMsg += "Rev the engine (Hold W)";
+            break;
+          case CalibrationState::Done:
+            calibMsg += "Success! Offsets saved.";
+            break;
+          default:
+            calibMsg +=
+                "Scanning... (" +
+                std::to_string(VehicleData::GetCalibrationCandidateCount()) +
+                " candidates left)";
+            break;
+          }
         }
         Renderer::DrawTextOverlay(calibMsg.c_str(), 0.5f, 0.1f, 0.6f);
         char throttleDbg[64]{};
         sprintf_s(throttleDbg, "[debug] raw W: %s | smoothed throttle: %.2f",
-                  (GetAsyncKeyState(0x57) & 0x8000) ? "DOWN" : "up",
+                  (GetAsyncKeyState(0x57) & 0x8000) ? "PRESSED" : "released",
                   InputHandler::GetSmoothedThrottle());
         Renderer::DrawTextOverlay(throttleDbg, 0.5f, 0.15f, 0.4f);
         Menu::Draw();

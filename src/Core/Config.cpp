@@ -20,6 +20,7 @@ float OverlayBarWidth = 0.12f;
 float OverlayBarHeight = 0.014f;
 
 bool RequireColdStart = true;
+bool ForceRecalibrate = false;
 int KeyEngine = 90; // Z key
 int KeyMenu = 219;  // [ key
 

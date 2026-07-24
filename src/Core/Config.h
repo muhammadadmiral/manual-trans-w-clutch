@@ -32,6 +32,7 @@ extern bool UseRealClutch;
 
 // Require turning on the engine (via KeyEngine) when entering a vehicle.
 extern bool RequireColdStart;
+extern bool ForceRecalibrate;
 
 extern float ThrottleAttack;
 extern float ThrottleRelease;
