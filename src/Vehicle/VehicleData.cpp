@@ -11,6 +11,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <vector>
+#include <winver.h>
+
+#pragma comment(lib, "Version.lib")
 
 VehicleOffsets VehicleData::resolvedOffsets{};
 VehicleOffsetSource VehicleData::offsetSource =
@@ -88,9 +92,10 @@ bool BuildIniPath(HMODULE pluginModule, char (&path)[MAX_PATH]) {
   return strcat_s(path, "\\manual-trans.ini") == 0;
 }
 
-uint32_t ReadHexOffset(const char *iniPath, const char *key) {
+uint32_t ReadHexOffset(const char *iniPath, const char *section,
+                       const char *key) {
   char buffer[32]{};
-  const DWORD count = GetPrivateProfileStringA("Offsets", key, "", buffer,
+  const DWORD count = GetPrivateProfileStringA(section, key, "", buffer,
                                                sizeof(buffer), iniPath);
   if (count == 0)
     return 0;
@@ -105,10 +110,51 @@ uint32_t ReadHexOffset(const char *iniPath, const char *key) {
   return static_cast<uint32_t>(value);
 }
 
+// Reads the running module's PE version resource ("A.B.C.D"). Used to
+// build/name a per-build ini offsets section, and to show the detected
+// game build in the load/fail notification so you know which
+// [Offsets.<version>] section to write.
+bool GetModuleFileVersion(HMODULE module, std::string &out) {
+  char path[MAX_PATH]{};
+  if (GetModuleFileNameA(module, path, MAX_PATH) == 0)
+    return false;
+
+  DWORD handle = 0;
+  const DWORD size = GetFileVersionInfoSizeA(path, &handle);
+  if (size == 0)
+    return false;
+
+  std::vector<char> buffer(size);
+  if (!GetFileVersionInfoA(path, handle, size, buffer.data()))
+    return false;
+
+  VS_FIXEDFILEINFO *info = nullptr;
+  UINT infoSize = 0;
+  if (!VerQueryValueA(buffer.data(), "\\", reinterpret_cast<void **>(&info),
+                      &infoSize) ||
+      info == nullptr) {
+    return false;
+  }
+
+  char text[64]{};
+  sprintf_s(text, "%u.%u.%u.%u", HIWORD(info->dwFileVersionMS),
+            LOWORD(info->dwFileVersionMS), HIWORD(info->dwFileVersionLS),
+            LOWORD(info->dwFileVersionLS));
+  out = text;
+  return true;
+}
+
 } // namespace
 
 bool VehicleOffsets::IsComplete() const {
   return Gear != 0 && NextGear != 0 && Clutch != 0 && RPM != 0;
+}
+
+std::string VehicleData::GetGameBuildVersion() {
+  std::string version;
+  if (!GetModuleFileVersion(GetModuleHandleW(nullptr), version))
+    return "";
+  return version;
 }
 
 bool VehicleData::AreOffsetsSane(const VehicleOffsets &value) {
@@ -199,11 +245,33 @@ bool VehicleData::LoadOffsetsFromIni(HMODULE pluginModule,
   if (!BuildIniPath(pluginModule, iniPath))
     return false;
 
+  // Try a build-specific section first, e.g. [Offsets.1.0.1013.20]. This
+  // lets you keep verified offsets for several game builds in the same
+  // ini without one overwriting the other - much safer than a single
+  // generic section once you're chasing more than one build.
+  const std::string buildVersion = GetGameBuildVersion();
+  if (!buildVersion.empty()) {
+    const std::string versionedSection = "Offsets." + buildVersion;
+    VehicleOffsets versioned{};
+    versioned.Gear = ReadHexOffset(iniPath, versionedSection.c_str(), "Gear");
+    versioned.NextGear =
+        ReadHexOffset(iniPath, versionedSection.c_str(), "NextGear");
+    versioned.Clutch =
+        ReadHexOffset(iniPath, versionedSection.c_str(), "Clutch");
+    versioned.RPM = ReadHexOffset(iniPath, versionedSection.c_str(), "RPM");
+
+    if (AreOffsetsSane(versioned)) {
+      result = versioned;
+      return true;
+    }
+  }
+
+  // Fall back to the generic [Offsets] section.
   VehicleOffsets candidate{};
-  candidate.Gear = ReadHexOffset(iniPath, "Gear");
-  candidate.NextGear = ReadHexOffset(iniPath, "NextGear");
-  candidate.Clutch = ReadHexOffset(iniPath, "Clutch");
-  candidate.RPM = ReadHexOffset(iniPath, "RPM");
+  candidate.Gear = ReadHexOffset(iniPath, "Offsets", "Gear");
+  candidate.NextGear = ReadHexOffset(iniPath, "Offsets", "NextGear");
+  candidate.Clutch = ReadHexOffset(iniPath, "Offsets", "Clutch");
+  candidate.RPM = ReadHexOffset(iniPath, "Offsets", "RPM");
 
   if (!AreOffsetsSane(candidate))
     return false;
