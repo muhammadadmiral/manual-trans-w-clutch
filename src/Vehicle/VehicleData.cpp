@@ -288,24 +288,31 @@ void VehicleData::SaveOffsetsToIni(HMODULE pluginModule,
   if (!BuildIniPath(pluginModule, iniPath))
     return;
 
-  const std::string buildVersion = GetGameBuildVersion();
-  std::string sectionName = "Offsets";
-  if (!buildVersion.empty()) {
-    sectionName += "." + buildVersion;
-  }
-
   char buffer[32]{};
+  
+  // Save to generic [Offsets] section
   sprintf_s(buffer, "0x%X", offsets.Gear);
-  WritePrivateProfileStringA(sectionName.c_str(), "Gear", buffer, iniPath);
-
+  WritePrivateProfileStringA("Offsets", "Gear", buffer, iniPath);
   sprintf_s(buffer, "0x%X", offsets.NextGear);
-  WritePrivateProfileStringA(sectionName.c_str(), "NextGear", buffer, iniPath);
-
+  WritePrivateProfileStringA("Offsets", "NextGear", buffer, iniPath);
   sprintf_s(buffer, "0x%X", offsets.Clutch);
-  WritePrivateProfileStringA(sectionName.c_str(), "Clutch", buffer, iniPath);
-
+  WritePrivateProfileStringA("Offsets", "Clutch", buffer, iniPath);
   sprintf_s(buffer, "0x%X", offsets.RPM);
-  WritePrivateProfileStringA(sectionName.c_str(), "RPM", buffer, iniPath);
+  WritePrivateProfileStringA("Offsets", "RPM", buffer, iniPath);
+
+  // Also save to versioned section [Offsets.<build>] if build version available
+  const std::string buildVersion = GetGameBuildVersion();
+  if (!buildVersion.empty()) {
+    std::string versionedSection = "Offsets." + buildVersion;
+    sprintf_s(buffer, "0x%X", offsets.Gear);
+    WritePrivateProfileStringA(versionedSection.c_str(), "Gear", buffer, iniPath);
+    sprintf_s(buffer, "0x%X", offsets.NextGear);
+    WritePrivateProfileStringA(versionedSection.c_str(), "NextGear", buffer, iniPath);
+    sprintf_s(buffer, "0x%X", offsets.Clutch);
+    WritePrivateProfileStringA(versionedSection.c_str(), "Clutch", buffer, iniPath);
+    sprintf_s(buffer, "0x%X", offsets.RPM);
+    WritePrivateProfileStringA(versionedSection.c_str(), "RPM", buffer, iniPath);
+  }
 
   WritePrivateProfileStringA("Memory", "AllowIniFallback", "1", iniPath);
 }
@@ -322,29 +329,15 @@ bool VehicleData::Initialize(HMODULE pluginModule) {
     return true;
   }
 
-  // lastFailureReason was already set inside ResolveOffsetsByPattern().
-  // It gets overwritten below only if the ini fallback path also fails,
-  // since that's the more actionable message for the user to see.
-  char iniPath[MAX_PATH]{};
-  const bool hasIniPath = BuildIniPath(pluginModule, iniPath);
-  const bool allowFallback =
-      hasIniPath &&
-      GetPrivateProfileIntA("Memory", "AllowIniFallback", 0, iniPath) != 0;
-
-  if (!allowFallback) {
-    lastFailureReason =
-        hasIniPath
-            ? "AOB failed; INI fallback disabled (set AllowIniFallback=1)"
-            : "AOB failed; INI path unresolved";
-  } else if (LoadOffsetsFromIni(pluginModule, candidate)) {
+  // Always attempt to load offsets from INI if present
+  if (LoadOffsetsFromIni(pluginModule, candidate)) {
     resolvedOffsets = candidate;
     offsetSource = VehicleOffsetSource::IniFallback;
     initialized = true;
-    return true; // Mod is fully initialized via INI
+    return true; // Mod is fully initialized via INI, no calibration needed!
   }
 
-  // If we reach here, AOB failed and INI failed/disabled.
-  // Enter Calibration Mode instead of killing the mod!
+  // If AOB failed and INI failed/absent, enter Calibration Mode
   resolvedOffsets = {};
   offsetSource = VehicleOffsetSource::Uninitialized;
   initialized = false;
@@ -353,7 +346,6 @@ bool VehicleData::Initialize(HMODULE pluginModule) {
       calibState = CalibrationState::WaitingForEngineOff;
   }
   
-  // Return true so ScriptMain continues and runs our Calibration loop!
   return true;
 }
 
