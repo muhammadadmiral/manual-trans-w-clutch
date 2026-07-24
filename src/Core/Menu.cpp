@@ -181,6 +181,26 @@ void Menu::Update() {
   if (!isOpen || menus.empty())
     return;
 
+  // Disable game's UI and weapon controls to prevent overlap
+  const int controlsToDisable[] = {
+      19,  // INPUT_CHARACTER_WHEEL
+      27,  // INPUT_PHONE
+      37,  // INPUT_SELECT_WEAPON
+      85,  // INPUT_VEH_RADIO_WHEEL
+      140, // INPUT_MELEE_ATTACK_LIGHT
+      172, // INPUT_CELLPHONE_UP
+      173, // INPUT_CELLPHONE_DOWN
+      174, // INPUT_CELLPHONE_LEFT
+      175, // INPUT_CELLPHONE_RIGHT
+      176, // INPUT_CELLPHONE_SELECT
+      177, // INPUT_CELLPHONE_CANCEL
+      261, // INPUT_PREV_WEAPON
+      262  // INPUT_NEXT_WEAPON
+  };
+  for (int c : controlsToDisable) {
+    PAD::DISABLE_CONTROL_ACTION(0, c, TRUE);
+  }
+
   Submenu &current = GetCurrentMenu();
   MenuItem &selectedItem = current.items[current.selectedIndex];
 
@@ -197,26 +217,33 @@ void Menu::Update() {
       if ((GetAsyncKeyState(k) & 0x8000) != 0 && k != VK_ESCAPE &&
           k != VK_RETURN && k != Config::KeyMenu) {
         *selectedItem.keyVal = k;
-        waitingForKeyBind = false;
         Config::SaveConfig(g_pluginModule);
+        
+        // Wait until the user releases the key so it doesn't immediately 
+        // trigger another menu action on the very next frame.
+        while ((GetAsyncKeyState(k) & 0x8000) != 0) {
+            scriptWait(0);
+        }
+        
+        waitingForKeyBind = false;
         return;
       }
     }
     return; // Block other inputs while waiting
   }
 
-  if (PAD::IS_CONTROL_JUST_PRESSED(0, 172)) { // UP
+  if (PAD::IS_DISABLED_CONTROL_JUST_PRESSED(0, 172)) { // UP
     current.selectedIndex--;
     if (current.selectedIndex < 0)
       current.selectedIndex = static_cast<int>(current.items.size()) - 1;
   }
-  if (PAD::IS_CONTROL_JUST_PRESSED(0, 173)) { // DOWN
+  if (PAD::IS_DISABLED_CONTROL_JUST_PRESSED(0, 173)) { // DOWN
     current.selectedIndex++;
     if (current.selectedIndex >= static_cast<int>(current.items.size()))
       current.selectedIndex = 0;
   }
 
-  if (PAD::IS_CONTROL_JUST_PRESSED(0, 177)) { // BACKSPACE / B
+  if (PAD::IS_DISABLED_CONTROL_JUST_PRESSED(0, 177)) { // BACKSPACE / B
     if (menuStack.size() > 1) {
       menuStack.pop_back();
       Config::SaveConfig(g_pluginModule); // Save on back
@@ -226,7 +253,7 @@ void Menu::Update() {
     }
   }
 
-  if (PAD::IS_CONTROL_JUST_PRESSED(0, 176)) { // ENTER / A
+  if (PAD::IS_DISABLED_CONTROL_JUST_PRESSED(0, 176)) { // ENTER / A
     if (selectedItem.type == MenuItem::Bool && selectedItem.boolVal) {
       *selectedItem.boolVal = !(*selectedItem.boolVal);
       Config::SaveConfig(g_pluginModule);
@@ -238,14 +265,14 @@ void Menu::Update() {
   }
 
   if (selectedItem.type == MenuItem::Float && selectedItem.floatVal) {
-    if (PAD::IS_CONTROL_PRESSED(0, 174) ||
-        PAD::IS_CONTROL_JUST_PRESSED(0, 174)) { // LEFT
+    if (PAD::IS_DISABLED_CONTROL_PRESSED(0, 174) ||
+        PAD::IS_DISABLED_CONTROL_JUST_PRESSED(0, 174)) { // LEFT
       *selectedItem.floatVal -= selectedItem.floatStep;
       if (*selectedItem.floatVal < selectedItem.floatMin)
         *selectedItem.floatVal = selectedItem.floatMin;
     }
-    if (PAD::IS_CONTROL_PRESSED(0, 175) ||
-        PAD::IS_CONTROL_JUST_PRESSED(0, 175)) { // RIGHT
+    if (PAD::IS_DISABLED_CONTROL_PRESSED(0, 175) ||
+        PAD::IS_DISABLED_CONTROL_JUST_PRESSED(0, 175)) { // RIGHT
       *selectedItem.floatVal += selectedItem.floatStep;
       if (*selectedItem.floatVal > selectedItem.floatMax)
         *selectedItem.floatVal = selectedItem.floatMax;

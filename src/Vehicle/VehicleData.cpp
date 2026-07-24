@@ -532,80 +532,14 @@ void VehicleData::UpdateCalibration(HMODULE pluginModule, int vehicleHandle,
           const uint32_t searchHi = rpmOff + kGearSearchAfter;
           
           const bool regionReadable = AOBScanner::IsReadable(
-              calibVehicle.GetAddress() + searchLo, (searchHi - searchLo) + 32);
+              calibVehicle.GetAddress() + searchLo, (searchHi - searchLo) + 64 + 16);
 
           if (regionReadable) {
-          __try {
-            for (uint32_t gearOff = searchLo;
-                 gearOff <= searchHi && !foundGearLayout; ++gearOff) {
-              const uint8_t gearVal = *reinterpret_cast<uint8_t *>(
-                  calibVehicle.GetAddress() + gearOff);
-              if (gearVal != 0 && gearVal != 1)
-                continue;
-
-              uint32_t nextGearOff = 0, topGearOff = 0, ratiosOff = 0;
-              bool haveNext = false, haveTop = false, haveRatios = false;
-
-              for (int32_t d = -16; d <= 16 && !haveNext; ++d) {
-                if (d == 0 || static_cast<int64_t>(gearOff) + d < 0)
-                  continue;
-                const uint32_t off =
-                    static_cast<uint32_t>(static_cast<int64_t>(gearOff) + d);
-                const uint8_t v = *reinterpret_cast<uint8_t *>(
-                    calibVehicle.GetAddress() + off);
-                if (v <= 2) {
-                  nextGearOff = off;
-                  haveNext = true;
-                }
-              }
-              for (int32_t d = -24; d <= 24 && !haveTop; ++d) {
-                if (d == 0 || static_cast<int64_t>(gearOff) + d < 0)
-                  continue;
-                const uint32_t off =
-                    static_cast<uint32_t>(static_cast<int64_t>(gearOff) + d);
-                const uint8_t v = *reinterpret_cast<uint8_t *>(
-                    calibVehicle.GetAddress() + off);
-                if (v >= 4 && v <= 9) {
-                  topGearOff = off;
-                  haveTop = true;
-                }
-              }
-              for (int32_t d = -64; d <= 64 && !haveRatios; d += 4) {
-                if (static_cast<int64_t>(gearOff) + d < 8)
-                  continue;
-                const uint32_t off =
-                    static_cast<uint32_t>(static_cast<int64_t>(gearOff) + d);
-                const uintptr_t ptr = *reinterpret_cast<uintptr_t *>(
-                    calibVehicle.GetAddress() + off);
-                if (ptr < 0x10000000 || !AOBScanner::IsReadable(ptr, 16))
-                  continue;
-                const float *ratios = reinterpret_cast<const float *>(ptr);
-                bool plausible = true;
-                for (int g = 0; g < 4; ++g) {
-                  float r = ratios[g];
-                  if (!std::isfinite(r) || r < -20.0f || r > 20.0f ||
-                      (r > -0.1f && r < 0.1f)) {
-                    plausible = false;
-                    break;
-                  }
-                }
-                if (plausible) {
-                  ratiosOff = off;
-                  haveRatios = true;
-                }
-              }
-
-              if (haveNext && haveTop && haveRatios) {
-                foundGearOffset = gearOff;
-                foundNextGearOffset = nextGearOff;
-                foundTopGearOffset = topGearOff;
-                foundRatiosOffset = ratiosOff;
-                foundGearLayout = true;
-              }
-            }
-          } __except (EXCEPTION_EXECUTE_HANDLER) {
-            foundGearLayout = false;
+            foundGearLayout = SearchGearLayout(
+                calibVehicle, searchLo, searchHi, foundGearOffset,
+                foundNextGearOffset, foundTopGearOffset, foundRatiosOffset);
           }
+
         }
 
           if (foundGearLayout) {
@@ -667,6 +601,97 @@ const char *VehicleData::GetOffsetSourceName() {
 
 const VehicleOffsets &VehicleData::GetResolvedOffsets() {
   return resolvedOffsets;
+}
+
+// =============================================================================
+// Helper implementations
+// =============================================================================
+
+bool VehicleData::SearchGearLayout(const GameMemory::CVehicle &calibVehicle,
+                                   uint32_t searchLo, uint32_t searchHi,
+                                   uint32_t &outGearOffset,
+                                   uint32_t &outNextGearOffset,
+                                   uint32_t &outTopGearOffset,
+                                   uint32_t &outRatiosOffset) {
+  bool foundLayout = false;
+  __try {
+    for (uint32_t gearOff = searchLo; gearOff <= searchHi && !foundLayout;
+         ++gearOff) {
+      const uint8_t gearVal = *reinterpret_cast<uint8_t *>(
+          calibVehicle.GetAddress() + gearOff);
+      // We are revving from standstill: Gear should be 0 (neutral) or 1 (first).
+      if (gearVal != 0 && gearVal != 1)
+        continue;
+
+      uint32_t nextGearOff = 0, topGearOff = 0, ratiosOff = 0;
+      bool haveNext = false, haveTop = false, haveRatios = false;
+
+      // NextGear should also logically be <= 2 (0, 1, or 2 if preparing shift)
+      for (int32_t d = -16; d <= 16 && !haveNext; ++d) {
+        if (d == 0 || static_cast<int64_t>(gearOff) + d < 0)
+          continue;
+        const uint32_t off =
+            static_cast<uint32_t>(static_cast<int64_t>(gearOff) + d);
+        const uint8_t v =
+            *reinterpret_cast<uint8_t *>(calibVehicle.GetAddress() + off);
+        if (v <= 2) {
+          nextGearOff = off;
+          haveNext = true;
+        }
+      }
+      
+      // TopGear behaves like the max number of gears (usually 4 to 9)
+      for (int32_t d = -24; d <= 24 && !haveTop; ++d) {
+        if (d == 0 || static_cast<int64_t>(gearOff) + d < 0)
+          continue;
+        const uint32_t off =
+            static_cast<uint32_t>(static_cast<int64_t>(gearOff) + d);
+        const uint8_t v =
+            *reinterpret_cast<uint8_t *>(calibVehicle.GetAddress() + off);
+        if (v >= 4 && v <= 9) {
+          topGearOff = off;
+          haveTop = true;
+        }
+      }
+      
+      // GearRatios points to a float array. We test behavior/plausibility:
+      for (int32_t d = -64; d <= 64 && !haveRatios; d += 4) {
+        if (static_cast<int64_t>(gearOff) + d < 8)
+          continue;
+        const uint32_t off =
+            static_cast<uint32_t>(static_cast<int64_t>(gearOff) + d);
+        const uintptr_t ptr =
+            *reinterpret_cast<uintptr_t *>(calibVehicle.GetAddress() + off);
+        if (ptr < 0x10000000 || !AOBScanner::IsReadable(ptr, 16))
+          continue;
+        const float *ratios = reinterpret_cast<const float *>(ptr);
+        bool plausible = true;
+        for (int g = 0; g < 4; ++g) {
+          float r = ratios[g];
+          if (!std::isfinite(r) || r < -20.0f || r > 20.0f ||
+              (r > -0.1f && r < 0.1f)) {
+            plausible = false;
+            break;
+          }
+        }
+        if (plausible) {
+          ratiosOff = off;
+          haveRatios = true;
+        }
+      }
+
+      if (haveNext && haveTop && haveRatios) {
+        outGearOffset = gearOff;
+        outNextGearOffset = nextGearOff;
+        outTopGearOffset = topGearOff;
+        outRatiosOffset = ratiosOff;
+        foundLayout = true;
+      }
+    }
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return false;
+  }
+  return foundLayout;
 }
 
 // =============================================================================

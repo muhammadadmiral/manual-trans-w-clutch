@@ -95,6 +95,13 @@ private:
                                const VehicleOffsets &offsets);
   static bool AreOffsetsSane(const VehicleOffsets &value);
 
+  static bool SearchGearLayout(const GameMemory::CVehicle &calibVehicle,
+                               uint32_t searchLo, uint32_t searchHi,
+                               uint32_t &outGearOffset,
+                               uint32_t &outNextGearOffset,
+                               uint32_t &outTopGearOffset,
+                               uint32_t &outRatiosOffset);
+
   static CalibrationState calibState;
   static std::vector<uint32_t> candidateOffsets;
   // Value each surviving candidate read at idle, captured in the
