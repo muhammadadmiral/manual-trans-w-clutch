@@ -80,11 +80,6 @@ void ReadConfig(HMODULE module) {
 
   strcat_s(iniPath, "\\manual-trans.ini");
 
-  if (GetFileAttributesA(iniPath) == INVALID_FILE_ATTRIBUTES) {
-    // Generate boilerplate INI if it doesn't exist
-    SaveConfig(module);
-  }
-
   KeyShiftUp = GetPrivateProfileIntA("Controls", "ShiftUp", VK_LSHIFT, iniPath);
   KeyShiftDown =
       GetPrivateProfileIntA("Controls", "ShiftDown", VK_LCONTROL, iniPath);
