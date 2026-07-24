@@ -127,7 +127,7 @@ bool GetModuleFileVersion(HMODULE module, std::string &out) {
     return false;
 
   std::vector<char> buffer(size);
-  if (!GetFileVersionInfoA(path, handle, size, buffer.data()))
+  if (!GetFileVersionInfoA(path, 0, size, buffer.data()))
     return false;
 
   VS_FIXEDFILEINFO *info = nullptr;
@@ -282,7 +282,8 @@ bool VehicleData::LoadOffsetsFromIni(HMODULE pluginModule,
   return true;
 }
 
-void VehicleData::SaveOffsetsToIni(HMODULE pluginModule, const VehicleOffsets &offsets) {
+void VehicleData::SaveOffsetsToIni(HMODULE pluginModule,
+                                   const VehicleOffsets &offsets) {
   char iniPath[MAX_PATH]{};
   if (!BuildIniPath(pluginModule, iniPath))
     return;
@@ -305,7 +306,7 @@ void VehicleData::SaveOffsetsToIni(HMODULE pluginModule, const VehicleOffsets &o
 
   sprintf_s(buffer, "0x%X", offsets.RPM);
   WritePrivateProfileStringA(sectionName.c_str(), "RPM", buffer, iniPath);
-  
+
   WritePrivateProfileStringA("Memory", "AllowIniFallback", "1", iniPath);
 }
 
@@ -335,14 +336,15 @@ bool VehicleData::Initialize(HMODULE pluginModule) {
         hasIniPath
             ? "AOB failed; INI fallback disabled (set AllowIniFallback=1)"
             : "AOB failed; INI path unresolved";
-    if (allowFallback && LoadOffsetsFromIni(pluginModule, candidate)) {
-      resolvedOffsets = candidate;
-      offsetSource = VehicleOffsetSource::IniFallback;
-      initialized = true;
-      return true;
-    }
+  } else if (LoadOffsetsFromIni(pluginModule, candidate)) {
+    resolvedOffsets = candidate;
+    offsetSource = VehicleOffsetSource::IniFallback;
+    initialized = true;
+    return true; // Mod is fully initialized via INI
   }
 
+  // If we reach here, AOB failed and INI failed/disabled.
+  // Enter Calibration Mode instead of killing the mod!
   resolvedOffsets = {};
   offsetSource = VehicleOffsetSource::Uninitialized;
   initialized = false;
@@ -350,90 +352,107 @@ bool VehicleData::Initialize(HMODULE pluginModule) {
   if (calibState == CalibrationState::None) {
       calibState = CalibrationState::WaitingForEngineOff;
   }
-  return false;
+  
+  // Return true so ScriptMain continues and runs our Calibration loop!
+  return true;
 }
 
 void VehicleData::ResetCalibration() {
-    calibState = CalibrationState::WaitingForEngineOff;
+  initialized = false;
+  calibState = CalibrationState::WaitingForEngineOff;
+  offsetSource = VehicleOffsetSource::Uninitialized;
+  resolvedOffsets = {};
+  candidateOffsets.clear();
+}
+
+CalibrationState VehicleData::GetCalibrationState() { return calibState; }
+
+void VehicleData::UpdateCalibration(HMODULE pluginModule, int vehicleHandle,
+                                    bool isEngineOn, bool isRevving) {
+  if (initialized || calibState == CalibrationState::None ||
+      calibState == CalibrationState::Done ||
+      calibState == CalibrationState::Failed)
+    return;
+
+  BYTE *base = getScriptHandleBaseAddress(vehicleHandle);
+  if (!base)
+    return;
+
+  if (calibState == CalibrationState::WaitingForEngineOff) {
+    if (!isEngineOn) {
+      calibState = CalibrationState::ScanningEngineOff;
+    }
+  } else if (calibState == CalibrationState::ScanningEngineOff) {
     candidateOffsets.clear();
-    resolvedOffsets = {};
-    initialized = false;
-    offsetSource = VehicleOffsetSource::Uninitialized;
-}
-
-CalibrationState VehicleData::GetCalibrationState() {
-    return calibState;
-}
-
-void VehicleData::UpdateCalibration(HMODULE pluginModule, int vehicleHandle, bool isEngineOn, bool isRevving) {
-    if (initialized || calibState == CalibrationState::None || calibState == CalibrationState::Done || calibState == CalibrationState::Failed) return;
-
-    BYTE* base = getScriptHandleBaseAddress(vehicleHandle);
-    if (!base) return;
-
-    if (calibState == CalibrationState::WaitingForEngineOff) {
-        if (!isEngineOn) {
-            calibState = CalibrationState::ScanningEngineOff;
+    for (uint32_t offset = 0x600; offset < 0xC00; offset += 4) {
+      if (AOBScanner::IsReadable(reinterpret_cast<uintptr_t>(base) + offset,
+                                 4)) {
+        float val = *reinterpret_cast<float *>(base + offset);
+        if (val == 0.0f) {
+          candidateOffsets.push_back(offset);
         }
-    } else if (calibState == CalibrationState::ScanningEngineOff) {
-        candidateOffsets.clear();
-        for (uint32_t offset = 0x700; offset < 0xA00; offset += 4) {
-            if (AOBScanner::IsReadable(reinterpret_cast<uintptr_t>(base) + offset, 4)) {
-                float val = *reinterpret_cast<float*>(base + offset);
-                if (val == 0.0f) {
-                    candidateOffsets.push_back(offset);
-                }
-            }
-        }
-        calibState = CalibrationState::WaitingForEngineOn;
-    } else if (calibState == CalibrationState::WaitingForEngineOn) {
-        if (isEngineOn) {
-            calibState = CalibrationState::ScanningEngineOn;
-        }
-    } else if (calibState == CalibrationState::ScanningEngineOn) {
-        std::vector<uint32_t> nextCandidates;
-        for (uint32_t offset : candidateOffsets) {
-            float val = *reinterpret_cast<float*>(base + offset);
-            if (val > 0.1f && val < 0.3f) {
-                nextCandidates.push_back(offset);
-            }
-        }
+      }
+    }
+    calibState = CalibrationState::WaitingForEngineOn;
+  } else if (calibState == CalibrationState::WaitingForEngineOn) {
+    if (isEngineOn) {
+      calibState = CalibrationState::ScanningEngineOn;
+    }
+  } else if (calibState == CalibrationState::ScanningEngineOn) {
+    std::vector<uint32_t> nextCandidates;
+    bool foundIdle = false;
+    for (uint32_t offset : candidateOffsets) {
+      float val = *reinterpret_cast<float *>(base + offset);
+      if (val > 0.15f && val < 0.35f) {
+        nextCandidates.push_back(offset);
+        foundIdle = true;
+      }
+    }
+    
+    // Only proceed when the engine has spooled up to idle and we found candidates
+    if (foundIdle) {
         candidateOffsets = nextCandidates;
         calibState = CalibrationState::WaitingForRev;
-    } else if (calibState == CalibrationState::WaitingForRev) {
-        if (isRevving) {
-            calibState = CalibrationState::ScanningRev;
-        }
-    } else if (calibState == CalibrationState::ScanningRev) {
-        std::vector<uint32_t> nextCandidates;
-        for (uint32_t offset : candidateOffsets) {
-            float val = *reinterpret_cast<float*>(base + offset);
-            if (val > 0.4f && val <= 1.2f) { // RPM increases
-                nextCandidates.push_back(offset);
-            }
-        }
+    }
+  } else if (calibState == CalibrationState::WaitingForRev) {
+    if (isRevving) {
+      calibState = CalibrationState::ScanningRev;
+    }
+  } else if (calibState == CalibrationState::ScanningRev) {
+    std::vector<uint32_t> nextCandidates;
+    bool foundRev = false;
+    for (uint32_t offset : candidateOffsets) {
+      float val = *reinterpret_cast<float *>(base + offset);
+      if (val > 0.4f && val <= 1.2f) { // RPM increases
+        nextCandidates.push_back(offset);
+        foundRev = true;
+      }
+    }
+    
+    if (foundRev) {
         candidateOffsets = nextCandidates;
         
-        if (candidateOffsets.size() == 1) {
-            resolvedOffsets.RPM = candidateOffsets[0];
-            resolvedOffsets.Clutch = resolvedOffsets.RPM + 12; // Typical GTA V memory layout
-            resolvedOffsets.Gear = resolvedOffsets.RPM - 36;
-            resolvedOffsets.NextGear = resolvedOffsets.Gear - 2;
-
-            if (AreOffsetsSane(resolvedOffsets)) {
-                SaveOffsetsToIni(pluginModule, resolvedOffsets);
-                offsetSource = VehicleOffsetSource::Calibration;
-                initialized = true;
-                calibState = CalibrationState::Done;
-            } else {
-                calibState = CalibrationState::Failed;
-                lastFailureReason = "Calibration found invalid offset layout";
-            }
-        } else if (candidateOffsets.empty()) {
+        if (!candidateOffsets.empty()) {
+          resolvedOffsets.RPM = candidateOffsets[0];
+          resolvedOffsets.Clutch = resolvedOffsets.RPM + 12; // Typical GTA V memory layout
+          resolvedOffsets.Gear = resolvedOffsets.RPM - 36;
+          resolvedOffsets.NextGear = resolvedOffsets.Gear - 2;
+          
+          if (AreOffsetsSane(resolvedOffsets)) {
+            calibState = CalibrationState::Done;
+            offsetSource = VehicleOffsetSource::Calibration;
+            initialized = true;
+            SaveOffsetsToIni(pluginModule, resolvedOffsets);
+          } else {
             calibState = CalibrationState::Failed;
-            lastFailureReason = "Calibration failed to find unique RPM offset";
+            lastFailureReason = "Calibration found invalid offset layout";
+          }
+        } else {
+          calibState = CalibrationState::Failed;
+          lastFailureReason = "Calibration failed to isolate RPM offset";
         }
     }
+  }
 }
 
 bool VehicleData::IsInitialized() { return initialized; }
@@ -489,26 +508,41 @@ bool VehicleData::IsValid() const {
 uint8_t VehicleData::GetGear() const {
   if (!CanRead(resolvedOffsets.Gear, sizeof(uint8_t)))
     return 0;
-  return *reinterpret_cast<const uint8_t *>(baseAddress + resolvedOffsets.Gear);
+  __try {
+    return *reinterpret_cast<const uint8_t *>(baseAddress + resolvedOffsets.Gear);
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return 0;
+  }
 }
 
 uint8_t VehicleData::GetNextGear() const {
   if (!CanRead(resolvedOffsets.NextGear, sizeof(uint8_t)))
     return 0;
-  return *reinterpret_cast<const uint8_t *>(baseAddress +
-                                            resolvedOffsets.NextGear);
+  __try {
+    return *reinterpret_cast<const uint8_t *>(baseAddress + resolvedOffsets.NextGear);
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return 0;
+  }
 }
 
 float VehicleData::GetClutch() const {
   if (!CanRead(resolvedOffsets.Clutch, sizeof(float)))
     return 0.0f;
-  return *reinterpret_cast<const float *>(baseAddress + resolvedOffsets.Clutch);
+  __try {
+    return *reinterpret_cast<const float *>(baseAddress + resolvedOffsets.Clutch);
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return 0.0f;
+  }
 }
 
 float VehicleData::GetRPM() const {
   if (!CanRead(resolvedOffsets.RPM, sizeof(float)))
     return 0.0f;
-  return *reinterpret_cast<const float *>(baseAddress + resolvedOffsets.RPM);
+  __try {
+    return *reinterpret_cast<const float *>(baseAddress + resolvedOffsets.RPM);
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return 0.0f;
+  }
 }
 
 bool VehicleData::HasPlausibleLayout(int maxGear) const {
@@ -533,15 +567,23 @@ bool VehicleData::HasPlausibleLayout(int maxGear) const {
 bool VehicleData::SetGear(uint8_t gear) {
   if (!CanWrite(resolvedOffsets.Gear, sizeof(gear)))
     return false;
-  *reinterpret_cast<uint8_t *>(baseAddress + resolvedOffsets.Gear) = gear;
-  return true;
+  __try {
+    *reinterpret_cast<uint8_t *>(baseAddress + resolvedOffsets.Gear) = gear;
+    return true;
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return false;
+  }
 }
 
 bool VehicleData::SetNextGear(uint8_t gear) {
   if (!CanWrite(resolvedOffsets.NextGear, sizeof(gear)))
     return false;
-  *reinterpret_cast<uint8_t *>(baseAddress + resolvedOffsets.NextGear) = gear;
-  return true;
+  __try {
+    *reinterpret_cast<uint8_t *>(baseAddress + resolvedOffsets.NextGear) = gear;
+    return true;
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return false;
+  }
 }
 
 bool VehicleData::SetClutch(float clutch) {
@@ -549,14 +591,22 @@ bool VehicleData::SetClutch(float clutch) {
       !CanWrite(resolvedOffsets.Clutch, sizeof(clutch))) {
     return false;
   }
-  *reinterpret_cast<float *>(baseAddress + resolvedOffsets.Clutch) = clutch;
-  return true;
+  __try {
+    *reinterpret_cast<float *>(baseAddress + resolvedOffsets.Clutch) = clutch;
+    return true;
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return false;
+  }
 }
 
 bool VehicleData::SetRPM(float rpm) {
   if (!std::isfinite(rpm) || !CanWrite(resolvedOffsets.RPM, sizeof(rpm))) {
     return false;
   }
-  *reinterpret_cast<float *>(baseAddress + resolvedOffsets.RPM) = rpm;
-  return true;
+  __try {
+    *reinterpret_cast<float *>(baseAddress + resolvedOffsets.RPM) = rpm;
+    return true;
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return false;
+  }
 }

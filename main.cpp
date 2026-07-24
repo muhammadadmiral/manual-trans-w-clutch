@@ -13,9 +13,9 @@
 #include <string>
 #include <unordered_map>
 
-namespace {
-
 HMODULE g_pluginModule = nullptr;
+
+namespace {
 
 // Standard eControl ids used across the GTA IV/V modding community since
 // forever (INPUT_VEHICLE_ACCELERATE / INPUT_VEHICLE_BRAKE). If your
@@ -138,7 +138,14 @@ void ResetInputEdges(bool &shiftUpPressed, bool &shiftDownPressed) {
 } // namespace
 
 void ScriptMain() {
-  scriptWait(2000);
+  // Wait until game loading completes and player ped exists
+  while (true) {
+    scriptWait(1000);
+    const Ped playerPed = PLAYER::PLAYER_PED_ID();
+    if (ENTITY::DOES_ENTITY_EXIST(playerPed) && !PED::IS_PED_INJURED(playerPed)) {
+      break;
+    }
+  }
 
   if (!VehicleData::Initialize(g_pluginModule)) {
     const std::string buildVersion = VehicleData::GetGameBuildVersion();
@@ -152,16 +159,7 @@ void ScriptMain() {
 
   Config::ReadConfig(g_pluginModule);
 
-  const VehicleOffsets &offsets = VehicleData::GetResolvedOffsets();
-  const std::string buildVersion = VehicleData::GetGameBuildVersion();
-  char loadedMessage[256]{};
-  sprintf_s(loadedMessage,
-            "Manual transmission: %s | build %s | G:%X N:%X R:%X C:%X",
-            VehicleData::GetOffsetSourceName(),
-            buildVersion.empty() ? "unknown" : buildVersion.c_str(),
-            offsets.Gear, offsets.NextGear, offsets.RPM, offsets.Clutch);
-  ShowNotification(loadedMessage);
-
+  bool notificationShown = false;
   Vehicle activeVehicle = 0;
   uint8_t manualGear = 1;
   bool activeLayoutValidated = false;
@@ -170,6 +168,10 @@ void ScriptMain() {
 
   bool engineOnEdges = false;
   bool isEngineOn = true;
+
+  float smoothedThrottle = 0.0f;
+  float smoothedBrake = 0.0f;
+  float smoothedClutch = 0.0f;
 
   while (true) {
     scriptWait(0);
@@ -194,6 +196,20 @@ void ScriptMain() {
       continue;
     }
 
+    // Show loaded notification once when entering a vehicle safely
+    if (!notificationShown && VehicleData::IsInitialized()) {
+      notificationShown = true;
+      const VehicleOffsets &offsets = VehicleData::GetResolvedOffsets();
+      const std::string buildVersion = VehicleData::GetGameBuildVersion();
+      char loadedMessage[256]{};
+      sprintf_s(loadedMessage,
+                "Manual transmission: %s | build %s | G:%X N:%X R:%X C:%X",
+                VehicleData::GetOffsetSourceName(),
+                buildVersion.empty() ? "unknown" : buildVersion.c_str(),
+                offsets.Gear, offsets.NextGear, offsets.RPM, offsets.Clutch);
+      ShowNotification(loadedMessage);
+    }
+
     const int maxGear = VEHICLE::_GET_VEHICLE_MAX_DRIVE_GEAR_COUNT(vehicle);
     VehicleData data(vehicle);
     isEngineOn = VEHICLE::GET_IS_VEHICLE_ENGINE_RUNNING(vehicle) != 0;
@@ -201,18 +217,20 @@ void ScriptMain() {
     if (vehicle != activeVehicle) {
       activeVehicle = vehicle;
       activeLayoutValidated = data.HasPlausibleLayout(maxGear);
-      
+
       if (Config::RequireColdStart) {
-          VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
-          isEngineOn = false;
+        VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
+        isEngineOn = false;
       }
 
       if (!activeLayoutValidated && VehicleData::IsInitialized()) {
-        ShowNotification("CVehicle validation failed. Memory writes blocked.");
+        ShowNotification("CVehicle validation failed. Recalibrating...");
         ResetInputEdges(shiftUpPressed, shiftDownPressed);
+        VehicleData::ResetCalibration();
       } else {
         const uint8_t detectedGear = data.GetGear();
-        manualGear = detectedGear >= 1 && detectedGear <= maxGear ? detectedGear : 1;
+        manualGear =
+            detectedGear >= 1 && detectedGear <= maxGear ? detectedGear : 1;
       }
       shiftUpPressed = (GetAsyncKeyState(Config::KeyShiftUp) & 0x8000) != 0;
       shiftDownPressed = (GetAsyncKeyState(Config::KeyShiftDown) & 0x8000) != 0;
@@ -221,31 +239,57 @@ void ScriptMain() {
 
     const bool engineKey = (GetAsyncKeyState(Config::KeyEngine) & 0x8000) != 0;
     if (engineKey && !engineOnEdges) {
-        isEngineOn = !isEngineOn;
-        VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, isEngineOn ? TRUE : FALSE, FALSE, TRUE);
+      isEngineOn = !isEngineOn;
+      VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, isEngineOn ? TRUE : FALSE, FALSE,
+                                     TRUE);
     }
     engineOnEdges = engineKey;
 
     if (!VehicleData::IsInitialized()) {
-        const bool isRevving = GetControlNormal(kInputGroupVehicle, kControlVehicleAccelerate) > 0.5f;
-        VehicleData::UpdateCalibration(g_pluginModule, vehicle, isEngineOn, isRevving);
-        
+      const bool isRevving = GetControlNormal(kInputGroupVehicle,
+                                              kControlVehicleAccelerate) > 0.5f;
+      VehicleData::UpdateCalibration(g_pluginModule, vehicle, isEngineOn,
+                                     isRevving);
+
+      if (VehicleData::IsInitialized()) {
+        activeLayoutValidated = data.HasPlausibleLayout(maxGear);
+        ShowNotification("Calibration complete! Manual transmission active.");
+      } else {
         CalibrationState state = VehicleData::GetCalibrationState();
         std::string calibMsg = "Calibration: ";
         switch (state) {
-            case CalibrationState::WaitingForEngineOff: calibMsg += "Turn off engine (press " + std::string(1, (char)Config::KeyEngine) + ")"; break;
-            case CalibrationState::ScanningEngineOff: calibMsg += "Scanning..."; break;
-            case CalibrationState::WaitingForEngineOn: calibMsg += "Turn ON engine and idle"; break;
-            case CalibrationState::ScanningEngineOn: calibMsg += "Scanning..."; break;
-            case CalibrationState::WaitingForRev: calibMsg += "Rev the engine (Hold W)"; break;
-            case CalibrationState::ScanningRev: calibMsg += "Scanning..."; break;
-            case CalibrationState::Done: calibMsg += "Success! Offsets saved."; break;
-            case CalibrationState::Failed: calibMsg += "Failed. Try again."; break;
-            default: break;
+        case CalibrationState::WaitingForEngineOff:
+          calibMsg += "Turn off engine (press " +
+                      std::string(1, (char)Config::KeyEngine) + ")";
+          break;
+        case CalibrationState::ScanningEngineOff:
+          calibMsg += "Scanning...";
+          break;
+        case CalibrationState::WaitingForEngineOn:
+          calibMsg += "Turn ON engine and idle";
+          break;
+        case CalibrationState::ScanningEngineOn:
+          calibMsg += "Scanning...";
+          break;
+        case CalibrationState::WaitingForRev:
+          calibMsg += "Rev the engine (Hold W)";
+          break;
+        case CalibrationState::ScanningRev:
+          calibMsg += "Scanning...";
+          break;
+        case CalibrationState::Done:
+          calibMsg += "Success! Offsets saved.";
+          break;
+        case CalibrationState::Failed:
+          calibMsg += "Failed. Try again.";
+          break;
+        default:
+          break;
         }
         DrawTextOverlay(calibMsg.c_str(), 0.5f, 0.1f, 0.6f);
         Menu::Draw();
         continue;
+      }
     }
 
     if (!activeLayoutValidated || !data.IsValid()) {
@@ -256,6 +300,48 @@ void ScriptMain() {
     const bool isUp = (GetAsyncKeyState(Config::KeyShiftUp) & 0x8000) != 0;
     const bool isDown = (GetAsyncKeyState(Config::KeyShiftDown) & 0x8000) != 0;
     const bool isClutch = (GetAsyncKeyState(Config::KeyClutch) & 0x8000) != 0;
+
+    // --- Analog Emulation / Smoothing ---
+    const bool isThrottle = (GetAsyncKeyState(0x57) & 0x8000) != 0 ||
+                            (GetAsyncKeyState(VK_UP) & 0x8000) != 0; // W or UP
+    const bool isBrake = (GetAsyncKeyState(0x53) & 0x8000) != 0 ||
+                         (GetAsyncKeyState(VK_DOWN) & 0x8000) != 0; // S or DOWN
+
+    if (isThrottle) {
+      smoothedThrottle += Config::ThrottleAttack;
+    } else {
+      smoothedThrottle -= Config::ThrottleRelease;
+    }
+
+    if (isBrake) {
+      smoothedBrake += Config::BrakeAttack;
+    } else {
+      smoothedBrake -= Config::BrakeRelease;
+    }
+
+    if (isClutch) {
+      smoothedClutch += Config::ClutchAttack;
+    } else {
+      smoothedClutch -= Config::ClutchRelease;
+    }
+
+    smoothedThrottle = (std::max)(0.0f, (std::min)(1.0f, smoothedThrottle));
+    smoothedBrake = (std::max)(0.0f, (std::min)(1.0f, smoothedBrake));
+    smoothedClutch = (std::max)(0.0f, (std::min)(1.0f, smoothedClutch));
+
+    PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, kControlVehicleAccelerate,
+                                      smoothedThrottle);
+    PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, kControlVehicleBrake, smoothedBrake);
+
+    // --- Engine Stall Logic ---
+    if (isEngineOn && manualGear > 0) {
+      if (data.GetRPM() < 0.15f &&
+          smoothedClutch < 0.5f) { // RPM drops too low and clutch isn't held
+        isEngineOn = false;
+        VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
+        ShowNotification("Engine Stalled!");
+      }
+    }
 
     if (isUp && !shiftUpPressed && manualGear < maxGear) {
       ++manualGear;
@@ -268,14 +354,10 @@ void ScriptMain() {
     shiftDownPressed = isDown;
 
     // --- Clutch Logic ---
-    // Prefer writing the real clutch value (0 = engaged, 1 = disengaged) so
-    // RPM/wheelspin behaves like an actual clutch. If that offset isn't
-    // writable for some reason, fall back to the power-cheat trick, which is
-    // cruder (kills power outright) but still stops the car from lurching.
-    const float clutchTarget = isClutch ? 1.0f : 0.0f;
+    const float clutchTarget = smoothedClutch;
     if (Config::UseRealClutch && data.SetClutch(clutchTarget)) {
       VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, 1.0f);
-    } else if (isClutch) {
+    } else if (clutchTarget > 0.5f) {
       VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, 0.0f);
     } else {
       VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, 1.0f);
@@ -331,7 +413,7 @@ void ScriptMain() {
       DrawBar(barX, y, barWidth, barHeight, brakeFraction, 220, 90, 220,
               "BRAKE");
     }
-    
+
     Menu::Draw();
   }
 }

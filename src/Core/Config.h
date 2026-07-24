@@ -15,11 +15,15 @@ extern bool DebugOverlay;
 // more than one drive gear.
 extern bool AllowQuadbikes;
 
+// Prefer writing the real Clutch offset (smoother, revs/wheelspin behave
+// like an actual disengaged clutch). Falls back automatically to the
+// SET_VEHICLE_CHEAT_POWER_INCREASE trick if the offset isn't writable.
+// Set false to always use the cheat-power trick.
+extern bool UseRealClutch;
+
 // Require turning on the engine (via KeyEngine) when entering a vehicle.
 extern bool RequireColdStart;
 
-// Smoothing rates for keyboard emulation (0.01 to 1.0)
-// Higher = faster response, Lower = smoother/slower response
 extern float ThrottleAttack;
 extern float ThrottleRelease;
 extern float BrakeAttack;
@@ -27,7 +31,6 @@ extern float BrakeRelease;
 extern float ClutchAttack;
 extern float ClutchRelease;
 
-// Save float setting to INI
 void WriteFloat(const char *section, const char *key, float value, const char *iniPath);
 void SaveConfig(HMODULE module);
 

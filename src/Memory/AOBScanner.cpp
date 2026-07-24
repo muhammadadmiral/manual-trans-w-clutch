@@ -80,21 +80,35 @@ bool AOBScanner::IsReadable(uintptr_t address, size_t size) {
   if (address == 0 || size == 0)
     return false;
 
-  MEMORY_BASIC_INFORMATION info{};
-  if (VirtualQuery(reinterpret_cast<const void *>(address), &info,
-                   sizeof(info)) == 0) {
-    return false;
+  const uintptr_t startPage = address & ~static_cast<uintptr_t>(4095);
+  const uintptr_t endPage = (address + size - 1) & ~static_cast<uintptr_t>(4095);
+
+  for (uintptr_t page = startPage; page <= endPage; page += 4096) {
+    MEMORY_BASIC_INFORMATION info{};
+    if (VirtualQuery(reinterpret_cast<const void *>(page), &info, sizeof(info)) == 0) {
+      return false;
+    }
+    if (info.State != MEM_COMMIT || !IsReadableProtection(info.Protect)) {
+      return false;
+    }
   }
 
-  if (info.State != MEM_COMMIT || !IsReadableProtection(info.Protect)) {
+  return true;
+}
+
+static bool ComparePatternSafe(const uint8_t *data, const std::vector<int> &pattern) {
+  __try {
+    const size_t patternSize = pattern.size();
+    for (size_t i = 0; i < patternSize; ++i) {
+      const int expected = pattern[i];
+      if (expected != -1 && data[i] != static_cast<uint8_t>(expected)) {
+        return false;
+      }
+    }
+    return true;
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
     return false;
   }
-
-  const uintptr_t regionStart = reinterpret_cast<uintptr_t>(info.BaseAddress);
-  const uintptr_t regionEnd = regionStart + info.RegionSize;
-  if (address < regionStart || address > regionEnd)
-    return false;
-  return size <= regionEnd - address;
 }
 
 std::vector<uintptr_t> AOBScanner::FindAll(const char *signature,
@@ -139,28 +153,18 @@ std::vector<uintptr_t> AOBScanner::FindAll(const char *signature,
         nt->OptionalHeader.SizeOfImage - section->VirtualAddress;
     sectionSize = std::min(sectionSize, imageRemaining);
 
-    if (sectionSize < patternSize ||
-        !IsReadable(reinterpret_cast<uintptr_t>(sectionBase), sectionSize)) {
+    if (sectionSize < patternSize) {
       continue;
     }
 
     const size_t lastStart = sectionSize - patternSize;
     for (size_t offset = 0; offset <= lastStart; ++offset) {
-      bool matched = true;
-      for (size_t byteIndex = 0; byteIndex < patternSize; ++byteIndex) {
-        const int expected = pattern[byteIndex];
-        if (expected != -1 && sectionBase[offset + byteIndex] != expected) {
-          matched = false;
-          break;
-        }
+      const uint8_t *candidate = sectionBase + offset;
+      if (ComparePatternSafe(candidate, pattern)) {
+        matches.push_back(reinterpret_cast<uintptr_t>(candidate));
+        if (matches.size() >= maxMatches)
+          return matches;
       }
-
-      if (!matched)
-        continue;
-
-      matches.push_back(reinterpret_cast<uintptr_t>(sectionBase + offset));
-      if (matches.size() >= maxMatches)
-        return matches;
     }
   }
 

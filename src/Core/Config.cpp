@@ -21,6 +21,13 @@ bool RequireColdStart = true;
 int KeyEngine = 90; // Z key
 int KeyMenu = 219;  // [ key
 
+float ThrottleAttack = 0.05f;
+float ThrottleRelease = 0.1f;
+float BrakeAttack = 0.1f;
+float BrakeRelease = 0.2f;
+float ClutchAttack = 0.05f;
+float ClutchRelease = 0.1f;
+
 namespace {
 
 float ReadFloat(const char *section, const char *key, float fallback,
@@ -88,6 +95,13 @@ void ReadConfig(HMODULE module) {
   RequireColdStart =
       GetPrivateProfileIntA("Vehicles", "RequireColdStart", 1, iniPath) != 0;
 
+  ThrottleAttack = ReadFloat("Analog", "ThrottleAttack", 0.05f, iniPath);
+  ThrottleRelease = ReadFloat("Analog", "ThrottleRelease", 0.10f, iniPath);
+  BrakeAttack = ReadFloat("Analog", "BrakeAttack", 0.10f, iniPath);
+  BrakeRelease = ReadFloat("Analog", "BrakeRelease", 0.20f, iniPath);
+  ClutchAttack = ReadFloat("Analog", "ClutchAttack", 0.05f, iniPath);
+  ClutchRelease = ReadFloat("Analog", "ClutchRelease", 0.10f, iniPath);
+
   char excludedClassesBuffer[128]{};
   GetPrivateProfileStringA("Vehicles", "ExcludedClasses", "",
                            excludedClassesBuffer, sizeof(excludedClassesBuffer),
@@ -100,4 +114,31 @@ void ReadConfig(HMODULE module) {
   OverlayBarWidth = ReadFloat("Overlay", "BarWidth", 0.12f, iniPath);
   OverlayBarHeight = ReadFloat("Overlay", "BarHeight", 0.014f, iniPath);
 }
+
+void WriteFloat(const char *section, const char *key, float value, const char *iniPath) {
+    char buffer[32]{};
+    sprintf_s(buffer, "%.3f", value);
+    WritePrivateProfileStringA(section, key, buffer, iniPath);
+}
+
+void SaveConfig(HMODULE module) {
+  char iniPath[MAX_PATH];
+  DWORD length = GetModuleFileNameA(module, iniPath, MAX_PATH);
+  if (length == 0 || length >= MAX_PATH) return;
+
+  char *slash = std::strrchr(iniPath, '\\');
+  if (!slash) slash = std::strrchr(iniPath, '/');
+  if (!slash) return;
+  *slash = '\0';
+
+  strcat_s(iniPath, "\\manual-trans.ini");
+  
+  WriteFloat("Analog", "ThrottleAttack", ThrottleAttack, iniPath);
+  WriteFloat("Analog", "ThrottleRelease", ThrottleRelease, iniPath);
+  WriteFloat("Analog", "BrakeAttack", BrakeAttack, iniPath);
+  WriteFloat("Analog", "BrakeRelease", BrakeRelease, iniPath);
+  WriteFloat("Analog", "ClutchAttack", ClutchAttack, iniPath);
+  WriteFloat("Analog", "ClutchRelease", ClutchRelease, iniPath);
+}
+
 } // namespace Config
