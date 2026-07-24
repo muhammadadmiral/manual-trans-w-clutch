@@ -30,6 +30,17 @@ float BrakeRelease = 0.2f;
 float ClutchAttack = 0.05f;
 float ClutchRelease = 0.1f;
 
+int   KeyParkingBrake = 0x50; // 'P' key
+
+float SteerAttack       = 0.08f;
+float SteerRelease      = 0.06f;
+float SteerExpo         = 0.35f;
+float SteerDeadzonePct  = 0.05f;
+
+float ThrottleExpo = 0.25f;
+float BrakeExpo    = 0.20f;
+float ClutchExpo   = 0.15f;
+
 namespace {
 
 float ReadFloat(const char *section, const char *key, float fallback,
@@ -92,6 +103,8 @@ void ReadConfig(HMODULE module) {
       GetPrivateProfileIntA("Controls", "SignalLeft", VK_NUMPAD4, iniPath);
   KeySignalRight =
       GetPrivateProfileIntA("Controls", "SignalRight", VK_NUMPAD6, iniPath);
+  KeyParkingBrake =
+      GetPrivateProfileIntA("Controls", "ParkingBrake", 0x50, iniPath);
 
   DebugOverlay = GetPrivateProfileIntA("Debug", "Overlay", 1, iniPath) != 0;
   AllowQuadbikes =
@@ -101,12 +114,20 @@ void ReadConfig(HMODULE module) {
   RequireColdStart =
       GetPrivateProfileIntA("Vehicles", "RequireColdStart", 1, iniPath) != 0;
 
-  ThrottleAttack = ReadFloat("Analog", "ThrottleAttack", 0.05f, iniPath);
-  ThrottleRelease = ReadFloat("Analog", "ThrottleRelease", 0.10f, iniPath);
-  BrakeAttack = ReadFloat("Analog", "BrakeAttack", 0.10f, iniPath);
-  BrakeRelease = ReadFloat("Analog", "BrakeRelease", 0.20f, iniPath);
-  ClutchAttack = ReadFloat("Analog", "ClutchAttack", 0.05f, iniPath);
-  ClutchRelease = ReadFloat("Analog", "ClutchRelease", 0.10f, iniPath);
+  ThrottleAttack   = ReadFloat("Analog", "ThrottleAttack",  0.05f, iniPath);
+  ThrottleRelease  = ReadFloat("Analog", "ThrottleRelease", 0.10f, iniPath);
+  BrakeAttack      = ReadFloat("Analog", "BrakeAttack",     0.10f, iniPath);
+  BrakeRelease     = ReadFloat("Analog", "BrakeRelease",    0.20f, iniPath);
+  ClutchAttack     = ReadFloat("Analog", "ClutchAttack",    0.05f, iniPath);
+  ClutchRelease    = ReadFloat("Analog", "ClutchRelease",   0.10f, iniPath);
+  ThrottleExpo     = ReadFloat("Analog", "ThrottleExpo",    0.25f, iniPath);
+  BrakeExpo        = ReadFloat("Analog", "BrakeExpo",       0.20f, iniPath);
+  ClutchExpo       = ReadFloat("Analog", "ClutchExpo",      0.15f, iniPath);
+
+  SteerAttack      = ReadFloat("Steering", "Attack",        0.08f, iniPath);
+  SteerRelease     = ReadFloat("Steering", "Release",       0.06f, iniPath);
+  SteerExpo        = ReadFloat("Steering", "Expo",          0.35f, iniPath);
+  SteerDeadzonePct = ReadFloat("Steering", "DeadzonePct",   0.05f, iniPath);
 
   char excludedClassesBuffer[128]{};
   GetPrivateProfileStringA("Vehicles", "ExcludedClasses", "",
@@ -155,20 +176,29 @@ void SaveConfig(HMODULE module) {
   WriteInt("Controls", "ClutchKey", KeyClutch, iniPath);
   WriteInt("Controls", "EngineKey", KeyEngine, iniPath);
   WriteInt("Controls", "MenuKey", KeyMenu, iniPath);
-  WriteInt("Controls", "SignalLeft", KeySignalLeft, iniPath);
-  WriteInt("Controls", "SignalRight", KeySignalRight, iniPath);
+  WriteInt("Controls", "SignalLeft",    KeySignalLeft,    iniPath);
+  WriteInt("Controls", "SignalRight",   KeySignalRight,   iniPath);
+  WriteInt("Controls", "ParkingBrake", KeyParkingBrake,  iniPath);
 
   WriteInt("Debug", "Overlay", DebugOverlay ? 1 : 0, iniPath);
   WriteInt("Vehicles", "AllowQuadbikes", AllowQuadbikes ? 1 : 0, iniPath);
   WriteInt("Vehicles", "UseRealClutch", UseRealClutch ? 1 : 0, iniPath);
   WriteInt("Vehicles", "RequireColdStart", RequireColdStart ? 1 : 0, iniPath);
 
-  WriteFloat("Analog", "ThrottleAttack", ThrottleAttack, iniPath);
+  WriteFloat("Analog", "ThrottleAttack",  ThrottleAttack,  iniPath);
   WriteFloat("Analog", "ThrottleRelease", ThrottleRelease, iniPath);
-  WriteFloat("Analog", "BrakeAttack", BrakeAttack, iniPath);
-  WriteFloat("Analog", "BrakeRelease", BrakeRelease, iniPath);
-  WriteFloat("Analog", "ClutchAttack", ClutchAttack, iniPath);
-  WriteFloat("Analog", "ClutchRelease", ClutchRelease, iniPath);
+  WriteFloat("Analog", "BrakeAttack",     BrakeAttack,     iniPath);
+  WriteFloat("Analog", "BrakeRelease",    BrakeRelease,    iniPath);
+  WriteFloat("Analog", "ClutchAttack",    ClutchAttack,    iniPath);
+  WriteFloat("Analog", "ClutchRelease",   ClutchRelease,   iniPath);
+  WriteFloat("Analog", "ThrottleExpo",    ThrottleExpo,    iniPath);
+  WriteFloat("Analog", "BrakeExpo",       BrakeExpo,       iniPath);
+  WriteFloat("Analog", "ClutchExpo",      ClutchExpo,      iniPath);
+
+  WriteFloat("Steering", "Attack",       SteerAttack,      iniPath);
+  WriteFloat("Steering", "Release",      SteerRelease,     iniPath);
+  WriteFloat("Steering", "Expo",         SteerExpo,        iniPath);
+  WriteFloat("Steering", "DeadzonePct",  SteerDeadzonePct, iniPath);
 
   WriteInt("Overlay", "Bars", OverlayBars ? 1 : 0, iniPath);
   WriteFloat("Overlay", "PosX", OverlayPosX, iniPath);

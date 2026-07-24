@@ -80,6 +80,38 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
     }
   }
 
+  // --- Gear Ratio Over-Rev Simulation ---
+  if (s_manualGear > 0 && s_manualGear <= maxGear) {
+    float currentRatio = data.GetGearRatio(s_manualGear);
+    float topRatio = data.GetGearRatio(maxGear);
+
+    // Very simplified approximation: if ratio is valid and we are moving fast
+    if (currentRatio > 0.0f && topRatio > 0.0f) {
+      // Relative ratio compares current gear to top gear
+      float relativeRatio = currentRatio / topRatio;
+
+      // If speed is very high but we are in a very low gear, trigger over-rev
+      // limit
+      float estimatedSpeedRatio =
+          speedKmH / 300.0f; // Assume ~300km/h max speed for typical supercars
+      float estimatedRPM = estimatedSpeedRatio * relativeRatio;
+
+      if (estimatedRPM > 1.2f && clutch < 0.5f) {
+        // OVER-REV! The player downshifted too early at high speed.
+        // We can simulate engine braking by applying a brake force natively,
+        // or just playing a warning sound and killing the engine.
+        // For now, let's stall the engine if they severely over-rev it to
+        // protect the engine!
+        if (isEngineOn) {
+          isEngineOn = false;
+          VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
+          PlayGearGrindSound(vehicle);
+          grindWarningTimer = 60; // Show warning
+        }
+      }
+    }
+  }
+
   return s_manualGear;
 }
 

@@ -21,17 +21,37 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="src\Memory\AOBScanner.cpp" />
+    <ClCompile Include="src\Memory\GameMemoryEngine.cpp" />
+    <ClCompile Include="src\Memory\OffsetResolver.cpp" />
     <ClCompile Include="src\Vehicle\VehicleData.cpp" />
+    <ClCompile Include="src\Vehicle\FuelSystem.cpp" />
+    <ClCompile Include="src\Vehicle\LightsLogic.cpp" />
+    <ClCompile Include="src\Vehicle\ParkingBrake.cpp" />
+    <ClCompile Include="src\Vehicle\PhysicsEngine.cpp" />
+    <ClCompile Include="src\Vehicle\TelemetryLogger.cpp" />
+    <ClCompile Include="src\Vehicle\TractionControl.cpp" />
+    <ClCompile Include="src\Vehicle\TurboSystem.cpp" />
+    <ClCompile Include="src\Vehicle\GearLogic.cpp" />
     <ClCompile Include="src\Core\Config.cpp" />
     <ClCompile Include="src\Core\Menu.cpp" />
     <ClCompile Include="src\Core\InputHandler.cpp" />
     <ClCompile Include="src\Core\Renderer.cpp" />
-    <ClCompile Include="src\Vehicle\GearLogic.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Core\Menu.h" />
     <ClInclude Include="src\Core\InputHandler.h" />
     <ClInclude Include="src\Core\Renderer.h" />
+    <ClInclude Include="src\Memory\AOBScanner.h" />
+    <ClInclude Include="src\Memory\GameMemoryEngine.h" />
+    <ClInclude Include="src\Memory\OffsetResolver.h" />
+    <ClInclude Include="src\Vehicle\VehicleData.h" />
+    <ClInclude Include="src\Vehicle\FuelSystem.h" />
+    <ClInclude Include="src\Vehicle\LightsLogic.h" />
+    <ClInclude Include="src\Vehicle\ParkingBrake.h" />
+    <ClInclude Include="src\Vehicle\PhysicsEngine.h" />
+    <ClInclude Include="src\Vehicle\TelemetryLogger.h" />
+    <ClInclude Include="src\Vehicle\TractionControl.h" />
+    <ClInclude Include="src\Vehicle\TurboSystem.h" />
     <ClInclude Include="src\Vehicle\GearLogic.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

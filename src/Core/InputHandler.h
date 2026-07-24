@@ -16,5 +16,6 @@ bool IsSignalRightJustPressed();
 float GetSmoothedThrottle();
 float GetSmoothedBrake();
 float GetSmoothedClutch();
+float GetSmoothedSteer(); // -1.0 to +1.0
 
 } // namespace InputHandler

@@ -19,4 +19,8 @@ void DrawDebugOverlay(int manualGear, unsigned gameGear, unsigned nextGear,
 
 void DrawPedalsOverlay(float rpm, float clutch, float throttle, float brake);
 
+void DrawSimulationOverlay(float fuel, float oilTemp, float gearboxHealth,
+                            float clutchHeat, bool parkingBrake,
+                            bool wheelsLocked, float engineBrake);
+
 } // namespace Renderer

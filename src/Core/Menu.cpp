@@ -11,6 +11,53 @@ std::vector<int> Menu::menuStack;
 
 extern HMODULE g_pluginModule; // Needed to save INI, from main.cpp
 
+bool Menu::waitingForKeyBind = false;
+
+std::string Menu::VkName(int vk) {
+  if (vk >= 'A' && vk <= 'Z')
+    return std::string(1, static_cast<char>(vk));
+  if (vk >= '0' && vk <= '9')
+    return std::string(1, static_cast<char>(vk));
+  if (vk >= VK_NUMPAD0 && vk <= VK_NUMPAD9)
+    return "NUMPAD " + std::to_string(vk - VK_NUMPAD0);
+  switch (vk) {
+  case VK_LBUTTON:
+    return "LMB";
+  case VK_RBUTTON:
+    return "RMB";
+  case VK_MBUTTON:
+    return "MMB";
+  case VK_XBUTTON1:
+    return "MOUSE4";
+  case VK_XBUTTON2:
+    return "MOUSE5";
+  case VK_SPACE:
+    return "SPACE";
+  case VK_RETURN:
+    return "ENTER";
+  case VK_SHIFT:
+    return "SHIFT";
+  case VK_CONTROL:
+    return "CTRL";
+  case VK_MENU:
+    return "ALT";
+  case VK_TAB:
+    return "TAB";
+  case VK_ESCAPE:
+    return "ESC";
+  case VK_UP:
+    return "UP";
+  case VK_DOWN:
+    return "DOWN";
+  case VK_LEFT:
+    return "LEFT";
+  case VK_RIGHT:
+    return "RIGHT";
+  default:
+    return "VK " + std::to_string(vk);
+  }
+}
+
 void Menu::Initialize() {
   menus.clear();
   menuStack.clear();
@@ -19,6 +66,7 @@ void Menu::Initialize() {
   Submenu main;
   main.title = "MANUAL TRANS";
   main.items.push_back(MenuItem("Main Settings", MenuItem::Submenu, 1));
+  main.items.push_back(MenuItem("Controls / Keybinds", MenuItem::Submenu, 4));
   main.items.push_back(MenuItem("Analog Tuning", MenuItem::Submenu, 2));
   main.items.push_back(MenuItem("HUD Settings", MenuItem::Submenu, 3));
   menus.push_back(main);
@@ -60,6 +108,24 @@ void Menu::Initialize() {
   hud.items.push_back(
       MenuItem("Overlay Pedal Bars", MenuItem::Bool, &Config::OverlayBars));
   menus.push_back(hud);
+
+  // 4: Controls / Keybinds
+  Submenu keys;
+  keys.title = "CONTROLS & BINDS";
+  keys.items.push_back(
+      MenuItem("Shift Up", MenuItem::KeyBind, &Config::KeyShiftUp));
+  keys.items.push_back(
+      MenuItem("Shift Down", MenuItem::KeyBind, &Config::KeyShiftDown));
+  keys.items.push_back(
+      MenuItem("Clutch", MenuItem::KeyBind, &Config::KeyClutch));
+  keys.items.push_back(
+      MenuItem("Engine On/Off", MenuItem::KeyBind, &Config::KeyEngine));
+  keys.items.push_back(MenuItem("Menu", MenuItem::KeyBind, &Config::KeyMenu));
+  keys.items.push_back(
+      MenuItem("Turn Signal Left", MenuItem::KeyBind, &Config::KeySignalLeft));
+  keys.items.push_back(MenuItem("Turn Signal Right", MenuItem::KeyBind,
+                                &Config::KeySignalRight));
+  menus.push_back(keys);
 
   menuStack.push_back(0); // Push Main Menu
 }
@@ -114,6 +180,28 @@ void Menu::Update() {
     return;
 
   Submenu &current = GetCurrentMenu();
+  MenuItem &selectedItem = current.items[current.selectedIndex];
+
+  if (waitingForKeyBind && selectedItem.type == MenuItem::KeyBind &&
+      selectedItem.keyVal) {
+    if (PAD::IS_CONTROL_JUST_PRESSED(0, 177) ||
+        (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0) {
+      // Cancel bind
+      waitingForKeyBind = false;
+      return;
+    }
+    // Check all possible keys
+    for (int k = 1; k < 256; ++k) {
+      if ((GetAsyncKeyState(k) & 0x8000) != 0 && k != VK_ESCAPE &&
+          k != VK_RETURN && k != Config::KeyMenu) {
+        *selectedItem.keyVal = k;
+        waitingForKeyBind = false;
+        Config::SaveConfig(g_pluginModule);
+        return;
+      }
+    }
+    return; // Block other inputs while waiting
+  }
 
   if (PAD::IS_CONTROL_JUST_PRESSED(0, 172)) { // UP
     current.selectedIndex--;
@@ -136,14 +224,14 @@ void Menu::Update() {
     }
   }
 
-  MenuItem &selectedItem = current.items[current.selectedIndex];
-
   if (PAD::IS_CONTROL_JUST_PRESSED(0, 176)) { // ENTER / A
     if (selectedItem.type == MenuItem::Bool && selectedItem.boolVal) {
       *selectedItem.boolVal = !(*selectedItem.boolVal);
       Config::SaveConfig(g_pluginModule);
     } else if (selectedItem.type == MenuItem::Submenu) {
       menuStack.push_back(selectedItem.targetSubmenu);
+    } else if (selectedItem.type == MenuItem::KeyBind) {
+      waitingForKeyBind = true;
     }
   }
 
@@ -205,6 +293,12 @@ void Menu::Draw() {
       sprintf_s(valBuf, "< %.2f >", *item.floatVal);
     } else if (item.type == MenuItem::Submenu) {
       sprintf_s(valBuf, ">>>");
+    } else if (item.type == MenuItem::KeyBind && item.keyVal) {
+      if (waitingForKeyBind && isSelected) {
+        sprintf_s(valBuf, "[PRESS KEY]");
+      } else {
+        sprintf_s(valBuf, "[%s]", VkName(*item.keyVal).c_str());
+      }
     }
 
     if (valBuf[0] != '\0') {

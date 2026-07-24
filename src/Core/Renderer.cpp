@@ -104,4 +104,51 @@ void DrawPedalsOverlay(float rpm, float clutch, float throttle, float brake) {
   DrawBar(barX, y, barWidth, barHeight, brake, 220, 90, 220, "BRAKE");
 }
 
+void DrawSimulationOverlay(float fuel, float oilTemp, float gearboxHealth,
+                            float clutchHeat, bool parkingBrake,
+                            bool wheelsLocked, float engineBrake) {
+  const float barX     = Config::OverlayPosX + Config::OverlayBarWidth + 0.015f;
+  const float barWidth = Config::OverlayBarWidth;
+  const float barHeight= Config::OverlayBarHeight;
+  const float gap      = barHeight + 0.006f;
+  float y = Config::OverlayPosY;
+
+  // Fuel: green > yellow > red
+  int fR = static_cast<int>((1.0f - fuel) * 255);
+  int fG = static_cast<int>(fuel * 200);
+  DrawBar(barX, y, barWidth, barHeight, fuel, fR, fG, 40, "FUEL");
+  y += gap;
+
+  // Oil Temperature: blue (cold) to red (hot)
+  int otR = static_cast<int>(oilTemp * 255);
+  int otB = static_cast<int>((1.0f - oilTemp) * 200);
+  DrawBar(barX, y, barWidth, barHeight, oilTemp, otR, 80, otB, "OIL TEMP");
+  y += gap;
+
+  // Gearbox Health: green to red
+  int ghR = static_cast<int>((1.0f - gearboxHealth) * 255);
+  int ghG = static_cast<int>(gearboxHealth * 200);
+  DrawBar(barX, y, barWidth, barHeight, gearboxHealth, ghR, ghG, 50, "GEARBOX");
+  y += gap;
+
+  // Clutch Heat: yellow to red
+  DrawBar(barX, y, barWidth, barHeight, clutchHeat, 255,
+          static_cast<int>((1.0f - clutchHeat) * 140), 40, "CLUTCH HEAT");
+  y += gap;
+
+  // Engine brake
+  DrawBar(barX, y, barWidth, barHeight, engineBrake, 180, 100, 255, "ENG BRAKE");
+  y += gap;
+
+  // Status indicators
+  if (parkingBrake) {
+    DrawTextOverlay("~o~[P] PARKED", barX, y, 0.30f);
+    y += gap;
+  }
+  if (wheelsLocked) {
+    DrawTextOverlay("~r~WHEEL LOCK!", barX, y, 0.30f);
+  }
+}
+
 } // namespace Renderer
+

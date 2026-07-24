@@ -1,149 +1,185 @@
 #include "InputHandler.h"
-#include "../../sdk/inc/main.h"
 #include "../../sdk/inc/natives.h"
 #include "Config.h"
 #include <Windows.h>
-#include <algorithm>
 
 namespace InputHandler {
 
-static bool s_shiftUpWasDown = false;
-static bool s_shiftDownWasDown = false;
-static bool s_engineWasDown = false;
-static bool s_signalLeftWasDown = false;
-static bool s_signalRightWasDown = false;
-
-static bool s_shiftUpJustPressed = false;
-static bool s_shiftDownJustPressed = false;
-static bool s_engineJustPressed = false;
-static bool s_signalLeftJustPressed = false;
-static bool s_signalRightJustPressed = false;
-
-static float s_smoothedThrottle = 0.0f;
-static float s_smoothedBrake = 0.0f;
-static float s_smoothedClutch = 0.0f;
-
-void Update() {
-  // Edge detection for digital inputs
-  const bool isUp = (GetAsyncKeyState(Config::KeyShiftUp) & 0x8000) != 0;
-  const bool isDown = (GetAsyncKeyState(Config::KeyShiftDown) & 0x8000) != 0;
-  const bool isEngine = (GetAsyncKeyState(Config::KeyEngine) & 0x8000) != 0;
-  const bool isSignalLeft =
-      (GetAsyncKeyState(Config::KeySignalLeft) & 0x8000) != 0;
-  const bool isSignalRight =
-      (GetAsyncKeyState(Config::KeySignalRight) & 0x8000) != 0;
-
-  s_shiftUpJustPressed = isUp && !s_shiftUpWasDown;
-  s_shiftDownJustPressed = isDown && !s_shiftDownWasDown;
-  s_engineJustPressed = isEngine && !s_engineWasDown;
-  s_signalLeftJustPressed = isSignalLeft && !s_signalLeftWasDown;
-  s_signalRightJustPressed = isSignalRight && !s_signalRightWasDown;
-
-  s_shiftUpWasDown = isUp;
-  s_shiftDownWasDown = isDown;
-  s_engineWasDown = isEngine;
-  s_signalLeftWasDown = isSignalLeft;
-  s_signalRightWasDown = isSignalRight;
-
-  // Analog smoothing for throttle, brake, clutch
-  const bool isThrottle = (GetAsyncKeyState(0x57) & 0x8000) != 0 ||
-                          (GetAsyncKeyState(VK_UP) & 0x8000) != 0;
-  const bool isBrake = (GetAsyncKeyState(0x53) & 0x8000) != 0 ||
-                       (GetAsyncKeyState(VK_DOWN) & 0x8000) != 0;
-  const bool isClutch = (GetAsyncKeyState(Config::KeyClutch) & 0x8000) != 0;
-
-  if (isThrottle) {
-    s_smoothedThrottle += Config::ThrottleAttack;
-  } else {
-    s_smoothedThrottle -= Config::ThrottleRelease;
-  }
-
-  if (isBrake) {
-    s_smoothedBrake += Config::BrakeAttack;
-  } else {
-    s_smoothedBrake -= Config::BrakeRelease;
-  }
-
-  if (isClutch) {
-    s_smoothedClutch += Config::ClutchAttack;
-  } else {
-    s_smoothedClutch -= Config::ClutchRelease;
-  }
-
-  s_smoothedThrottle = (std::max)(0.0f, (std::min)(1.0f, s_smoothedThrottle));
-  s_smoothedBrake = (std::max)(0.0f, (std::min)(1.0f, s_smoothedBrake));
-  s_smoothedClutch = (std::max)(0.0f, (std::min)(1.0f, s_smoothedClutch));
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+static inline float Clamp01(float v) {
+  return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v);
+}
+static inline float ClampSym(float v) {
+  return v < -1.0f ? -1.0f : (v > 1.0f ? 1.0f : v);
 }
 
-void ApplyGameControls(int manualGear, float clutch, float rpm, int maxGear,
+// ─── Edge-detection state ─────────────────────────────────────────────────────
+static bool s_shiftUpWasDown     = false;
+static bool s_shiftDownWasDown   = false;
+static bool s_engineWasDown      = false;
+static bool s_signalLeftWasDown  = false;
+static bool s_signalRightWasDown = false;
+
+static bool s_shiftUpJustPressed     = false;
+static bool s_shiftDownJustPressed   = false;
+static bool s_engineJustPressed      = false;
+static bool s_signalLeftJustPressed  = false;
+static bool s_signalRightJustPressed = false;
+
+// ─── Smoothed analog values ───────────────────────────────────────────────────
+static float s_smoothedThrottle = 0.0f;
+static float s_smoothedBrake    = 0.0f;
+static float s_smoothedClutch   = 0.0f;
+static float s_smoothedSteer    = 0.0f;
+
+// ─── Expo Curve ───────────────────────────────────────────────────────────────
+// expo 0 = linear, 1 = full cubic. Preserves sign.
+static float ApplyExpo(float raw, float expo) {
+  if (expo <= 0.0f) return raw;
+  float sign  = raw < 0.0f ? -1.0f : 1.0f;
+  float a     = raw < 0.0f ? -raw : raw;
+  // blend linear and cubic
+  float curved = a * (1.0f - expo) + a * a * a * expo;
+  return sign * Clamp01(curved);
+}
+
+// ─── Deadzone ────────────────────────────────────────────────────────────────
+static float ApplyDeadzone(float raw, float dz) {
+  if (dz <= 0.0f) return raw;
+  float sign = raw < 0.0f ? -1.0f : 1.0f;
+  float a    = raw < 0.0f ? -raw : raw;
+  if (a < dz) return 0.0f;
+  return sign * (a - dz) / (1.0f - dz);
+}
+
+// ─── Smooth Axis ─────────────────────────────────────────────────────────────
+static float SmoothAxis(float target, float cur, float attack, float release) {
+  if (target > cur) {
+    cur += attack;
+    if (cur > target) cur = target;
+  } else {
+    cur -= release;
+    if (cur < target) cur = target;
+  }
+  return Clamp01(cur);
+}
+
+// ─── Update ───────────────────────────────────────────────────────────────────
+void Update() {
+  const bool isUp          = (GetAsyncKeyState(Config::KeyShiftUp)     & 0x8000) != 0;
+  const bool isDown        = (GetAsyncKeyState(Config::KeyShiftDown)   & 0x8000) != 0;
+  const bool isEngine      = (GetAsyncKeyState(Config::KeyEngine)      & 0x8000) != 0;
+  const bool isSignalLeft  = (GetAsyncKeyState(Config::KeySignalLeft)  & 0x8000) != 0;
+  const bool isSignalRight = (GetAsyncKeyState(Config::KeySignalRight) & 0x8000) != 0;
+
+  s_shiftUpJustPressed     = isUp          && !s_shiftUpWasDown;
+  s_shiftDownJustPressed   = isDown        && !s_shiftDownWasDown;
+  s_engineJustPressed      = isEngine      && !s_engineWasDown;
+  s_signalLeftJustPressed  = isSignalLeft  && !s_signalLeftWasDown;
+  s_signalRightJustPressed = isSignalRight && !s_signalRightWasDown;
+
+  s_shiftUpWasDown     = isUp;
+  s_shiftDownWasDown   = isDown;
+  s_engineWasDown      = isEngine;
+  s_signalLeftWasDown  = isSignalLeft;
+  s_signalRightWasDown = isSignalRight;
+
+  // Throttle (W / UP)
+  const bool isThrottle = (GetAsyncKeyState(0x57) & 0x8000) != 0 ||
+                          (GetAsyncKeyState(VK_UP) & 0x8000) != 0;
+  s_smoothedThrottle = SmoothAxis(isThrottle ? 1.0f : 0.0f, s_smoothedThrottle,
+                                  Config::ThrottleAttack, Config::ThrottleRelease);
+  s_smoothedThrottle = ApplyExpo(s_smoothedThrottle, Config::ThrottleExpo);
+
+  // Brake (S / DOWN)
+  const bool isBrake = (GetAsyncKeyState(0x53) & 0x8000) != 0 ||
+                       (GetAsyncKeyState(VK_DOWN) & 0x8000) != 0;
+  s_smoothedBrake = SmoothAxis(isBrake ? 1.0f : 0.0f, s_smoothedBrake,
+                               Config::BrakeAttack, Config::BrakeRelease);
+  s_smoothedBrake = ApplyExpo(s_smoothedBrake, Config::BrakeExpo);
+
+  // Clutch
+  const bool isClutch = (GetAsyncKeyState(Config::KeyClutch) & 0x8000) != 0;
+  s_smoothedClutch = SmoothAxis(isClutch ? 1.0f : 0.0f, s_smoothedClutch,
+                                Config::ClutchAttack, Config::ClutchRelease);
+  s_smoothedClutch = ApplyExpo(s_smoothedClutch, Config::ClutchExpo);
+
+  // Steering (A/D or LEFT/RIGHT) with expo + deadzone + smooth return
+  const bool isLeft  = (GetAsyncKeyState(0x41) & 0x8000) != 0 ||
+                       (GetAsyncKeyState(VK_LEFT) & 0x8000) != 0;
+  const bool isRight = (GetAsyncKeyState(0x44) & 0x8000) != 0 ||
+                       (GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0;
+
+  float steerTarget = 0.0f;
+  if      (isLeft  && !isRight) steerTarget = -1.0f;
+  else if (isRight && !isLeft)  steerTarget =  1.0f;
+
+  if (steerTarget != 0.0f) {
+    s_smoothedSteer += Config::SteerAttack * steerTarget;
+    s_smoothedSteer  = ClampSym(s_smoothedSteer);
+  } else {
+    if (s_smoothedSteer > 0.0f) {
+      s_smoothedSteer -= Config::SteerRelease;
+      if (s_smoothedSteer < 0.0f) s_smoothedSteer = 0.0f;
+    } else if (s_smoothedSteer < 0.0f) {
+      s_smoothedSteer += Config::SteerRelease;
+      if (s_smoothedSteer > 0.0f) s_smoothedSteer = 0.0f;
+    }
+  }
+
+  float steerP = ApplyDeadzone(s_smoothedSteer, Config::SteerDeadzonePct);
+  steerP       = ApplyExpo(steerP, Config::SteerExpo);
+  s_smoothedSteer = ClampSym(steerP);
+}
+
+// ─── ApplyGameControls ────────────────────────────────────────────────────────
+void ApplyGameControls(int manualGear, float clutch, float rpm, int /*maxGear*/,
                        float forwardSpeed) {
   float finalThrottle = s_smoothedThrottle;
-  float finalBrake = s_smoothedBrake;
+  float finalBrake    = s_smoothedBrake;
 
-  // We no longer cut throttle for clutch/neutral. We rely entirely on the
-  // memory writes to fClutch! This allows the engine to rev naturally when W is
-  // pressed.
+  // Rev limiter
+  if (manualGear > 0 && rpm > 0.98f) finalThrottle = 0.0f;
 
-  // Rev Limiter Bounce: cut throttle at redline to prevent auto-upshifts.
-  if (manualGear > 0 && rpm > 0.98f) {
-    finalThrottle = 0.0f;
+  // Steer injection
+  if (s_smoothedSteer > 0.01f || s_smoothedSteer < -0.01f) {
+    PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 0, s_smoothedSteer);
   }
 
   if (manualGear == -1) {
-    // Reverse Gear
-    // Disable native forward acceleration (71) so W doesn't fight us
     PAD::DISABLE_CONTROL_ACTION(0, 71, true);
     PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, finalThrottle);
-
     if (finalBrake > 0.05f) {
-      if (forwardSpeed > 0.1f) {
-        // Moving forwards, 72 brakes.
+      if (forwardSpeed > 0.1f)
         PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, finalBrake);
-      } else {
-        // Moving backwards or stopped. 71 is disabled, use Handbrake.
+      else
         PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 76, finalBrake);
-      }
     }
   } else {
-    // Forward Gears (1-6) or Neutral (0)
-    if (forwardSpeed <= 0.1f) {
-      // Prevent native reverse when stopped or moving backwards
-      PAD::DISABLE_CONTROL_ACTION(0, 72, true);
-    }
-
+    if (forwardSpeed <= 0.1f) PAD::DISABLE_CONTROL_ACTION(0, 72, true);
     PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalThrottle);
-
     if (finalBrake > 0.05f) {
-      if (forwardSpeed > 0.1f) {
-        // Moving forwards, 72 brakes. (Not disabled)
-        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, finalBrake);
-      } else if (forwardSpeed < -0.1f) {
-        // Moving backwards, 71 brakes.
-        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalBrake);
-      } else {
-        // Stopped. Lock wheels with handbrake.
-        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 76, finalBrake);
-      }
+      if      (forwardSpeed >  0.1f) PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, finalBrake);
+      else if (forwardSpeed < -0.1f) PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalBrake);
+      else                           PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 76, finalBrake);
     }
   }
 }
 
 void ResetEdges() {
-  s_shiftUpWasDown = false;
-  s_shiftDownWasDown = false;
-  s_engineWasDown = false;
-  s_signalLeftWasDown = false;
-  s_signalRightWasDown = false;
+  s_shiftUpWasDown = s_shiftDownWasDown = s_engineWasDown =
+  s_signalLeftWasDown = s_signalRightWasDown = false;
 }
 
-bool IsShiftUpJustPressed() { return s_shiftUpJustPressed; }
-bool IsShiftDownJustPressed() { return s_shiftDownJustPressed; }
-bool IsEngineJustPressed() { return s_engineJustPressed; }
-bool IsSignalLeftJustPressed() { return s_signalLeftJustPressed; }
+bool IsShiftUpJustPressed()     { return s_shiftUpJustPressed;     }
+bool IsShiftDownJustPressed()   { return s_shiftDownJustPressed;   }
+bool IsEngineJustPressed()      { return s_engineJustPressed;      }
+bool IsSignalLeftJustPressed()  { return s_signalLeftJustPressed;  }
 bool IsSignalRightJustPressed() { return s_signalRightJustPressed; }
 
 float GetSmoothedThrottle() { return s_smoothedThrottle; }
-float GetSmoothedBrake() { return s_smoothedBrake; }
-float GetSmoothedClutch() { return s_smoothedClutch; }
+float GetSmoothedBrake()    { return s_smoothedBrake;    }
+float GetSmoothedClutch()   { return s_smoothedClutch;   }
+float GetSmoothedSteer()    { return s_smoothedSteer;    }
 
 } // namespace InputHandler

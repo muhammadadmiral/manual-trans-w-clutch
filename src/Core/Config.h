@@ -16,6 +16,7 @@ extern int KeyMenu;
 // switches to it directly.
 extern int KeySignalLeft;
 extern int KeySignalRight;
+extern int KeyParkingBrake;   // P by default
 
 extern bool DebugOverlay;
 
@@ -38,6 +39,17 @@ extern float BrakeAttack;
 extern float BrakeRelease;
 extern float ClutchAttack;
 extern float ClutchRelease;
+
+// Steering smoothing and expo. SteerExpo 0.0 = linear, 1.0 = full cubic expo.
+extern float SteerAttack;
+extern float SteerRelease;
+extern float SteerExpo;          // 0.0-1.0
+extern float SteerDeadzonePct;   // 0.0-0.15 recommended
+
+// Throttle/Brake expo curve (0.0 = linear, 1.0 = full cubic)
+extern float ThrottleExpo;
+extern float BrakeExpo;
+extern float ClutchExpo;
 
 void WriteFloat(const char *section, const char *key, float value,
                 const char *iniPath);
