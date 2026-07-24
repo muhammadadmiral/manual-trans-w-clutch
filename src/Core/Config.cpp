@@ -140,6 +140,12 @@ void ReadConfig(HMODULE module) {
   OverlayPosY = ReadFloat("Overlay", "PosY", 0.60f, iniPath);
   OverlayBarWidth = ReadFloat("Overlay", "BarWidth", 0.12f, iniPath);
   OverlayBarHeight = ReadFloat("Overlay", "BarHeight", 0.014f, iniPath);
+
+  // If the file doesn't exist, create it with all default settings so the user
+  // can see and edit them (fixes "I deleted it and it didn't recreate").
+  if (GetFileAttributesA(iniPath) == INVALID_FILE_ATTRIBUTES) {
+    SaveConfig(module);
+  }
 }
 
 void WriteFloat(const char *section, const char *key, float value,

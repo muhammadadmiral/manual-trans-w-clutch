@@ -34,8 +34,12 @@ bool OffsetResolver::ScanPatterns(VehicleOffsets &outOffsets,
 
   // 1. Core Transmission (Gear / NextGear / TopGear / GearRatios)
   addr = AOBScanner::FindUnique("48 8D 8F ? ? ? ? 4C 8B C3 F3 0F 11 7C 24");
+  if (addr == 0) addr = AOBScanner::FindUnique("88 8F ? ? ? ? 8B D1 48 8B 01 FF 90");
+  if (addr == 0) addr = AOBScanner::FindUnique("88 8F ? ? ? ? 44 0F B6 C6");
+  
   if (addr != 0) {
     uint32_t baseGearOffset = ResolveRipDisplacement(addr, 3);
+    if (baseGearOffset == 0) baseGearOffset = ResolveRipDisplacement(addr, 2); // For newer 88 8F pattern
     if (baseGearOffset != 0) {
       offsets.NextGear = baseGearOffset;
       offsets.Gear = baseGearOffset + 2;
