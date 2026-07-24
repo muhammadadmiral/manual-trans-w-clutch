@@ -10,6 +10,8 @@ void ResetEdges();
 bool IsShiftUpJustPressed();
 bool IsShiftDownJustPressed();
 bool IsEngineJustPressed();
+bool IsSignalLeftJustPressed();
+bool IsSignalRightJustPressed();
 
 float GetSmoothedThrottle();
 float GetSmoothedBrake();

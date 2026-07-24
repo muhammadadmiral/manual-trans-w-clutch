@@ -10,10 +10,14 @@ namespace InputHandler {
 static bool s_shiftUpWasDown = false;
 static bool s_shiftDownWasDown = false;
 static bool s_engineWasDown = false;
+static bool s_signalLeftWasDown = false;
+static bool s_signalRightWasDown = false;
 
 static bool s_shiftUpJustPressed = false;
 static bool s_shiftDownJustPressed = false;
 static bool s_engineJustPressed = false;
+static bool s_signalLeftJustPressed = false;
+static bool s_signalRightJustPressed = false;
 
 static float s_smoothedThrottle = 0.0f;
 static float s_smoothedBrake = 0.0f;
@@ -24,14 +28,22 @@ void Update() {
   const bool isUp = (GetAsyncKeyState(Config::KeyShiftUp) & 0x8000) != 0;
   const bool isDown = (GetAsyncKeyState(Config::KeyShiftDown) & 0x8000) != 0;
   const bool isEngine = (GetAsyncKeyState(Config::KeyEngine) & 0x8000) != 0;
+  const bool isSignalLeft =
+      (GetAsyncKeyState(Config::KeySignalLeft) & 0x8000) != 0;
+  const bool isSignalRight =
+      (GetAsyncKeyState(Config::KeySignalRight) & 0x8000) != 0;
 
   s_shiftUpJustPressed = isUp && !s_shiftUpWasDown;
   s_shiftDownJustPressed = isDown && !s_shiftDownWasDown;
   s_engineJustPressed = isEngine && !s_engineWasDown;
+  s_signalLeftJustPressed = isSignalLeft && !s_signalLeftWasDown;
+  s_signalRightJustPressed = isSignalRight && !s_signalRightWasDown;
 
   s_shiftUpWasDown = isUp;
   s_shiftDownWasDown = isDown;
   s_engineWasDown = isEngine;
+  s_signalLeftWasDown = isSignalLeft;
+  s_signalRightWasDown = isSignalRight;
 
   // Analog smoothing for throttle, brake, clutch
   const bool isThrottle = (GetAsyncKeyState(0x57) & 0x8000) != 0 ||
@@ -120,11 +132,15 @@ void ResetEdges() {
   s_shiftUpWasDown = false;
   s_shiftDownWasDown = false;
   s_engineWasDown = false;
+  s_signalLeftWasDown = false;
+  s_signalRightWasDown = false;
 }
 
 bool IsShiftUpJustPressed() { return s_shiftUpJustPressed; }
 bool IsShiftDownJustPressed() { return s_shiftDownJustPressed; }
 bool IsEngineJustPressed() { return s_engineJustPressed; }
+bool IsSignalLeftJustPressed() { return s_signalLeftJustPressed; }
+bool IsSignalRightJustPressed() { return s_signalRightJustPressed; }
 
 float GetSmoothedThrottle() { return s_smoothedThrottle; }
 float GetSmoothedBrake() { return s_smoothedBrake; }

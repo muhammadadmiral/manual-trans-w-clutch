@@ -247,6 +247,14 @@ bool VehicleData::LoadOffsetsFromIni(HMODULE pluginModule,
   if (!BuildIniPath(pluginModule, iniPath))
     return false;
 
+  // Respect [Memory] AllowIniFallback (defaults to allowed/1 if absent, so
+  // existing inis keep working). This flag is written automatically after a
+  // successful calibration; set it to 0 by hand if you ever want to force a
+  // fresh pattern-scan/recalibration without deleting the saved offsets.
+  if (GetPrivateProfileIntA("Memory", "AllowIniFallback", 1, iniPath) == 0) {
+    return false;
+  }
+
   // Try a build-specific section first, e.g. [Offsets.1.0.1013.20]. This
   // lets you keep verified offsets for several game builds in the same
   // ini without one overwriting the other - much safer than a single
@@ -463,6 +471,8 @@ const char *VehicleData::GetOffsetSourceName() {
     return "AOB";
   case VehicleOffsetSource::IniFallback:
     return "INI fallback";
+  case VehicleOffsetSource::Calibration:
+    return "Calibration (unverified - double check gears/lights!)";
   default:
     return "unresolved";
   }

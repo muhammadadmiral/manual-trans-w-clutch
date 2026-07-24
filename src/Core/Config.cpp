@@ -5,7 +5,9 @@
 namespace Config {
 int KeyShiftUp = VK_LSHIFT;
 int KeyShiftDown = VK_LCONTROL;
-int KeyClutch = 0x58; // 'X' key
+int KeyClutch = 0x58;            // 'X' key
+int KeySignalLeft = VK_NUMPAD4;  // default: numpad 4
+int KeySignalRight = VK_NUMPAD6; // default: numpad 6
 bool DebugOverlay = true;
 bool AllowQuadbikes = true;
 bool UseRealClutch = true;
@@ -86,6 +88,10 @@ void ReadConfig(HMODULE module) {
   KeyClutch = GetPrivateProfileIntA("Controls", "ClutchKey", 0x58, iniPath);
   KeyEngine = GetPrivateProfileIntA("Controls", "EngineKey", 90, iniPath);
   KeyMenu = GetPrivateProfileIntA("Controls", "MenuKey", 219, iniPath);
+  KeySignalLeft =
+      GetPrivateProfileIntA("Controls", "SignalLeft", VK_NUMPAD4, iniPath);
+  KeySignalRight =
+      GetPrivateProfileIntA("Controls", "SignalRight", VK_NUMPAD6, iniPath);
 
   DebugOverlay = GetPrivateProfileIntA("Debug", "Overlay", 1, iniPath) != 0;
   AllowQuadbikes =
@@ -149,6 +155,8 @@ void SaveConfig(HMODULE module) {
   WriteInt("Controls", "ClutchKey", KeyClutch, iniPath);
   WriteInt("Controls", "EngineKey", KeyEngine, iniPath);
   WriteInt("Controls", "MenuKey", KeyMenu, iniPath);
+  WriteInt("Controls", "SignalLeft", KeySignalLeft, iniPath);
+  WriteInt("Controls", "SignalRight", KeySignalRight, iniPath);
 
   WriteInt("Debug", "Overlay", DebugOverlay ? 1 : 0, iniPath);
   WriteInt("Vehicles", "AllowQuadbikes", AllowQuadbikes ? 1 : 0, iniPath);

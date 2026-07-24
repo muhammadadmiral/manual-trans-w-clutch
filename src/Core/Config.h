@@ -9,6 +9,14 @@ extern int KeyShiftDown;
 extern int KeyClutch;
 extern int KeyEngine;
 extern int KeyMenu;
+
+// Turn signal (sein) keys. Change these here or in the ini
+// ([Controls] SignalLeft= / SignalRight=) - whichever is easier for you.
+// Tapping either one toggles that signal on/off; tapping the opposite side
+// switches to it directly.
+extern int KeySignalLeft;
+extern int KeySignalRight;
+
 extern bool DebugOverlay;
 
 // Set false to disable manual shifting on quadbikes even if they report

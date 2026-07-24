@@ -103,6 +103,9 @@ void ScriptMain() {
   int manualGear = 0; // Updated by GearLogic
   static ULONGLONG s_vehicleEnterTime = 0;
 
+  // Turn signal state: 0 = off, 1 = left, 2 = right.
+  int activeSignal = 0;
+
   while (true) {
     scriptWait(0);
     Menu::Update();
@@ -111,6 +114,7 @@ void ScriptMain() {
     if (!PED::IS_PED_IN_ANY_VEHICLE(playerPed, FALSE)) {
       activeVehicle = 0;
       activeLayoutValidated = false;
+      activeSignal = 0;
       InputHandler::ResetEdges();
       Menu::Draw();
       continue;
@@ -120,6 +124,7 @@ void ScriptMain() {
     if (!IsValidVehicle(vehicle) || !IsPlayerDriving(playerPed, vehicle)) {
       activeVehicle = 0;
       activeLayoutValidated = false;
+      activeSignal = 0;
       InputHandler::ResetEdges();
       Menu::Draw();
       continue;
@@ -140,7 +145,11 @@ void ScriptMain() {
 
     const int maxGear = VEHICLE::_GET_VEHICLE_MAX_DRIVE_GEAR_COUNT(vehicle);
     VehicleData data(vehicle);
-    isEngineOn = VEHICLE::GET_IS_VEHICLE_ENGINE_RUNNING(vehicle) != 0;
+    // This is just a read of the game's own state, used below to detect
+    // *external* changes (stalls, the game killing the engine, etc). It must
+    // NOT be blindly copied into isEngineOn every frame - see comment below.
+    const bool actualEngineOn =
+        VEHICLE::GET_IS_VEHICLE_ENGINE_RUNNING(vehicle) != 0;
 
     if (vehicle != activeVehicle) {
       activeVehicle = vehicle;
@@ -152,10 +161,13 @@ void ScriptMain() {
       if (Config::RequireColdStart) {
         VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
         isEngineOn = false;
+      } else {
+        isEngineOn = actualEngineOn;
       }
 
       GearLogic::Reset(0); // Neutral
       s_vehicleEnterTime = GetTickCount64();
+      activeSignal = 0;
     }
 
     if (GetTickCount64() - s_vehicleEnterTime < 500) {
@@ -169,12 +181,48 @@ void ScriptMain() {
 
     if (InputHandler::IsEngineJustPressed()) {
       isEngineOn = !isEngineOn;
-      VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, isEngineOn ? TRUE : FALSE, FALSE,
+      // instantly = TRUE (3rd param) in BOTH directions. This is the fix for
+      // "engine won't turn on at all": with instantly=FALSE, the engine
+      // plays its multi-frame start-up animation, during which
+      // GET_IS_VEHICLE_ENGINE_RUNNING still reports FALSE. The old code then
+      // saw "not running yet" on the very next frame and force-killed the
+      // engine again below, every single frame - so it could never finish
+      // starting, and calibration (which waits for isEngineOn to become
+      // true) got stuck forever showing "Scanning...".
+      VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, isEngineOn ? TRUE : FALSE, TRUE,
                                      TRUE);
+    } else if (!isEngineOn && actualEngineOn) {
+      // We want the engine off (cold start hold, or after a stall) but the
+      // game still reports it running - correct it. Only fires on an actual
+      // mismatch, not unconditionally every frame.
+      VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
+    } else if (isEngineOn && !actualEngineOn) {
+      // Engine died from something other than us (fire, destroyed, ran out
+      // of fuel, etc). Reflect that instead of pretending it's still on.
+      isEngineOn = false;
     }
 
-    if (!isEngineOn) {
-      VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
+    // --- Turn signals (sein) ---
+    // NOTE ON THE NATIVE PARAMETER: SET_VEHICLE_INDICATOR_LIGHTS's "indicator"
+    // index has been documented inconsistently across SDK versions/dumps.
+    // kIndicatorLeft/kIndicatorRight below are the only two lines you should
+    // need to touch if your signals come out swapped in-game - just flip the
+    // two values and rebuild.
+    {
+      constexpr int kIndicatorLeft = 1;
+      constexpr int kIndicatorRight = 0;
+
+      if (InputHandler::IsSignalLeftJustPressed()) {
+        activeSignal = (activeSignal == 1) ? 0 : 1;
+        VEHICLE::SET_VEHICLE_INDICATOR_LIGHTS(vehicle, kIndicatorRight, FALSE);
+        VEHICLE::SET_VEHICLE_INDICATOR_LIGHTS(vehicle, kIndicatorLeft,
+                                              activeSignal == 1);
+      } else if (InputHandler::IsSignalRightJustPressed()) {
+        activeSignal = (activeSignal == 2) ? 0 : 2;
+        VEHICLE::SET_VEHICLE_INDICATOR_LIGHTS(vehicle, kIndicatorLeft, FALSE);
+        VEHICLE::SET_VEHICLE_INDICATOR_LIGHTS(vehicle, kIndicatorRight,
+                                              activeSignal == 2);
+      }
     }
 
     if (!VehicleData::IsInitialized()) {
@@ -219,6 +267,21 @@ void ScriptMain() {
     }
 
     if (!activeLayoutValidated || !data.IsValid()) {
+      Menu::Draw();
+      continue;
+    }
+
+    // Continuous sanity re-check, not just once right after calibration.
+    // Calibration-derived offsets (as opposed to the verified AOB pattern)
+    // are a best-effort guess and can land on the wrong field even if the
+    // values looked plausible for one instant. If the numbers drift outside
+    // plausible range later, stop touching memory instead of continuing to
+    // write into whatever that offset actually is.
+    if (!data.HasPlausibleLayout(maxGear > 0 ? maxGear : 6)) {
+      activeLayoutValidated = false;
+      Renderer::ShowNotification(
+          "Manual transmission: memory layout looks wrong, disabling for "
+          "this vehicle. Try recalibrating.");
       Menu::Draw();
       continue;
     }
