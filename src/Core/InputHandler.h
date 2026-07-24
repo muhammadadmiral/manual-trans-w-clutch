@@ -3,7 +3,7 @@
 namespace InputHandler {
 
 void Update();
-void ApplyGameControls(int manualGear);
+void ApplyGameControls(int manualGear, float clutch, float rpm, int maxGear, float forwardSpeed);
 void ResetEdges();
 
 bool IsShiftUpJustPressed();

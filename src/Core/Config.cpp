@@ -80,6 +80,11 @@ void ReadConfig(HMODULE module) {
 
   strcat_s(iniPath, "\\manual-trans.ini");
 
+  if (GetFileAttributesA(iniPath) == INVALID_FILE_ATTRIBUTES) {
+    // Generate boilerplate INI if it doesn't exist
+    SaveConfig(module);
+  }
+
   KeyShiftUp = GetPrivateProfileIntA("Controls", "ShiftUp", VK_LSHIFT, iniPath);
   KeyShiftDown =
       GetPrivateProfileIntA("Controls", "ShiftDown", VK_LCONTROL, iniPath);
@@ -121,6 +126,12 @@ void WriteFloat(const char *section, const char *key, float value, const char *i
     WritePrivateProfileStringA(section, key, buffer, iniPath);
 }
 
+void WriteInt(const char *section, const char *key, int value, const char *iniPath) {
+    char buffer[32]{};
+    sprintf_s(buffer, "%d", value);
+    WritePrivateProfileStringA(section, key, buffer, iniPath);
+}
+
 void SaveConfig(HMODULE module) {
   char iniPath[MAX_PATH];
   DWORD length = GetModuleFileNameA(module, iniPath, MAX_PATH);
@@ -133,12 +144,29 @@ void SaveConfig(HMODULE module) {
 
   strcat_s(iniPath, "\\manual-trans.ini");
   
+  WriteInt("Controls", "ShiftUp", KeyShiftUp, iniPath);
+  WriteInt("Controls", "ShiftDown", KeyShiftDown, iniPath);
+  WriteInt("Controls", "ClutchKey", KeyClutch, iniPath);
+  WriteInt("Controls", "EngineKey", KeyEngine, iniPath);
+  WriteInt("Controls", "MenuKey", KeyMenu, iniPath);
+
+  WriteInt("Debug", "Overlay", DebugOverlay ? 1 : 0, iniPath);
+  WriteInt("Vehicles", "AllowQuadbikes", AllowQuadbikes ? 1 : 0, iniPath);
+  WriteInt("Vehicles", "UseRealClutch", UseRealClutch ? 1 : 0, iniPath);
+  WriteInt("Vehicles", "RequireColdStart", RequireColdStart ? 1 : 0, iniPath);
+
   WriteFloat("Analog", "ThrottleAttack", ThrottleAttack, iniPath);
   WriteFloat("Analog", "ThrottleRelease", ThrottleRelease, iniPath);
   WriteFloat("Analog", "BrakeAttack", BrakeAttack, iniPath);
   WriteFloat("Analog", "BrakeRelease", BrakeRelease, iniPath);
   WriteFloat("Analog", "ClutchAttack", ClutchAttack, iniPath);
   WriteFloat("Analog", "ClutchRelease", ClutchRelease, iniPath);
+
+  WriteInt("Overlay", "Bars", OverlayBars ? 1 : 0, iniPath);
+  WriteFloat("Overlay", "PosX", OverlayPosX, iniPath);
+  WriteFloat("Overlay", "PosY", OverlayPosY, iniPath);
+  WriteFloat("Overlay", "BarWidth", OverlayBarWidth, iniPath);
+  WriteFloat("Overlay", "BarHeight", OverlayBarHeight, iniPath);
 }
 
 } // namespace Config
