@@ -150,9 +150,6 @@ void ScriptMain() {
                 isEngineOn = false;
             }
 
-            // Prevent automatic gearbox from shifting by setting a massive shift delay
-            VEHICLE::_SET_MINIMUM_TIME_BETWEEN_GEAR_SHIFTS(vehicle, 99999999);
-
             if (!activeLayoutValidated && VehicleData::IsInitialized()) {
                 Renderer::ShowNotification("CVehicle validation failed. Recalibrating...");
                 InputHandler::ResetEdges();
