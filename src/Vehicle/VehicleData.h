@@ -97,6 +97,14 @@ private:
 
   static CalibrationState calibState;
   static std::vector<uint32_t> candidateOffsets;
+  // Value each surviving candidate read at idle, captured in the
+  // engine-on stage. Used to detect rev by relative increase instead of
+  // a hardcoded absolute band (RPM's numeric scale isn't guaranteed to
+  // match legacy GTA V's 0-1 normalization on every build).
+  static std::vector<float> candidateIdleValues;
+  // 0 = not currently waiting; otherwise the tick count when the current
+  // settle wait started (see kEngineOffSettleMs etc below).
+  static uint64_t phaseEnterTick;
 
   // Scan window for calibration, in bytes from the CVehicle base.
   // GTA V legacy CVehicle is roughly ~0xE00-0x1200 bytes depending on
@@ -106,4 +114,22 @@ private:
   // rebuild.
   static constexpr uint32_t kCalibScanStart = 0x600;
   static constexpr uint32_t kCalibScanEnd = 0x1400;
+
+  // How long to wait, after the state we care about becomes true, before
+  // actually snapshotting memory. RPM doesn't jump instantly - it decays
+  // to 0 over time after the engine cuts, takes a moment to stabilize at
+  // idle, and takes a moment to climb when you rev. Scanning on the very
+  // next frame after the state flips catches a mid-transition value, not
+  // the settled one - this was the actual root cause of calibration
+  // reliably reaching "Scanning..." and then failing.
+  static constexpr uint64_t kEngineOffSettleMs = 2000;
+  static constexpr uint64_t kIdleSettleMs = 1500;
+  static constexpr uint64_t kRevSettleMs = 1200;
+
+  // Window (in bytes) around the found RPM offset to search for the
+  // Gear/NextGear/TopGear/GearRatios cluster. Deliberately wide and NOT
+  // tied to any one game build's exact byte layout - see the search
+  // itself in UpdateCalibration for why.
+  static constexpr uint32_t kGearSearchBefore = 0x400;
+  static constexpr uint32_t kGearSearchAfter = 0x100;
 };

@@ -23,6 +23,8 @@ std::string VehicleData::lastFailureReason = "not initialized";
 
 CalibrationState VehicleData::calibState = CalibrationState::None;
 std::vector<uint32_t> VehicleData::candidateOffsets;
+std::vector<float> VehicleData::candidateIdleValues;
+uint64_t VehicleData::phaseEnterTick = 0;
 
 namespace {
 
@@ -360,6 +362,8 @@ void VehicleData::ResetCalibration() {
   offsetSource = VehicleOffsetSource::Uninitialized;
   resolvedOffsets = {};
   candidateOffsets.clear();
+  candidateIdleValues.clear();
+  phaseEnterTick = 0;
 }
 
 CalibrationState VehicleData::GetCalibrationState() { return calibState; }
@@ -388,6 +392,21 @@ void VehicleData::UpdateCalibration(HMODULE pluginModule, int vehicleHandle,
     if (!isEngineOn)
       calibState = CalibrationState::ScanningEngineOff;
   } else if (calibState == CalibrationState::ScanningEngineOff) {
+    if (isEngineOn) {
+      // Changed their mind / engine came back on mid-wait. Start over.
+      calibState = CalibrationState::WaitingForEngineOff;
+      phaseEnterTick = 0;
+      return;
+    }
+    const uint64_t now = GetTickCount64();
+    if (phaseEnterTick == 0) {
+      phaseEnterTick = now;
+      return; // just arrived - let RPM actually decay before snapshotting
+    }
+    if (now - phaseEnterTick < kEngineOffSettleMs)
+      return; // still settling, try again next frame
+
+    phaseEnterTick = 0;
     candidateOffsets.clear();
     for (uint32_t offset = kCalibScanStart; offset < kCalibScanEnd;
          offset += 4) {
@@ -413,37 +432,83 @@ void VehicleData::UpdateCalibration(HMODULE pluginModule, int vehicleHandle,
     if (isEngineOn)
       calibState = CalibrationState::ScanningEngineOn;
   } else if (calibState == CalibrationState::ScanningEngineOn) {
+    if (!isEngineOn) {
+      calibState = CalibrationState::WaitingForEngineOn;
+      phaseEnterTick = 0;
+      return;
+    }
+    const uint64_t now = GetTickCount64();
+    if (phaseEnterTick == 0) {
+      phaseEnterTick = now;
+      return; // let RPM settle at idle before reading it
+    }
+    if (now - phaseEnterTick < kIdleSettleMs)
+      return;
+
+    phaseEnterTick = 0;
     std::vector<uint32_t> nextCandidates;
-    bool foundIdle = false;
+    std::vector<float> nextIdleValues;
     for (uint32_t offset : candidateOffsets) {
       float val =
           *reinterpret_cast<float *>(calibVehicle.GetAddress() + offset);
-      if (val > 0.15f && val < 0.35f) {
+      // Idle candidate: moved away from the 0.0 it had with the engine off,
+      // by a real (non-noise) amount, but not some unrelated huge counter.
+      // Deliberately NOT a fixed 0.1-0.4-style band - RPM's numeric scale
+      // isn't guaranteed to be the same "0-1 normalized" convention on
+      // every build/game version.
+      if (val > 0.02f && val < 50.0f) {
         nextCandidates.push_back(offset);
-        foundIdle = true;
+        nextIdleValues.push_back(val);
       }
     }
-    if (foundIdle) {
+    if (!nextCandidates.empty()) {
       candidateOffsets = nextCandidates;
+      candidateIdleValues = nextIdleValues;
       calibState = CalibrationState::WaitingForRev;
     } else {
       calibState = CalibrationState::Failed;
       lastFailureReason =
-          "None of the zero-candidates settled into an idle RPM range "
-          "(0.15-0.35) when engine turned on. Try recalibrating and make "
-          "sure the engine is idling steadily before it scans.";
+          "None of the zero-candidates moved off 0.0 once the engine was "
+          "idling. Either the engine wasn't actually idling yet when this "
+          "scanned (try recalibrating and wait a beat before it proceeds), "
+          "or none of the 0x600-0x1400 window candidates are RPM at all - "
+          "consider widening kCalibScanEnd.";
     }
   } else if (calibState == CalibrationState::WaitingForRev) {
     if (isRevving)
       calibState = CalibrationState::ScanningRev;
   } else if (calibState == CalibrationState::ScanningRev) {
+    if (!isRevving) {
+      // They let off the gas before it settled - go back and wait for a
+      // sustained rev instead of scanning a mid-climb value.
+      calibState = CalibrationState::WaitingForRev;
+      phaseEnterTick = 0;
+      return;
+    }
+    const uint64_t now = GetTickCount64();
+    if (phaseEnterTick == 0) {
+      phaseEnterTick = now;
+      return; // let RPM actually climb before reading it
+    }
+    if (now - phaseEnterTick < kRevSettleMs)
+      return;
+
+    phaseEnterTick = 0;
     std::vector<uint32_t> nextCandidates;
+    std::vector<float> nextIdleValues;
     bool foundRev = false;
-    for (uint32_t offset : candidateOffsets) {
+    for (size_t i = 0; i < candidateOffsets.size(); ++i) {
+      const uint32_t offset = candidateOffsets[i];
+      const float idleVal = candidateIdleValues[i];
       float val =
           *reinterpret_cast<float *>(calibVehicle.GetAddress() + offset);
-      if (val > 0.4f && val <= 1.2f) {
+      // RPM under load should sit meaningfully above its own idle value -
+      // relative to itself, not to a fixed absolute band. This is what
+      // makes it work regardless of whether RPM is stored 0-1 normalized,
+      // as raw revs, or some other scale on this build.
+      if (val > idleVal * 1.4f && (val - idleVal) > 0.02f) {
         nextCandidates.push_back(offset);
+        nextIdleValues.push_back(idleVal);
         foundRev = true;
       }
     }
@@ -455,66 +520,107 @@ void VehicleData::UpdateCalibration(HMODULE pluginModule, int vehicleHandle,
         resolvedOffsets.Clutch = resolvedOffsets.RPM + 12;
 
         bool foundGearLayout = false;
-        // The gear offset is usually between 0x20 and 0x60 bytes before RPM.
-        // We scan backwards to find a valid Gear structure.
-        for (uint32_t offset = resolvedOffsets.RPM - 0x10;
-             offset >= resolvedOffsets.RPM - 0x80; --offset) {
-          if (!AOBScanner::IsReadable(calibVehicle.GetAddress() + offset - 8,
-                                      32))
-            continue;
+        uint32_t foundGearOffset = 0, foundNextGearOffset = 0,
+                 foundTopGearOffset = 0, foundRatiosOffset = 0;
 
-          uint8_t gearVal =
-              *reinterpret_cast<uint8_t *>(calibVehicle.GetAddress() + offset);
+        // Gear-cluster search: instead of assuming one fixed historical
+        // byte layout (the old code only ever tried two exact patterns),
+        // scan a window around RPM for a byte that plausibly reads "Gear"
+        // (0 or 1, since we're revving from a standstill), then search its
+        // immediate neighborhood independently for a NextGear-like byte, a
+        // TopGear-like byte, and a pointer to something that actually looks
+        // like an array of gear ratios (finite floats in a sane range) -
+        // rather than just "a big-looking number". No fixed byte gap
+        // between the four fields is assumed, so this should survive
+        // layout differences across builds/game versions better than
+        // hardcoded deltas would.
+        const uint32_t rpmOff = resolvedOffsets.RPM;
+        const uint32_t searchLo =
+            rpmOff > kGearSearchBefore ? rpmOff - kGearSearchBefore : 0;
+        const uint32_t searchHi = rpmOff + kGearSearchAfter;
+        // One bulk readability check up front instead of one VirtualQuery
+        // per byte - keeps this from causing a frame hitch.
+        const bool regionReadable = AOBScanner::IsReadable(
+            calibVehicle.GetAddress() + searchLo, (searchHi - searchLo) + 32);
 
-          // When revving from standstill, Gear is usually 1 (sometimes 0 if
-          // neutral)
-          if (gearVal == 1 || gearVal == 0) {
-            // 1. Test Legacy Layout: NextGear=offset-2, TopGear=offset+4,
-            // GearRatios=offset+6
-            uint8_t nextGearLegacy = *reinterpret_cast<uint8_t *>(
-                calibVehicle.GetAddress() + offset - 2);
-            uint8_t topGearLegacy = *reinterpret_cast<uint8_t *>(
-                calibVehicle.GetAddress() + offset + 4);
-            uintptr_t ratiosLegacy = *reinterpret_cast<uintptr_t *>(
-                calibVehicle.GetAddress() + offset + 6);
+        if (regionReadable) {
+          __try {
+            for (uint32_t gearOff = searchLo;
+                 gearOff <= searchHi && !foundGearLayout; ++gearOff) {
+              const uint8_t gearVal = *reinterpret_cast<uint8_t *>(
+                  calibVehicle.GetAddress() + gearOff);
+              if (gearVal != 0 && gearVal != 1)
+                continue;
 
-            if ((nextGearLegacy == 0 || nextGearLegacy == 1 ||
-                 nextGearLegacy == 2) &&
-                (topGearLegacy >= 4 && topGearLegacy <= 9) &&
-                ratiosLegacy > 0x10000000 &&
-                AOBScanner::IsReadable(ratiosLegacy, 4)) {
+              uint32_t nextGearOff = 0, topGearOff = 0, ratiosOff = 0;
+              bool haveNext = false, haveTop = false, haveRatios = false;
 
-              resolvedOffsets.Gear = offset;
-              resolvedOffsets.NextGear = offset - 2;
-              resolvedOffsets.TopGear = offset + 4;
-              resolvedOffsets.GearRatios = offset + 6;
-              foundGearLayout = true;
-              break;
+              for (int32_t d = -16; d <= 16 && !haveNext; ++d) {
+                if (d == 0 || static_cast<int64_t>(gearOff) + d < 0)
+                  continue;
+                const uint32_t off =
+                    static_cast<uint32_t>(static_cast<int64_t>(gearOff) + d);
+                const uint8_t v = *reinterpret_cast<uint8_t *>(
+                    calibVehicle.GetAddress() + off);
+                if (v <= 2) {
+                  nextGearOff = off;
+                  haveNext = true;
+                }
+              }
+              for (int32_t d = -24; d <= 24 && !haveTop; ++d) {
+                if (d == 0 || static_cast<int64_t>(gearOff) + d < 0)
+                  continue;
+                const uint32_t off =
+                    static_cast<uint32_t>(static_cast<int64_t>(gearOff) + d);
+                const uint8_t v = *reinterpret_cast<uint8_t *>(
+                    calibVehicle.GetAddress() + off);
+                if (v >= 4 && v <= 9) {
+                  topGearOff = off;
+                  haveTop = true;
+                }
+              }
+              for (int32_t d = -64; d <= 64 && !haveRatios; d += 4) {
+                if (static_cast<int64_t>(gearOff) + d < 8)
+                  continue;
+                const uint32_t off =
+                    static_cast<uint32_t>(static_cast<int64_t>(gearOff) + d);
+                const uintptr_t ptr = *reinterpret_cast<uintptr_t *>(
+                    calibVehicle.GetAddress() + off);
+                if (ptr < 0x10000000 || !AOBScanner::IsReadable(ptr, 16))
+                  continue;
+                const float *ratios = reinterpret_cast<const float *>(ptr);
+                bool plausible = true;
+                for (int g = 0; g < 4; ++g) {
+                  if (!std::isfinite(ratios[g]) || ratios[g] <= 0.0f ||
+                      ratios[g] > 20.0f) {
+                    plausible = false;
+                    break;
+                  }
+                }
+                if (plausible) {
+                  ratiosOff = off;
+                  haveRatios = true;
+                }
+              }
+
+              if (haveNext && haveTop && haveRatios) {
+                foundGearOffset = gearOff;
+                foundNextGearOffset = nextGearOff;
+                foundTopGearOffset = topGearOff;
+                foundRatiosOffset = ratiosOff;
+                foundGearLayout = true;
+              }
             }
-
-            // 2. Test Enhanced Layout: NextGear=offset+2, TopGear=offset+6,
-            // GearRatios=offset+8
-            uint8_t nextGearEnhanced = *reinterpret_cast<uint8_t *>(
-                calibVehicle.GetAddress() + offset + 2);
-            uint8_t topGearEnhanced = *reinterpret_cast<uint8_t *>(
-                calibVehicle.GetAddress() + offset + 6);
-            uintptr_t ratiosEnhanced = *reinterpret_cast<uintptr_t *>(
-                calibVehicle.GetAddress() + offset + 8);
-
-            if ((nextGearEnhanced == 0 || nextGearEnhanced == 1 ||
-                 nextGearEnhanced == 2) &&
-                (topGearEnhanced >= 4 && topGearEnhanced <= 9) &&
-                ratiosEnhanced > 0x10000000 &&
-                AOBScanner::IsReadable(ratiosEnhanced, 4)) {
-
-              resolvedOffsets.Gear = offset;
-              resolvedOffsets.NextGear = offset + 2;
-              resolvedOffsets.TopGear = offset + 6;
-              resolvedOffsets.GearRatios = offset + 8;
-              foundGearLayout = true;
-              break;
-            }
+          } __except (EXCEPTION_EXECUTE_HANDLER) {
+            foundGearLayout = false;
           }
+        }
+
+        if (foundGearLayout) {
+          resolvedOffsets.Gear = foundGearOffset;
+          resolvedOffsets.NextGear = foundNextGearOffset;
+          resolvedOffsets.TopGear = foundTopGearOffset;
+          resolvedOffsets.GearRatios = foundRatiosOffset;
         }
 
         if (foundGearLayout && AreOffsetsSane(resolvedOffsets)) {
@@ -548,6 +654,14 @@ void VehicleData::UpdateCalibration(HMODULE pluginModule, int vehicleHandle,
         calibState = CalibrationState::Failed;
         lastFailureReason = "Calibration failed to isolate RPM offset";
       }
+    } else {
+      // No candidate climbed meaningfully above its own idle value.
+      calibState = CalibrationState::Failed;
+      lastFailureReason =
+          "Held revs for over a second but no idle-candidate rose above its "
+          "own idle value by 40%+. Either it wasn't revving hard enough to "
+          "register (try holding W harder/longer), or the idle-stage "
+          "candidates weren't RPM at all - recalibrate from scratch.";
     }
   }
 }

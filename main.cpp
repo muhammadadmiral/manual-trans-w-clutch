@@ -283,6 +283,11 @@ void ScriptMain() {
           break;
         }
         Renderer::DrawTextOverlay(calibMsg.c_str(), 0.5f, 0.1f, 0.6f);
+        char throttleDbg[64]{};
+        sprintf_s(throttleDbg, "[debug] raw W: %s | smoothed throttle: %.2f",
+                  (GetAsyncKeyState(0x57) & 0x8000) ? "DOWN" : "up",
+                  InputHandler::GetSmoothedThrottle());
+        Renderer::DrawTextOverlay(throttleDbg, 0.5f, 0.15f, 0.4f);
         Menu::Draw();
         continue;
       }
