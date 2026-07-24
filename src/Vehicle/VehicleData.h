@@ -14,18 +14,23 @@ struct VehicleOffsets {
   bool IsComplete() const;
 };
 
-enum class VehicleOffsetSource { Uninitialized, PatternScan, IniFallback, Calibration };
+enum class VehicleOffsetSource {
+  Uninitialized,
+  PatternScan,
+  IniFallback,
+  Calibration
+};
 
 enum class CalibrationState {
-    None,
-    WaitingForEngineOff,
-    ScanningEngineOff,
-    WaitingForEngineOn,
-    ScanningEngineOn,
-    WaitingForRev,
-    ScanningRev,
-    Done,
-    Failed
+  None,
+  WaitingForEngineOff,
+  ScanningEngineOff,
+  WaitingForEngineOn,
+  ScanningEngineOn,
+  WaitingForRev,
+  ScanningRev,
+  Done,
+  Failed
 };
 
 class VehicleData {
@@ -33,7 +38,8 @@ public:
   // Call once after ScriptHookV has initialized the script thread.
   static bool Initialize(HMODULE pluginModule);
   static void ResetCalibration();
-  static void UpdateCalibration(HMODULE pluginModule, int vehicleHandle, bool isEngineOn, bool isRevving);
+  static void UpdateCalibration(HMODULE pluginModule, int vehicleHandle,
+                                bool isEngineOn, bool isRevving);
   static CalibrationState GetCalibrationState();
   static bool IsInitialized();
   static VehicleOffsetSource GetOffsetSource();
@@ -77,7 +83,8 @@ private:
 
   static bool ResolveOffsetsByPattern(VehicleOffsets &result);
   static bool LoadOffsetsFromIni(HMODULE pluginModule, VehicleOffsets &result);
-  static void SaveOffsetsToIni(HMODULE pluginModule, const VehicleOffsets &offsets);
+  static void SaveOffsetsToIni(HMODULE pluginModule,
+                               const VehicleOffsets &offsets);
   static bool AreOffsetsSane(const VehicleOffsets &value);
 
   // Calibration state

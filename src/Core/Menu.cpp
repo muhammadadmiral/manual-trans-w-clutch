@@ -102,15 +102,16 @@ void Menu::DrawTextStr(const std::string &text, float x, float y, float scale,
 }
 
 void Menu::Update() {
-    static bool wasMenuKeyPressed = false;
-    bool isMenuKeyPressed = (GetAsyncKeyState(Config::KeyMenu) & 0x8000) != 0;
+  static bool wasMenuKeyPressed = false;
+  bool isMenuKeyPressed = (GetAsyncKeyState(Config::KeyMenu) & 0x8000) != 0;
 
-    if (isMenuKeyPressed && !wasMenuKeyPressed) {
-        Toggle();
-    }
-    wasMenuKeyPressed = isMenuKeyPressed;
+  if (isMenuKeyPressed && !wasMenuKeyPressed) {
+    Toggle();
+  }
+  wasMenuKeyPressed = isMenuKeyPressed;
 
-    if (!isOpen || menus.empty()) return;
+  if (!isOpen || menus.empty())
+    return;
 
   Submenu &current = GetCurrentMenu();
 
@@ -207,7 +208,8 @@ void Menu::Draw() {
     }
 
     if (valBuf[0] != '\0') {
-        DrawTextStr(valBuf, menuX + menuWidth - 0.05f, currentY + 0.005f, 0.35f, textR, textG, textB, 255, true);
+      DrawTextStr(valBuf, menuX + menuWidth - 0.05f, currentY + 0.005f, 0.35f,
+                  textR, textG, textB, 255, true);
     }
 
     currentY += itemHeight;

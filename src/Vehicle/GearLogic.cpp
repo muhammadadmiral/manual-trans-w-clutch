@@ -70,8 +70,7 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
   // throttle / RPM is low.
   if (isEngineOn && s_manualGear != 0) {
     const float vehicleSpeed = speedKmH / 3.6f;
-    if (vehicleSpeed < 1.5f && clutch < 0.25f &&
-        data.GetRPM() < 0.22f) {
+    if (vehicleSpeed < 1.5f && clutch < 0.25f && data.GetRPM() < 0.22f) {
       isEngineOn = false;
       VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
       // Will show notification via main loop or renderer, for now just play
@@ -86,8 +85,9 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
 
 void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
                    float clutch) {
-  // We no longer use cheat power to kill torque because negative values cause the car to reverse.
-  // Instead, the clutch logic is handled by cutting throttle input in InputHandler.
+  // We no longer use cheat power to kill torque because negative values cause
+  // the car to reverse. Instead, the clutch logic is handled by cutting
+  // throttle input in InputHandler.
   VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, 0.0f);
 
   if (manualGear == 0) {

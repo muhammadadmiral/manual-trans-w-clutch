@@ -289,7 +289,7 @@ void VehicleData::SaveOffsetsToIni(HMODULE pluginModule,
     return;
 
   char buffer[32]{};
-  
+
   // Save to generic [Offsets] section
   sprintf_s(buffer, "0x%X", offsets.Gear);
   WritePrivateProfileStringA("Offsets", "Gear", buffer, iniPath);
@@ -305,13 +305,17 @@ void VehicleData::SaveOffsetsToIni(HMODULE pluginModule,
   if (!buildVersion.empty()) {
     std::string versionedSection = "Offsets." + buildVersion;
     sprintf_s(buffer, "0x%X", offsets.Gear);
-    WritePrivateProfileStringA(versionedSection.c_str(), "Gear", buffer, iniPath);
+    WritePrivateProfileStringA(versionedSection.c_str(), "Gear", buffer,
+                               iniPath);
     sprintf_s(buffer, "0x%X", offsets.NextGear);
-    WritePrivateProfileStringA(versionedSection.c_str(), "NextGear", buffer, iniPath);
+    WritePrivateProfileStringA(versionedSection.c_str(), "NextGear", buffer,
+                               iniPath);
     sprintf_s(buffer, "0x%X", offsets.Clutch);
-    WritePrivateProfileStringA(versionedSection.c_str(), "Clutch", buffer, iniPath);
+    WritePrivateProfileStringA(versionedSection.c_str(), "Clutch", buffer,
+                               iniPath);
     sprintf_s(buffer, "0x%X", offsets.RPM);
-    WritePrivateProfileStringA(versionedSection.c_str(), "RPM", buffer, iniPath);
+    WritePrivateProfileStringA(versionedSection.c_str(), "RPM", buffer,
+                               iniPath);
   }
 
   WritePrivateProfileStringA("Memory", "AllowIniFallback", "1", iniPath);
@@ -341,11 +345,11 @@ bool VehicleData::Initialize(HMODULE pluginModule) {
   resolvedOffsets = {};
   offsetSource = VehicleOffsetSource::Uninitialized;
   initialized = false;
-  
+
   if (calibState == CalibrationState::None) {
-      calibState = CalibrationState::WaitingForEngineOff;
+    calibState = CalibrationState::WaitingForEngineOff;
   }
-  
+
   return true;
 }
 
@@ -400,11 +404,12 @@ void VehicleData::UpdateCalibration(HMODULE pluginModule, int vehicleHandle,
         foundIdle = true;
       }
     }
-    
-    // Only proceed when the engine has spooled up to idle and we found candidates
+
+    // Only proceed when the engine has spooled up to idle and we found
+    // candidates
     if (foundIdle) {
-        candidateOffsets = nextCandidates;
-        calibState = CalibrationState::WaitingForRev;
+      candidateOffsets = nextCandidates;
+      calibState = CalibrationState::WaitingForRev;
     }
   } else if (calibState == CalibrationState::WaitingForRev) {
     if (isRevving) {
@@ -420,29 +425,30 @@ void VehicleData::UpdateCalibration(HMODULE pluginModule, int vehicleHandle,
         foundRev = true;
       }
     }
-    
+
     if (foundRev) {
-        candidateOffsets = nextCandidates;
-        
-        if (!candidateOffsets.empty()) {
-          resolvedOffsets.RPM = candidateOffsets[0];
-          resolvedOffsets.Clutch = resolvedOffsets.RPM + 12; // Typical GTA V memory layout
-          resolvedOffsets.Gear = resolvedOffsets.RPM - 36;
-          resolvedOffsets.NextGear = resolvedOffsets.Gear - 2;
-          
-          if (AreOffsetsSane(resolvedOffsets)) {
-            calibState = CalibrationState::Done;
-            offsetSource = VehicleOffsetSource::Calibration;
-            initialized = true;
-            SaveOffsetsToIni(pluginModule, resolvedOffsets);
-          } else {
-            calibState = CalibrationState::Failed;
-            lastFailureReason = "Calibration found invalid offset layout";
-          }
+      candidateOffsets = nextCandidates;
+
+      if (!candidateOffsets.empty()) {
+        resolvedOffsets.RPM = candidateOffsets[0];
+        resolvedOffsets.Clutch =
+            resolvedOffsets.RPM + 12; // Typical GTA V memory layout
+        resolvedOffsets.Gear = resolvedOffsets.RPM - 36;
+        resolvedOffsets.NextGear = resolvedOffsets.Gear - 2;
+
+        if (AreOffsetsSane(resolvedOffsets)) {
+          calibState = CalibrationState::Done;
+          offsetSource = VehicleOffsetSource::Calibration;
+          initialized = true;
+          SaveOffsetsToIni(pluginModule, resolvedOffsets);
         } else {
           calibState = CalibrationState::Failed;
-          lastFailureReason = "Calibration failed to isolate RPM offset";
+          lastFailureReason = "Calibration found invalid offset layout";
         }
+      } else {
+        calibState = CalibrationState::Failed;
+        lastFailureReason = "Calibration failed to isolate RPM offset";
+      }
     }
   }
 }
@@ -501,7 +507,8 @@ uint8_t VehicleData::GetGear() const {
   if (!CanRead(resolvedOffsets.Gear, sizeof(uint8_t)))
     return 0;
   __try {
-    return *reinterpret_cast<const uint8_t *>(baseAddress + resolvedOffsets.Gear);
+    return *reinterpret_cast<const uint8_t *>(baseAddress +
+                                              resolvedOffsets.Gear);
   } __except (EXCEPTION_EXECUTE_HANDLER) {
     return 0;
   }
@@ -511,7 +518,8 @@ uint8_t VehicleData::GetNextGear() const {
   if (!CanRead(resolvedOffsets.NextGear, sizeof(uint8_t)))
     return 0;
   __try {
-    return *reinterpret_cast<const uint8_t *>(baseAddress + resolvedOffsets.NextGear);
+    return *reinterpret_cast<const uint8_t *>(baseAddress +
+                                              resolvedOffsets.NextGear);
   } __except (EXCEPTION_EXECUTE_HANDLER) {
     return 0;
   }
@@ -521,7 +529,8 @@ float VehicleData::GetClutch() const {
   if (!CanRead(resolvedOffsets.Clutch, sizeof(float)))
     return 0.0f;
   __try {
-    return *reinterpret_cast<const float *>(baseAddress + resolvedOffsets.Clutch);
+    return *reinterpret_cast<const float *>(baseAddress +
+                                            resolvedOffsets.Clutch);
   } __except (EXCEPTION_EXECUTE_HANDLER) {
     return 0.0f;
   }

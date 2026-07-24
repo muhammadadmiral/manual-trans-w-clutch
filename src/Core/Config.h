@@ -31,7 +31,8 @@ extern float BrakeRelease;
 extern float ClutchAttack;
 extern float ClutchRelease;
 
-void WriteFloat(const char *section, const char *key, float value, const char *iniPath);
+void WriteFloat(const char *section, const char *key, float value,
+                const char *iniPath);
 void SaveConfig(HMODULE module);
 
 // Extra VEHICLE::GET_VEHICLE_CLASS() ids to treat as automatic-only, on

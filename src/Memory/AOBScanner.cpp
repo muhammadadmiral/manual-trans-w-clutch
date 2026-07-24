@@ -81,11 +81,13 @@ bool AOBScanner::IsReadable(uintptr_t address, size_t size) {
     return false;
 
   const uintptr_t startPage = address & ~static_cast<uintptr_t>(4095);
-  const uintptr_t endPage = (address + size - 1) & ~static_cast<uintptr_t>(4095);
+  const uintptr_t endPage =
+      (address + size - 1) & ~static_cast<uintptr_t>(4095);
 
   for (uintptr_t page = startPage; page <= endPage; page += 4096) {
     MEMORY_BASIC_INFORMATION info{};
-    if (VirtualQuery(reinterpret_cast<const void *>(page), &info, sizeof(info)) == 0) {
+    if (VirtualQuery(reinterpret_cast<const void *>(page), &info,
+                     sizeof(info)) == 0) {
       return false;
     }
     if (info.State != MEM_COMMIT || !IsReadableProtection(info.Protect)) {
@@ -96,7 +98,8 @@ bool AOBScanner::IsReadable(uintptr_t address, size_t size) {
   return true;
 }
 
-static bool ComparePatternSafe(const uint8_t *data, const std::vector<int> &pattern) {
+static bool ComparePatternSafe(const uint8_t *data,
+                               const std::vector<int> &pattern) {
   __try {
     const size_t patternSize = pattern.size();
     for (size_t i = 0; i < patternSize; ++i) {

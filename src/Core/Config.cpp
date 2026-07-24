@@ -120,30 +120,35 @@ void ReadConfig(HMODULE module) {
   OverlayBarHeight = ReadFloat("Overlay", "BarHeight", 0.014f, iniPath);
 }
 
-void WriteFloat(const char *section, const char *key, float value, const char *iniPath) {
-    char buffer[32]{};
-    sprintf_s(buffer, "%.3f", value);
-    WritePrivateProfileStringA(section, key, buffer, iniPath);
+void WriteFloat(const char *section, const char *key, float value,
+                const char *iniPath) {
+  char buffer[32]{};
+  sprintf_s(buffer, "%.3f", value);
+  WritePrivateProfileStringA(section, key, buffer, iniPath);
 }
 
-void WriteInt(const char *section, const char *key, int value, const char *iniPath) {
-    char buffer[32]{};
-    sprintf_s(buffer, "%d", value);
-    WritePrivateProfileStringA(section, key, buffer, iniPath);
+void WriteInt(const char *section, const char *key, int value,
+              const char *iniPath) {
+  char buffer[32]{};
+  sprintf_s(buffer, "%d", value);
+  WritePrivateProfileStringA(section, key, buffer, iniPath);
 }
 
 void SaveConfig(HMODULE module) {
   char iniPath[MAX_PATH];
   DWORD length = GetModuleFileNameA(module, iniPath, MAX_PATH);
-  if (length == 0 || length >= MAX_PATH) return;
+  if (length == 0 || length >= MAX_PATH)
+    return;
 
   char *slash = std::strrchr(iniPath, '\\');
-  if (!slash) slash = std::strrchr(iniPath, '/');
-  if (!slash) return;
+  if (!slash)
+    slash = std::strrchr(iniPath, '/');
+  if (!slash)
+    return;
   *slash = '\0';
 
   strcat_s(iniPath, "\\manual-trans.ini");
-  
+
   WriteInt("Controls", "ShiftUp", KeyShiftUp, iniPath);
   WriteInt("Controls", "ShiftDown", KeyShiftDown, iniPath);
   WriteInt("Controls", "ClutchKey", KeyClutch, iniPath);

@@ -14,7 +14,8 @@ void DrawGearHUD(int manualGear, int maxGear);
 
 void DrawGrindWarning();
 
-void DrawDebugOverlay(int manualGear, unsigned gameGear, unsigned nextGear, float rpm, float clutch, const char* srcName);
+void DrawDebugOverlay(int manualGear, unsigned gameGear, unsigned nextGear,
+                      float rpm, float clutch, const char *srcName);
 
 void DrawPedalsOverlay(float rpm, float clutch, float throttle, float brake);
 
