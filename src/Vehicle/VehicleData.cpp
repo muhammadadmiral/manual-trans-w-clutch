@@ -540,8 +540,6 @@ void VehicleData::UpdateCalibration(HMODULE pluginModule, int vehicleHandle,
                 foundNextGearOffset, foundTopGearOffset, foundRatiosOffset);
           }
 
-        }
-
           if (foundGearLayout) {
             resolvedOffsets.Gear = foundGearOffset;
             resolvedOffsets.NextGear = foundNextGearOffset;
