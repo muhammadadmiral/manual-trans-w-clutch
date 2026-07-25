@@ -73,6 +73,7 @@ extern float ShiftShockStrength;
 extern float NoLiftShiftPenalty;
 extern bool SynchronizerWear;
 extern bool ShiftResistance;
+extern bool NativeGearboxPatch;
 extern bool FuelCutoffEngineBrake;
 extern float ConnectedRPMSync;
 extern bool AutomaticBrakeInterlock;

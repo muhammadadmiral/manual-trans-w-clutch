@@ -34,6 +34,7 @@ struct State {
   DWORD kickdownStartedAt = 0;
   int lastShiftDirection = 0;
   float coupling = 0.0f;
+  float hydraulicCoupling = 0.0f;
   float decisionRPM = 0.2f;
   float shiftTargetRPM = 0.2f;
   float inputThrottle = 0.0f;

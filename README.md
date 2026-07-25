@@ -76,7 +76,7 @@ dijelaskan di [docs/configuration.md](docs/configuration.md).
    memuat ScriptHookV.
 
 Sesudah mengganti ASI, cek awal `manual-trans.log`. Build sprint ini wajib
-mencetak `Runtime=driveline-r19-telemetry-safe` dan path file yang benar-benar dimuat. Kalau
+mencetak `Runtime=driveline-r20-lowrpm-takeover` dan path file yang benar-benar dimuat. Kalau
 baris itu tidak ada, GTA masih memakai salinan ASI lama.
 
 Artefak yang sudah diverifikasi pada sprint ini:
@@ -144,8 +144,8 @@ terverifikasi. TCS/ABS otomatis tidak mengintervensi bila `CWheel` tidak
 ter-resolve. Cluster engine memakai `Clutch=RPM+0xC` dan
 `EngineThrottle=RPM+0x10`; field throttle ini bukan pedal input. Saat mode
 transmisi aktif, RPM dan engine-throttle dapat ditulis untuk menjaga
-sinkronisasi poros. Executable code patch dikarantina pada GTA V Enhanced
-karena kedua strategi patch flow-control terbukti crash di game thread.
-Takeover r18 hanya memakai field drivetrain tervalidasi dan native controls;
-tidak ada write ke `.text` GTA. Byte legacy patch tetap punya rollback
+sinkronisasi poros. Native gearbox override r20 hanya mengganti opcode branch
+`JNE` menjadi `JMP` lewat write satu byte; body instruksi tidak ditimpa.
+Toggle `Native Gearbox Override` dapat mematikannya secara runtime dan
+merestore byte asli untuk diagnosis fail-open.
 saat mod Off, keluar kendaraan, atau unload.

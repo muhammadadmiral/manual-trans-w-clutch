@@ -283,6 +283,8 @@ void Menu::Initialize() {
                                    &Config::SynchronizerWear));
   gearbox.items.push_back(MenuItem("Shift Resistance", MenuItem::Bool,
                                    &Config::ShiftResistance));
+  gearbox.items.push_back(MenuItem("Native Gearbox Override", MenuItem::Bool,
+                                   &Config::NativeGearboxPatch));
   gearbox.items.push_back(MenuItem("Reverse Lockout km/h", MenuItem::Float,
                                    &Config::ReverseLockoutSpeedKmH,
                                    0.50f, 0.00f, 30.00f));

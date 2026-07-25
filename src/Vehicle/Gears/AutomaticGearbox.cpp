@@ -204,6 +204,7 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
   if (s_state.selector == Selector::Park ||
       s_state.selector == Selector::Neutral) {
     s_state.coupling = 0.0f;
+    s_state.hydraulicCoupling = 0.0f;
     s_state.shiftPhase = ShiftPhase::Engaged;
     return 0;
   }
@@ -215,6 +216,7 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
                                  throttle * 0.12f,
                              0.0f, 1.0f)
                  : 0.0f;
+    s_state.hydraulicCoupling = s_state.coupling;
     return -1;
   }
 
@@ -241,6 +243,14 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
                                throttle * 0.08f - unlockAmount,
                            sport ? 0.58f : 0.48f, 1.0f)
                : 0.0f;
+  float nativeCoupling = converterCoupling;
+  if (engineOn && std::fabs(signedSpeedMps) < 8.0f) {
+    const float transferFloor =
+        (sport ? 0.66f : 0.62f) + throttle * (sport ? 0.22f : 0.18f);
+    nativeCoupling =
+        (std::max)(nativeCoupling,
+                   std::clamp(transferFloor, 0.0f, 0.92f));
+  }
   s_state.tccLocked =
       Config::AutomaticTCC && s_state.currentGear >= 3 &&
       std::fabs(signedSpeedMps) > 14.0f && throttle > 0.05f &&
@@ -266,6 +276,9 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
           static_cast<float>(phaseElapsed) /
           static_cast<float>((std::max<DWORD>)(1, disengageMs));
       s_state.coupling = converterCoupling * (1.0f - SmoothStep(progress));
+      s_state.hydraulicCoupling = s_state.coupling;
+      s_state.coupling =
+          nativeCoupling * (1.0f - SmoothStep(progress));
       if (s_state.pendingGear > s_state.shiftFromGear &&
           s_state.decisionRPM > 0.72f && phaseElapsed < 100)
         s_state.ignitionCut = true;
@@ -274,9 +287,11 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
         s_state.shiftPhase = ShiftPhase::Synchronizing;
         s_state.phaseStartedAt = now;
         s_state.coupling = 0.0f;
+        s_state.hydraulicCoupling = 0.0f;
       }
     } else if (s_state.shiftPhase == ShiftPhase::Synchronizing) {
       s_state.coupling = 0.0f;
+      s_state.hydraulicCoupling = 0.0f;
       s_state.shiftTargetRPM =
           std::clamp(RoadRPM(vehicle, data, vehicleMaxGear,
                              s_state.currentGear, signedSpeedMps),
@@ -297,12 +312,18 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
           static_cast<float>(phaseElapsed) /
           static_cast<float>((std::max<DWORD>)(1, engageMs));
       s_state.coupling = converterCoupling * SmoothStep(progress);
+      s_state.hydraulicCoupling = s_state.coupling;
+      s_state.coupling = nativeCoupling * SmoothStep(progress);
       s_state.shiftTargetRPM =
           std::clamp(RoadRPM(vehicle, data, vehicleMaxGear,
                              s_state.currentGear, signedSpeedMps),
                      0.20f, 0.97f);
       if (phaseElapsed >= engageMs) {
         s_state.coupling = converterCoupling;
+        s_state.hydraulicCoupling =
+            s_state.tccLocked ? 1.0f : converterCoupling;
+        s_state.coupling =
+            s_state.tccLocked ? 1.0f : nativeCoupling;
         s_state.shiftPhase = ShiftPhase::Engaged;
         s_state.lastShiftTime = now;
         s_state.fluidTemperature =
@@ -322,9 +343,15 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
     return s_state.currentGear;
   }
 
-  s_state.coupling = s_state.tccLocked ? 1.0f : converterCoupling;
-  if (s_state.hillCreepFailure)
+  s_state.hydraulicCoupling =
+      s_state.tccLocked ? 1.0f : converterCoupling;
+  s_state.coupling =
+      s_state.tccLocked ? 1.0f : nativeCoupling;
+  if (s_state.hillCreepFailure) {
+    s_state.hydraulicCoupling =
+        (std::min)(s_state.hydraulicCoupling, 0.42f);
     s_state.coupling = (std::min)(s_state.coupling, 0.42f);
+  }
   const DWORD elapsedSinceShift = now - s_state.lastShiftTime;
   if (elapsedSinceShift < delayMs)
     return s_state.currentGear;
@@ -518,8 +545,10 @@ void ApplyToMemory(Vehicle vehicle, VehicleData &data, int activeGear,
 
 Selector GetSelector() { return s_state.selector; }
 int GetCurrentGear() { return s_state.currentGear; }
-float GetCoupling() { return s_state.coupling; }
-float GetClutchDisengagement() { return 1.0f - s_state.coupling; }
+float GetCoupling() { return s_state.hydraulicCoupling; }
+float GetClutchDisengagement() {
+  return 1.0f - s_state.hydraulicCoupling;
+}
 bool IsSport() { return s_state.selector == Selector::Sport; }
 bool IsKickdownActive() { return s_state.kickdown; }
 bool IsShifting() { return s_state.shiftPhase != ShiftPhase::Engaged; }
@@ -532,6 +561,7 @@ void ForceNeutral() {
   s_state.currentGear = 1;
   s_state.pendingGear = 1;
   s_state.coupling = 0.0f;
+  s_state.hydraulicCoupling = 0.0f;
   s_state.shiftPhase = ShiftPhase::Engaged;
   s_state.safetyNeutral = true;
   LOG_WARN(Gear, "Automatic safety-neutral: parking brake while moving");

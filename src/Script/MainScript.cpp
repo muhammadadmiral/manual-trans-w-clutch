@@ -251,7 +251,7 @@ void ScriptMain() {
       const VehicleOffsets &off = VehicleData::GetResolvedOffsets();
       const std::string bv = VehicleData::GetGameBuildVersion();
       char notify[256]{};
-      sprintf_s(notify, "Manual trans r19: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
+      sprintf_s(notify, "Manual trans r20: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
                 VehicleData::GetOffsetSourceName(),
                 bv.empty() ? "?" : bv.c_str(), off.Gear, off.NextGear, off.RPM,
                 off.Clutch);
@@ -848,14 +848,15 @@ void ScriptMain() {
       LOG_INFO(Gear,
                "STATUS: Mode=%d Profile=%s Selector=%s Gear=%d Mem=%u Next=%u "
                "Speed=%.1f Signed=%.2f RPM=%.3f Throttle=%.3f Brake=%.3f "
-               "PedalClutch=%.3f MemClutch=%.3f Engine=%d Start=%d",
+               "PedalClutch=%.3f MemClutch=%.3f Engine=%d Start=%d Patch=%d",
                transmissionMode, VehicleProfile::GetName(vehicleProfile),
                automaticMode ? AutomaticGearbox::GetSelectorName() : "M",
                manualGear, static_cast<unsigned>(data.GetGear()),
                static_cast<unsigned>(data.GetNextGear()), speedKmH,
                forwardSpeed, data.GetRPM(), driveThrottle, absBrake,
                simulatedClutch, data.GetClutch(), isEngineOn ? 1 : 0,
-               engineStarting ? 1 : 0);
+               engineStarting ? 1 : 0,
+               GearboxPatches::IsApplied() ? 1 : 0);
       LOG_INFO(Physics,
                "ENGINE: Owned=%d CtrlRPM=%.3f Target=%.3f WheelRPM=%.3f "
                "Physical=%.0f Idle=%.0f Redline=%.0f Load=%.3f "
@@ -893,12 +894,14 @@ void ScriptMain() {
                BrakeSystem::IsABSActive() ? 1 : 0);
       if (automaticMode) {
         LOG_INFO(Gear,
-                 "AUTO: Phase=%s Current=%d Pending=%d Coupling=%.3f "
+                 "AUTO: Phase=%s Current=%d Pending=%d Hydraulic=%.3f "
+                 "Native=%.3f "
                  "DecisionRPM=%.3f TCC=%d ATF=%.3f Limp=%d KDWait=%d "
                  "NDrop=%d Boost=%.2f TM=%.3f IgnCut=%d",
                  AutomaticGearbox::GetShiftPhaseName(),
                  autoState.currentGear, autoState.pendingGear,
-                 autoState.coupling, autoState.decisionRPM,
+                 autoState.hydraulicCoupling, autoState.coupling,
+                 autoState.decisionRPM,
                  autoState.tccLocked ? 1 : 0, autoState.fluidTemperature,
                  autoState.limpMode ? 1 : 0,
                  autoState.kickdownPending ? 1 : 0,

@@ -1,4 +1,5 @@
 #include "GearboxPatches.h"
+#include "../Core/Config.h"
 #include "../Core/ModLogger.h"
 #include "AOBScanner.h"
 
@@ -311,11 +312,16 @@ bool ApplyAll() {
 
 bool SetActive(bool active) {
   if (active) {
+    if (Config::NativeGearboxPatch)
+      return ApplyAll();
+
+    if (s_applied && !RestoreApplied())
+      return false;
     if (!s_quarantineNoticeShown) {
       s_quarantineNoticeShown = true;
       LOG_WARN(Memory,
-               "Executable gearbox patch dikarantina untuk Enhanced "
-               "(no .text write); scripted memory takeover tetap aktif");
+               "Native gearbox override dimatikan dari config; scripted "
+               "memory takeover berjalan fail-open tanpa .text write");
     }
     return true;
   }

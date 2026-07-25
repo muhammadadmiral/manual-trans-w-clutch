@@ -88,6 +88,9 @@ tidak lagi menjadi faktor tunggal.
   selama sesi drivetrain.
 - `Shift Resistance`: synchronizer aus menambah delay; mismatch berat dapat
   menolak shift.
+- `Native Gearbox Override`: menahan auto-shift/throttle suppression native
+  lewat patch branch satu byte. Matikan untuk diagnosis fail-open; byte asli
+  direstore tanpa restart.
 - `Reverse Lockout km/h`: kecepatan maksimum untuk memasukkan reverse.
 - `Over-rev Damage`: kerusakan money shift.
 
@@ -141,5 +144,4 @@ menambah `TCC`, `ATF`, `Limp`, `KDPending`, `NeutralDrop`, `BrakeBoost`,
 
 `Condition` berasal dari engine health. Nilai upgrade dibaca langsung dari mod
 kendaraan, bukan INI. `LowRec` dan `PowerMul` adalah satu-satunya jalur
-recovery low-RPM pada r19-telemetry-safe; tidak ada write runtime drive-force
-atau executable `.text` GTA.
+recovery low-RPM pada r20-lowrpm-takeover; tidak ada write runtime drive-force.

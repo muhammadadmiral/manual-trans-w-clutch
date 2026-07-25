@@ -76,6 +76,7 @@ float ShiftShockStrength = 0.65f;
 float NoLiftShiftPenalty = 0.35f;
 bool SynchronizerWear = true;
 bool ShiftResistance = true;
+bool NativeGearboxPatch = true;
 bool FuelCutoffEngineBrake = true;
 float ConnectedRPMSync = 0.25f;
 bool AutomaticBrakeInterlock = true;
@@ -335,6 +336,8 @@ void ReadConfig(HMODULE module) {
         GetPrivateProfileIntA("Gearbox", "SynchronizerWear", 1, ini) != 0;
     ShiftResistance =
         GetPrivateProfileIntA("Gearbox", "ShiftResistance", 1, ini) != 0;
+    NativeGearboxPatch =
+        GetPrivateProfileIntA("Gearbox", "NativeOverridePatch", 1, ini) != 0;
     FuelCutoffEngineBrake =
         GetPrivateProfileIntA("Engine", "FuelCutoffEngineBrake", 1, ini) != 0;
 
@@ -388,9 +391,9 @@ void ReadConfig(HMODULE module) {
 
     // Auto-create if the file doesn't exist yet
     if (GetFileAttributesA(ini) == INVALID_FILE_ATTRIBUTES ||
-        drivetrainSchema < 6) {
+        drivetrainSchema < 7) {
         SaveConfig(module);
-        WriteInt("Internal", "DrivetrainSchema", 6, ini);
+        WriteInt("Internal", "DrivetrainSchema", 7, ini);
     }
 }
 
@@ -493,6 +496,8 @@ void SaveConfig(HMODULE module) {
     WriteInt("Gearbox", "SynchronizerWear",
              SynchronizerWear ? 1 : 0, ini);
     WriteInt("Gearbox", "ShiftResistance", ShiftResistance ? 1 : 0, ini);
+    WriteInt("Gearbox", "NativeOverridePatch",
+             NativeGearboxPatch ? 1 : 0, ini);
 
     WriteFloat("Clutch", "BiteStart", ClutchBiteStart, ini);
     WriteFloat("Clutch", "BiteEnd", ClutchBiteEnd, ini);
