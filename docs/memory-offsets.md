@@ -35,10 +35,11 @@ Field baru harus punya signature, relasi struct yang konsisten, range check, dan
 jalur no-op ketika resolver gagal.
 
 Runtime menulis clutch dengan semantik signed GTA: `1` terhubung, nilai negatif
-hard-open. Empat code signature Enhanced menonaktifkan auto-shift/clutch-low-RPM
-dan throttle-lift native. Resolver wajib menemukan masing-masing tepat satu
-kali. Patch dipasang sekaligus, menyimpan byte asli, rollback bila satu write
-gagal, dan direstore ketika mode Off/keluar kendaraan/unload.
+hard-open. Lima code signature Enhanced menonaktifkan auto-shift, pelepasan
+clutch pada RPM rendah/redline, dan throttle-lift native. Resolver wajib
+menemukan masing-masing tepat satu kali. Patch dipasang sekaligus, menyimpan
+byte asli, rollback bila satu write gagal, dan direstore ketika mode Off/keluar
+kendaraan/unload.
 
 RPM saat clutch tersambung dihitung dari road speed, runtime flat velocity, dan
 rasio kendaraan aktif. RPM ini bukan pengganti kecepatan: wheel angular

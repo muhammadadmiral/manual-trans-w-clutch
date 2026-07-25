@@ -11,7 +11,7 @@ Sprint drivetrain aktif. Fokus saat ini:
 
 - netral dan clutch memutus drivetrain tanpa mematikan throttle mesin;
 - gearbox native Enhanced yang memaksa shift/clutch/throttle diambil alih lewat
-  empat signature tervalidasi; pemasangan atomik dan selalu punya rollback;
+  lima signature tervalidasi; pemasangan atomik dan selalu punya rollback;
 - RPM netral/clutch-open memakai free-rev inertia, sedangkan RPM tersambung
   mengikuti kecepatan jalan dan rasio gear aktif tanpa menulis velocity;
 - pelepasan clutch gradual memakai actuator clutch internal GTA;
@@ -67,7 +67,7 @@ dijelaskan di [docs/configuration.md](docs/configuration.md).
    memuat ScriptHookV.
 
 Sesudah mengganti ASI, cek awal `manual-trans.log`. Build sprint ini wajib
-mencetak `Runtime=driveline-r5` dan path file yang benar-benar dimuat. Kalau
+mencetak `Runtime=driveline-r6` dan path file yang benar-benar dimuat. Kalau
 baris itu tidak ada, GTA masih memakai salinan ASI lama.
 
 Artefak yang sudah diverifikasi pada sprint ini:
@@ -122,6 +122,6 @@ terverifikasi. TCS/ABS otomatis tidak mengintervensi bila `CWheel` tidak
 ter-resolve. Cluster engine memakai `Clutch=RPM+0xC` dan
 `EngineThrottle=RPM+0x10`; field throttle ini bukan pedal input. Saat mode
 transmisi aktif, RPM dan engine-throttle dapat ditulis untuk menjaga
-sinkronisasi poros setelah auto-shift native dinonaktifkan. Empat code patch
+sinkronisasi poros setelah auto-shift native dinonaktifkan. Lima code patch
 wajib resolve unik; satu kegagalan membatalkan semuanya. Byte asli direstore
 saat mod Off, keluar kendaraan, atau unload.

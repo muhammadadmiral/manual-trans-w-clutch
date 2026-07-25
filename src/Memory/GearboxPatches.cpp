@@ -26,7 +26,7 @@ struct Patch {
 
 // Signature ini milik rutinitas transmisi GTA V Enhanced. Yang diambil cuma
 // bentuk instruksinya; patch/rollback dan ownership state tetap punya kita.
-std::array<Patch, 4> s_patches{{
+std::array<Patch, 5> s_patches{{
     {"shift-up + clutch",
      "75 0D 66 41 FF 45 ? 41 C7 45 54 CD CC CC 3D 41 C7 85 ? 00 00 00 "
      "00 00 00 00",
@@ -34,7 +34,10 @@ std::array<Patch, 4> s_patches{{
     {"shift-down + clutch",
      "75 0D 66 41 FF 4D ? 41 C7 45 54 CD CC CC 3D 66 41 C7 45 04 06 00",
      0, 2},
-    {"clutch low RPM", "C7 43 40 CD CC CC 3D 66", 0, 7},
+    {"clutch low RPM", "C7 43 ? CD CC CC 3D 66", 0, 7},
+    {"clutch rev limit",
+     "C7 43 ? CD CC CC 3D 44 89 ? ? ? ? ? 44 89 ? ? ? ? ?",
+     0, 7},
     {"throttle lift", "89 4F 58 F3 44 0F 11", 0, 3},
 }};
 
@@ -135,6 +138,10 @@ bool ResolveAll() {
       return false;
     }
 
+    LOG_INFO(Memory, "Gearbox patch resolved: %s=%p offset=%zu len=%zu",
+             patch.name, reinterpret_cast<void *>(patch.address), patch.offset,
+             patch.length);
+
     if (!CopyFromAddress(patch.address, patch.original.data(),
                          patch.length)) {
       s_failure = std::string(patch.name) + " gagal menyimpan byte asli";
@@ -146,11 +153,13 @@ bool ResolveAll() {
 
   s_resolved = true;
   LOG_INFO(Memory,
-           "Gearbox native Enhanced resolved: up=%p down=%p low=%p lift=%p",
+           "Gearbox native Enhanced resolved: up=%p down=%p low=%p "
+           "rev=%p lift=%p",
            reinterpret_cast<void *>(s_patches[0].address),
            reinterpret_cast<void *>(s_patches[1].address),
            reinterpret_cast<void *>(s_patches[2].address),
-           reinterpret_cast<void *>(s_patches[3].address));
+           reinterpret_cast<void *>(s_patches[3].address),
+           reinterpret_cast<void *>(s_patches[4].address));
   return true;
 }
 
@@ -212,7 +221,7 @@ bool ApplyAll() {
   s_applied = true;
   s_failure.clear();
   LOG_INFO(Memory,
-           "Gearbox native override aktif (4/4, atomic, velocity untouched)");
+           "Gearbox native override aktif (5/5, atomic, velocity untouched)");
   return true;
 }
 
@@ -226,7 +235,7 @@ bool SetActive(bool active) {
 
   const bool restored = RestoreApplied();
   if (restored)
-    LOG_INFO(Memory, "Gearbox native override direstore (4/4)");
+    LOG_INFO(Memory, "Gearbox native override direstore (5/5)");
   return restored;
 }
 
