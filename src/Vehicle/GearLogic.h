@@ -18,6 +18,6 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
 // Synchronizes the calculated manual gear to the game's memory safely to
 // prevent crashes
 void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
-                   float clutch, float throttle);
+                   int maxGear, float clutch, float throttle, float speedKmH);
 
 } // namespace GearLogic

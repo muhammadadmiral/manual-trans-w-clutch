@@ -121,6 +121,7 @@ static float s_smoothedThrottle = 0.0f;
 static float s_smoothedBrake    = 0.0f;
 static float s_smoothedClutch   = 0.0f;
 static float s_smoothedSteer    = 0.0f;
+static float s_driveCoupling    = 0.0f;
 
 // ── Raw state ─────────────────────────────────────────────────────────────────
 static bool  s_throttleDown  = false;
@@ -211,11 +212,16 @@ void Update() {
 // =============================================================================
 // ApplyGameControls
 // =============================================================================
-void ApplyGameControls(int manualGear, float clutch, float rpm, int /*maxGear*/,
+void ApplyGameControls(int manualGear, float clutch, float driveThrottle,
+                       int /*maxGear*/,
                        float forwardSpeed)
 {
-    float finalThrottle = GetSmoothedThrottle();
+    const float finalThrottle = Clamp01(driveThrottle);
     float finalBrake    = GetSmoothedBrake();
+    const bool hardDisconnect = IsClutchDown() || clutch >= 0.98f;
+    const float clutchCoupling =
+        hardDisconnect ? 0.0f : (1.0f - Clamp01(clutch));
+    s_driveCoupling = manualGear == 0 ? 0.0f : clutchCoupling;
 
     // We removed the aggressive custom rev limiter. 
     // Since we now set TopGear to current gear, the native GTA V auto-upshift is disabled,
@@ -238,11 +244,7 @@ void ApplyGameControls(int manualGear, float clutch, float rpm, int /*maxGear*/,
                 forwardSpeed > 0.1f ? 72 : 76, finalBrake);
     } else if (manualGear == -1) {
         // Reverse gear — swap throttle/brake controls
-        static float reverseEngagement = 1.0f;
-        if (clutch > 0.45f) reverseEngagement = 0.0f;
-        else reverseEngagement = std::fminf(1.0f, reverseEngagement + 0.035f);
-        const float coupledThrottle =
-            finalThrottle * (1.0f - Clamp01(clutch)) * reverseEngagement;
+        const float coupledThrottle = finalThrottle * clutchCoupling;
         PAD::DISABLE_CONTROL_ACTION(0, 71, true);
         PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, coupledThrottle);
         if (finalBrake > 0.02f) {
@@ -254,11 +256,11 @@ void ApplyGameControls(int manualGear, float clutch, float rpm, int /*maxGear*/,
         // Disconnect torque at the input layer instead: pedal down (1.0)
         // progressively removes all drive throttle while still allowing the
         // engine RPM to be simulated independently.
-        static float forwardEngagement = 1.0f;
-        if (clutch > 0.45f) forwardEngagement = 0.0f;
-        else forwardEngagement = std::fminf(1.0f, forwardEngagement + 0.035f);
-        const float coupledThrottle =
-            finalThrottle * (1.0f - Clamp01(clutch)) * forwardEngagement;
+        const float coupledThrottle = finalThrottle * clutchCoupling;
+        // SET_CONTROL_VALUE_NEXT_FRAME does not reliably replace a live
+        // keyboard value by itself. Disable GTA's raw W/accelerate path first,
+        // then inject only torque that passed through the clutch and TCS.
+        PAD::DISABLE_CONTROL_ACTION(0, 71, true);
         if (forwardSpeed <= 0.1f)
             PAD::DISABLE_CONTROL_ACTION(0, 72, true);
         PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, coupledThrottle);
@@ -277,6 +279,8 @@ void ResetEdges() {
     s_shiftUpWasDown = s_shiftDownWasDown = s_engineWasDown =
     s_signalLeftWasDown = s_signalRightWasDown = s_signalHazardWasDown = false;
     s_lastTick = 0;
+    s_smoothedThrottle = s_smoothedBrake = s_smoothedClutch = 0.0f;
+    s_smoothedSteer = s_rawSteerTarget = s_driveCoupling = 0.0f;
 }
 
 // =============================================================================
@@ -294,6 +298,7 @@ bool IsBrakeDown()    { return s_brakeDown;     }
 bool IsClutchDown()   { return s_clutchDown;    }
 
 float GetRawSteer()        { return s_rawSteerTarget; }
+float GetDriveCoupling()   { return s_driveCoupling; }
 
 float GetSmoothedThrottle() {
     return ApplyExpo(s_smoothedThrottle, Config::ThrottleExpo);

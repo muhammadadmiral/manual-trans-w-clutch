@@ -401,7 +401,12 @@ void ScriptMain() {
     const float vehicleSpeed = ENTITY::GET_ENTITY_SPEED(vehicle);
     const float speedKmH = vehicleSpeed * 3.6f;
     const float forwardSpeed = ENTITY::GET_ENTITY_SPEED_VECTOR(vehicle, TRUE).y;
-    const float clutch = InputHandler::GetSmoothedClutch();
+    // A digital clutch must disconnect on the first pressed frame. Attack
+    // still shapes release/travel, but can never leave residual drive while
+    // the key is physically held.
+    const float clutch = InputHandler::IsClutchDown()
+        ? 1.0f
+        : InputHandler::GetSmoothedClutch();
     const float throttle = InputHandler::GetSmoothedThrottle();
     const float rpm = data.GetRPM();
 
@@ -424,11 +429,12 @@ void ScriptMain() {
 
     static DWORD s_lastStatusLog = 0;
     if (GetTickCount() - s_lastStatusLog > 1000) {
-      LOG_INFO(Gear, "STATUS: Selected=%d MemGear=%u Next=%u PedalClutch=%.3f ClutchCandidateRO=%.3f InputThrottle=%.3f Brake=%.3f NativeRPM=%.3f SpeedKmH=%.1f SignedMps=%.2f | TCS=%.2f ABS=%.2f | Sig=%d Rev=%d",
+      LOG_INFO(Gear, "STATUS: Selected=%d MemGear=%u Next=%u PedalClutch=%.3f ClutchKey=%d DriveCoupling=%.3f ClutchCandidateRO=%.3f InputThrottle=%.3f Brake=%.3f NativeRPM=%.3f SpeedKmH=%.1f SignedMps=%.2f | TCS=%.2f ABS=%.2f | Sig=%d Rev=%d",
                manualGear, static_cast<unsigned>(data.GetGear()),
                static_cast<unsigned>(data.GetNextGear()), simulatedClutch,
-               data.GetClutch(), tcsThrottle, absBrake, rpm, speedKmH,
-               forwardSpeed,
+               InputHandler::IsClutchDown() ? 1 : 0,
+               InputHandler::GetDriveCoupling(), data.GetClutch(), tcsThrottle,
+               absBrake, rpm, speedKmH, forwardSpeed,
                TractionControl::IsTCSActive() ? 1.0f : 0.0f, TractionControl::IsABSActive() ? 1.0f : 0.0f,
                activeSignal, (manualGear == -1) ? 1 : 0);
       s_lastStatusLog = GetTickCount();
@@ -443,10 +449,8 @@ void ScriptMain() {
     }
 
     // Apply native controls
-    InputHandler::ApplyGameControls(manualGear, simulatedClutch, rpm, maxGear,
-                                    forwardSpeed);
-    if (tcsThrottle < throttle)
-      PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, tcsThrottle);
+    InputHandler::ApplyGameControls(manualGear, simulatedClutch, tcsThrottle,
+                                    maxGear, forwardSpeed);
     if (absBrake < InputHandler::GetSmoothedBrake()) {
       PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, forwardSpeed > 0.1f ? 72 : 76,
                                         absBrake);
@@ -494,8 +498,8 @@ void ScriptMain() {
     }
 
     // Memory writes + lights
-    GearLogic::ApplyToMemory(vehicle, data, manualGear, simulatedClutch,
-                             throttle);
+    GearLogic::ApplyToMemory(vehicle, data, manualGear, maxGear,
+                             simulatedClutch, throttle, speedKmH);
     LightsLogic::Update(vehicle, data, manualGear,
                         InputHandler::GetSmoothedBrake(), throttle);
 

@@ -9,7 +9,8 @@ namespace InputHandler {
 void Update();
 
 // Apply computed control values to the GTA V input system.
-void ApplyGameControls(int manualGear, float clutch, float rpm, int maxGear,
+void ApplyGameControls(int manualGear, float clutch, float driveThrottle,
+                       int maxGear,
                        float forwardSpeed);
 
 // Reset edge-detect state (call when player exits vehicle)
@@ -29,6 +30,7 @@ float GetSmoothedBrake();
 float GetSmoothedClutch();
 float GetSmoothedSteer();        // -1.0 (left) to +1.0 (right)
 float GetRawSteer();             // Pre-smoothing steer target (-1/0/+1)
+float GetDriveCoupling();        // Last torque coupling sent to the game
 
 // ── Raw digital state ─────────────────────────────────────────────────────────
 bool IsThrottleDown();

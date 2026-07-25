@@ -22,14 +22,16 @@ static inline float InvLerp(float a, float b, float v) {
   return Clamp01((v - a) / (b - a));
 }
 
-// Mechanical clutch engagement curve from raw pedal value.
-// raw = 0 → clutch fully open (no torque transfer)
-// raw = 1 → clutch fully engaged (direct drive)
-static float ComputeClutchEngagement(float rawClutch) {
+// Mechanical clutch disengagement curve from pedal position.
+// raw = 0 -> pedal released / clutch locked
+// raw = 1 -> pedal down / clutch open
+static float ComputeClutchDisengagement(float rawClutch) {
   if (rawClutch < kClutchBitePoint) return 0.0f;
   if (rawClutch < kClutchBitePoint + kClutchBiteRange) {
     float t = InvLerp(kClutchBitePoint, kClutchBitePoint + kClutchBiteRange, rawClutch);
-    return t * t * t; // cubic ease-in
+    // Smoothstep has zero slope at both ends: initial bite does not grab
+    // abruptly, and full lock does not leave a long mushy tail.
+    return t * t * (3.0f - 2.0f * t);
   }
   return 1.0f;
 }
@@ -49,12 +51,14 @@ void Reset() {
 float UpdateClutch(float rawClutch, float rawThrottle, float rpm, bool isEngineOn) {
   ClutchState &cs = s_state.clutch;
 
-  float engagement = ComputeClutchEngagement(rawClutch);
+  float disengagement = ComputeClutchDisengagement(rawClutch);
+  float engagement = 1.0f - disengagement;
 
   // Apply clutch fade from overheating
   if (cs.slipHeat > kClutchFadeThreshold) {
     float fadeAmount = InvLerp(kClutchFadeThreshold, 1.0f, cs.slipHeat);
     engagement *= (1.0f - fadeAmount * 0.5f);
+    disengagement = 1.0f - engagement;
   }
 
   // Detect slipping
@@ -71,7 +75,10 @@ float UpdateClutch(float rawClutch, float rawThrottle, float rpm, bool isEngineO
   cs.engagementRatio = engagement;
   cs.prevClutchInput = rawClutch;
 
-  return engagement;
+  // Callers historically consume a pedal/disengagement value: 0 transfers
+  // torque, 1 disconnects it. Keep that API while storing the mechanically
+  // correct engagement ratio in ClutchState.
+  return disengagement;
 }
 
 bool UpdatePostGear(Vehicle vehicle, VehicleData &data, int manualGear,

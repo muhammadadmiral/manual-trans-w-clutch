@@ -117,7 +117,7 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
 }
 
 void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
-                   float clutch, float throttle) {
+                   int maxGear, float clutch, float throttle, float speedKmH) {
   // We do not override engine torque here. 
   // Keep the native gearbox in memory-neutral through the upper half of the
   // pedal travel. Below this bite point the selected gear reconnects and the
@@ -129,6 +129,7 @@ void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
   static bool shiftArmed = false;
   static bool clutchWasOpen = false;
   static DWORD nativeShiftUntil = 0;
+  static DWORD reconnectRpmUntil = 0;
 
   if (manualGear != selectedLastFrame) {
     shiftFromGear = selectedLastFrame;
@@ -140,13 +141,16 @@ void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
   // Releasing the pedal through the bite point commits the preselected gear.
   // Request it as Current != Next for a short window so GTA's own transmission
   // code performs its torque cut, RPM transition and stock shift audio.
-  if (clutchWasOpen && !clutchOpen && shiftArmed) {
-    nativeShiftUntil = GetTickCount() + 240;
-    shiftArmed = false;
-    LOG_INFO(Gear,
-             "NATIVE_SHIFT_REQUEST: from=%d to=%d rpm=%.3f clutch=%.3f "
-             "windowMs=240",
-             shiftFromGear, shiftToGear, data.GetRPM(), clutch);
+  if (clutchWasOpen && !clutchOpen) {
+    reconnectRpmUntil = GetTickCount() + 500;
+    if (shiftArmed) {
+      nativeShiftUntil = GetTickCount() + 240;
+      shiftArmed = false;
+      LOG_INFO(Gear,
+               "NATIVE_SHIFT_REQUEST: from=%d to=%d rpm=%.3f clutch=%.3f "
+               "windowMs=240",
+               shiftFromGear, shiftToGear, data.GetRPM(), clutch);
+    }
   }
   clutchWasOpen = clutchOpen;
 
@@ -194,6 +198,31 @@ void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
     // selected gear; forcing an estimated ratio here caused idle lockups.
     // Once a driven gear reaches redline, hold just below GTA's native hard
     // cut instead of allowing the stock limiter to drop and rebuild RPM.
+    // A free-rev RPM written while the clutch was open can otherwise survive
+    // after a low-speed shift. Pull it promptly toward road-coupled RPM during
+    // hook-up so second gear lugs and higher gears stall instead of producing
+    // a high-RPM sound at walking speed.
+    if (GetTickCount() < reconnectRpmUntil && manualGear > 0) {
+      const float gearRatio =
+          data.GetGearRatio(static_cast<uint8_t>(manualGear));
+      const float topRatio = data.GetGearRatio(static_cast<uint8_t>(maxGear));
+      if (gearRatio > 0.0f && topRatio > 0.0f) {
+        const float roadRPM = std::clamp(
+            (speedKmH / 300.0f) * (gearRatio / topRatio), 0.0f, 0.98f);
+        const float launchFloor =
+            manualGear == 1
+                ? 0.20f + std::clamp(throttle, 0.0f, 1.0f) * 0.12f
+                : (manualGear == 2
+                       ? 0.20f + std::clamp(throttle, 0.0f, 1.0f) * 0.05f
+                       : 0.20f);
+        const float coupledRPM =
+            roadRPM > launchFloor ? roadRPM : launchFloor;
+        const float correctedRPM =
+            data.GetRPM() + (coupledRPM - data.GetRPM()) * 0.32f;
+        data.SetRPM(std::clamp(correctedRPM, 0.20f, 0.98f));
+      }
+    }
+
     static int heldGear = 0;
     static bool holdingRedline = false;
     if (manualGear != heldGear || throttle < 0.85f) {
