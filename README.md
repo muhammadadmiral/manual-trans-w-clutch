@@ -76,7 +76,7 @@ dijelaskan di [docs/configuration.md](docs/configuration.md).
    memuat ScriptHookV.
 
 Sesudah mengganti ASI, cek awal `manual-trans.log`. Build sprint ini wajib
-mencetak `Runtime=driveline-r17-atomic-jump` dan path file yang benar-benar dimuat. Kalau
+mencetak `Runtime=driveline-r18-safe-takeover` dan path file yang benar-benar dimuat. Kalau
 baris itu tidak ada, GTA masih memakai salinan ASI lama.
 
 Artefak yang sudah diverifikasi pada sprint ini:
@@ -144,7 +144,8 @@ terverifikasi. TCS/ABS otomatis tidak mengintervensi bila `CWheel` tidak
 ter-resolve. Cluster engine memakai `Clutch=RPM+0xC` dan
 `EngineThrottle=RPM+0x10`; field throttle ini bukan pedal input. Saat mode
 transmisi aktif, RPM dan engine-throttle dapat ditulis untuk menjaga
-sinkronisasi poros setelah auto-shift native dinonaktifkan. Dua code patch
-kritikal wajib resolve unik; satu kegagalan membatalkan takeover. Dua patch
-opsional boleh fail-open. Byte asli direstore
+sinkronisasi poros. Executable code patch dikarantina pada GTA V Enhanced
+karena kedua strategi patch flow-control terbukti crash di game thread.
+Takeover r18 hanya memakai field drivetrain tervalidasi dan native controls;
+tidak ada write ke `.text` GTA. Byte legacy patch tetap punya rollback
 saat mod Off, keluar kendaraan, atau unload.

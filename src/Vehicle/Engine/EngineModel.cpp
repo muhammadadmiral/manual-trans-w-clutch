@@ -451,7 +451,10 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
         std::clamp(0.72f + nativeAcceleration * 1.10f, 0.65f, 1.60f);
   }
 
-  const bool nativeOverride = GearboxPatches::IsApplied();
+  // ScriptMain hanya memanggil model ini saat mode drivetrain aktif. Code
+  // patch executable dikarantina di Enhanced, tetapi ownership RPM tetap
+  // diperlukan untuk mengatasi throttle cut forced-gear native.
+  const bool nativeOverride = true;
   const bool open =
       gear == 0 ||
       (automaticMode ? clutchEngagement < 0.08f

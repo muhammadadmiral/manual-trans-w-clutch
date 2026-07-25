@@ -53,6 +53,7 @@ std::array<Patch, 4> s_patches{{
 bool s_resolveAttempted = false;
 bool s_resolved = false;
 bool s_applied = false;
+bool s_quarantineNoticeShown = false;
 std::string s_failure;
 
 bool IsExactBytes(uintptr_t address, const uint8_t *bytes, size_t length) {
@@ -309,8 +310,15 @@ bool ApplyAll() {
 } // namespace
 
 bool SetActive(bool active) {
-  if (active)
-    return ApplyAll();
+  if (active) {
+    if (!s_quarantineNoticeShown) {
+      s_quarantineNoticeShown = true;
+      LOG_WARN(Memory,
+               "Executable gearbox patch dikarantina untuk Enhanced "
+               "(no .text write); scripted memory takeover tetap aktif");
+    }
+    return true;
+  }
   if (!s_applied)
     return true;
 
