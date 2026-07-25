@@ -288,10 +288,37 @@ void ScriptMain() {
 
     // ── Engine toggle key ─────────────────────────────────────────────────
     if (InputHandler::IsEngineJustPressed()) {
-      isEngineOn = !isEngineOn;
-      VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, isEngineOn ? TRUE : FALSE, TRUE,
-                                     TRUE);
-      LOG_INFO(Script, "Engine key → %s", isEngineOn ? "ON" : "OFF");
+      bool canStart = true;
+      if (!isEngineOn && VehicleData::IsInitialized() &&
+          Config::StarterInterlock && Config::TransmissionMode != 0) {
+        const bool vehicleElectric =
+            VEHICLE::_GET_IS_VEHICLE_ELECTRIC(
+                ENTITY::GET_ENTITY_MODEL(vehicle)) != 0;
+        const bool automaticStart =
+            vehicleElectric || Config::TransmissionMode == 1;
+        if (automaticStart) {
+          const auto selector = AutomaticGearbox::GetSelector();
+          const bool safeSelector =
+              selector == AutomaticGearbox::Selector::Park ||
+              selector == AutomaticGearbox::Selector::Neutral;
+          const bool brakeReady =
+              !Config::AutomaticStartRequiresBrake ||
+              InputHandler::GetSmoothedBrake() >= 0.25f;
+          canStart = safeSelector && brakeReady;
+        } else {
+          canStart = manualGear == 0 || InputHandler::IsClutchDown();
+        }
+      }
+
+      if (canStart) {
+        isEngineOn = !isEngineOn;
+        VEHICLE::SET_VEHICLE_ENGINE_ON(
+            vehicle, isEngineOn ? TRUE : FALSE, TRUE, TRUE);
+        LOG_INFO(Script, "Engine key → %s", isEngineOn ? "ON" : "OFF");
+      } else {
+        Renderer::ShowNotification(
+            "~r~Starter interlock:~w~ clutch / brake dan posisi gear belum aman");
+      }
     } else if (!isEngineOn && actualEngineOn) {
       // Game AI turned it back on — force our state.
       VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
@@ -502,8 +529,9 @@ void ScriptMain() {
                "RPM=%.3f SpeedKmH=%.1f SignedMps=%.2f "
                "Inertia=%.3f ExpectedRPM=%.3f Load=%.3f Creep=%.3f "
                "TorqueReserve=%.3f Stall=%.3f Wheels=%d "
-               "Clash=%.3f Shock=%.3f BTO=%d Kick=%d | "
-               "TCS=%.2f ABS=%.2f | Sig=%d Rev=%d",
+               "Clash=%.3f Shock=%.3f Dump=%.3f Money=%d "
+               "BrakeTemp=%.3f Fade=%.3f BTO=%d Kick=%d | "
+               "TCS=%.2f ABS=%.2f Park=%d | Sig=%d Rev=%d",
                transmissionMode,
                automaticMode ? AutomaticGearbox::GetSelectorName() : "M",
                manualGear, static_cast<unsigned>(data.GetGear()),
@@ -519,17 +547,27 @@ void ScriptMain() {
                static_cast<int>(data.GetWheelCount()),
                GearboxSystem::GetState().clashSeverity,
                GearboxSystem::GetState().shockRemaining,
+               ClutchSystem::GetDumpSeverity(),
+               GearboxSystem::GetState().moneyShift ? 1 : 0,
+               BrakeSystem::GetTemperature(), BrakeSystem::GetFadeLevel(),
                PedalModel::IsBrakeOverrideActive() ? 1 : 0,
                AutomaticGearbox::IsKickdownActive() ? 1 : 0,
-               TractionControl::IsTCSActive() ? 1.0f : 0.0f, BrakeSystem::IsABSActive() ? 1.0f : 0.0f,
+               TractionControl::IsTCSActive() ? 1.0f : 0.0f,
+               BrakeSystem::IsABSActive() ? 1.0f : 0.0f,
+               parkingBrakeOn ? 1 : 0,
                activeSignal, (manualGear == -1) ? 1 : 0);
       s_lastStatusLog = GetTickCount();
     }
 
     float turboMul =
         TurboSystem::Update(vehicle, data, rpm, throttle, isEngineOn);
-    if (TurboSystem::HasTurbo())
-      VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, turboMul);
+    const float sportTorqueMul =
+        automaticMode && AutomaticGearbox::IsSport()
+            ? 1.0f +
+                  std::clamp(Config::AutomaticSTorqueBoost, 0.0f, 0.50f)
+            : 1.0f;
+    VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(
+        vehicle, turboMul * sportTorqueMul);
     if (turboMul > 1.05f) {
       LOG_DEBUG_T(Turbo, 1000, "Boost active: mul=%.3f press=%.3f", turboMul,
                   TurboSystem::GetBoostPressure());
@@ -616,6 +654,10 @@ void ScriptMain() {
            (TractionControl::IsTCSActive() ? "~y~ON" : "~g~OK") +
            " | ABS: " + (BrakeSystem::IsABSActive() ? "~y~ON" : "~g~OK") +
            (LaunchControl::IsActive() ? " | LC: ~b~HOLD" : "") +
+           (PedalModel::IsBrakeOverrideActive() ? " | PEDAL: ~r~BTO" : "") +
+           (ClutchSystem::IsDumpActive() ? " | CLUTCH: ~r~DUMP" : "") +
+           (GearboxSystem::GetState().moneyShift ? " | GEAR: ~r~OVERREV" : "") +
+           (BrakeSystem::GetFadeLevel() > 0.01f ? " | BRAKE: ~r~FADE" : "") +
            (GearboxSystem::GetState().clashActive ? " | GEAR: ~r~CLASH" : "") +
            (TurboSystem::HasTurbo()
                 ? (" | BOOST: " +

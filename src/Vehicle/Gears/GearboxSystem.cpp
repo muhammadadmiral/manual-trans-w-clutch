@@ -59,6 +59,7 @@ void Update(VehicleData &data, int gear, int maxGear,
   } else {
     s_state.torqueCut = 0.0f;
     s_state.clashActive = false;
+    s_state.moneyShift = false;
   }
 }
 
@@ -81,10 +82,20 @@ void NotifyShift(VehicleData &data, int fromGear, int toGear,
   const float rpm = data.GetRPM();
 
   s_state.shiftTargetRPM = rpm;
+  s_state.moneyShift = false;
   if (fromGear != 0 && toGear != 0 && fromRatio > 0.01f &&
       toRatio > 0.01f) {
+    const float rawTarget = rpm * toRatio / fromRatio;
+    s_state.moneyShift = rawTarget > 1.0f;
     s_state.shiftTargetRPM =
-        std::clamp(rpm * toRatio / fromRatio, 0.15f, 1.0f);
+        std::clamp(rawTarget, 0.15f, 1.0f);
+    if (s_state.moneyShift) {
+      const float overSpeed = std::clamp(rawTarget - 1.0f, 0.0f, 1.0f);
+      s_state.health = std::max(
+          0.0f, s_state.health -
+                    std::max(0.0f, Config::OverRevShiftDamage) *
+                        (0.5f + overSpeed));
+    }
   }
   s_state.syncError = std::fabs(s_state.shiftTargetRPM - rpm);
 
@@ -94,6 +105,8 @@ void NotifyShift(VehicleData &data, int fromGear, int toGear,
   s_state.clashSeverity = std::clamp(
       (clutchless ? 0.55f : 0.0f) + s_state.syncError * 1.25f + noLift,
       0.0f, 1.0f);
+  if (s_state.moneyShift)
+    s_state.clashSeverity = 1.0f;
   s_state.clashActive = Config::GearClash && s_state.clashSeverity > 0.05f;
   s_state.shockRemaining =
       s_state.clashActive ? 0.10f + 0.14f * s_state.clashSeverity : 0.0f;
@@ -118,6 +131,7 @@ void NotifyAutomaticShift(VehicleData &data, int fromGear, int toGear,
 
   s_state.lastFromGear = fromGear;
   s_state.lastToGear = toGear;
+  s_state.moneyShift = false;
   s_state.shiftTargetRPM =
       fromRatio > 0.01f && toRatio > 0.01f
           ? std::clamp(rpm * toRatio / fromRatio, 0.15f, 1.0f)

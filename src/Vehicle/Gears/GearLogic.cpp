@@ -1,9 +1,11 @@
 #include "GearLogic.h"
 #include "../../../sdk/inc/natives.h"
 #include "../../Core/ModLogger.h"
+#include "../../Core/Config.h"
 #include "../VehicleData.h"
 #include "GearboxSystem.h"
 #include <algorithm>
+#include <cmath>
 
 namespace GearLogic {
 
@@ -54,6 +56,16 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
       }
       s_lastShiftTime = currentTime;
     } else if (isDown && s_manualGear > -1) {
+      if (s_manualGear == 0 &&
+          std::fabs(speedKmH) >
+              (std::max)(0.0f, Config::ReverseLockoutSpeedKmH)) {
+        PlayGearGrindSound(vehicle);
+        grindWarningTimer = 45;
+        LOG_WARN(Gear, "Reverse lockout: speed=%.1fkm/h limit=%.1f",
+                 speedKmH, Config::ReverseLockoutSpeedKmH);
+        s_lastShiftTime = currentTime;
+        return s_manualGear;
+      }
       const int fromGear = s_manualGear;
       const int toGear = s_manualGear - 1;
       const bool clutchless = clutch < 0.35f && isEngineOn;

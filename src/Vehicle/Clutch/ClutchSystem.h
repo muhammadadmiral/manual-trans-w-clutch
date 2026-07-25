@@ -10,6 +10,10 @@ struct State {
   float engagement = 1.0f;
   float heat = 0.0f;
   float nativeActuator = 1.0f;
+  float previousDisengagement = 0.0f;
+  float releaseRate = 0.0f;
+  float dumpSeverity = 0.0f;
+  float dumpRemaining = 0.0f;
   bool slipping = false;
 };
 
@@ -24,6 +28,8 @@ void ApplyToVehicle(VehicleData &data, int gear, float speedMps);
 float GetEngagement();
 float GetHeat();
 float GetNativeActuator();
+float GetDumpSeverity();
+bool IsDumpActive();
 bool IsDrivelineOpen(int gear);
 const State &GetState();
 

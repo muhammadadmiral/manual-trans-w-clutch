@@ -184,9 +184,15 @@ void ApplyGameControls(int manualGear, float clutch, float driveThrottle,
             // Di reverse, axis accelerate GTA jadi rem lawan arah.
             PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalBrake);
         }
-    } else if (std::fabs(finalThrottle - s_smoothedThrottle) > 0.005f) {
-        PAD::DISABLE_CONTROL_ACTION(0, 71, true);
-        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalThrottle);
+    } else {
+        if (std::fabs(finalThrottle - s_smoothedThrottle) > 0.005f) {
+            PAD::DISABLE_CONTROL_ACTION(0, 71, true);
+            PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalThrottle);
+        }
+        if (std::fabs(finalBrake - s_smoothedBrake) > 0.005f) {
+            PAD::DISABLE_CONTROL_ACTION(0, 72, true);
+            PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, finalBrake);
+        }
     }
     (void)forwardSpeed;
 }

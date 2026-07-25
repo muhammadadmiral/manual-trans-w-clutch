@@ -147,6 +147,11 @@ void Menu::Initialize() {
   engine.items.push_back(MenuItem("Idle Torque", MenuItem::Float,
                                   &Config::IdleTorqueFraction,
                                   0.01f, 0.02f, 0.60f));
+  engine.items.push_back(MenuItem(
+      "Starter Interlock", MenuItem::Bool, &Config::StarterInterlock));
+  engine.items.push_back(MenuItem(
+      "Auto Start Needs Brake", MenuItem::Bool,
+      &Config::AutomaticStartRequiresBrake));
   engine.items.push_back(MenuItem("RPM Sync", MenuItem::Float,
                                   &Config::ConnectedRPMSync,
                                   0.01f, 0.00f, 1.00f));

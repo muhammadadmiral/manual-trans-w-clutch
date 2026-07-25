@@ -34,6 +34,38 @@ float UpdatePedal(float rawPedal, float throttle, bool engineOn) {
   float engagement = 1.0f - disengagement;
 
   const float dt = std::clamp(MISC::GET_FRAME_TIME(), 0.0f, 0.05f);
+  if (dt > 0.0001f) {
+    s_state.releaseRate =
+        (s_state.previousDisengagement - disengagement) / dt;
+  } else {
+    s_state.releaseRate = 0.0f;
+  }
+  const float dumpRate = std::max(1.0f, Config::ClutchDumpRate);
+  const float freshDump =
+      Clamp01((s_state.releaseRate - dumpRate) / dumpRate) *
+      Clamp01(throttle) * engagement;
+  if (engineOn && freshDump > 0.05f) {
+    s_state.dumpSeverity =
+        std::max(s_state.dumpSeverity, freshDump);
+    s_state.dumpRemaining = 0.16f;
+  } else if (s_state.dumpRemaining > 0.0f) {
+    s_state.dumpRemaining =
+        std::max(0.0f, s_state.dumpRemaining - dt);
+    s_state.dumpSeverity *= std::max(0.0f, 1.0f - dt * 5.0f);
+  } else {
+    s_state.dumpSeverity = 0.0f;
+  }
+  s_state.previousDisengagement = disengagement;
+
+  if (s_state.dumpRemaining > 0.0f &&
+      Config::ClutchDumpShock > 0.01f) {
+    PAD::SET_CONTROL_SHAKE(
+        0, 100,
+        static_cast<int>(80.0f + s_state.dumpSeverity *
+                                     Clamp01(Config::ClutchDumpShock) *
+                                     175.0f));
+  }
+
   s_state.slipping = engineOn && engagement > 0.01f && engagement < 0.99f;
   if (s_state.slipping) {
     const float slipEnergy =
@@ -76,6 +108,8 @@ void ApplyToVehicle(VehicleData &data, int gear, float speedMps) {
 float GetEngagement() { return s_state.engagement; }
 float GetHeat() { return s_state.heat; }
 float GetNativeActuator() { return s_state.nativeActuator; }
+float GetDumpSeverity() { return s_state.dumpSeverity; }
+bool IsDumpActive() { return s_state.dumpRemaining > 0.0f; }
 bool IsDrivelineOpen(int gear) {
   return gear == 0 || s_state.disengagement > 0.40f;
 }

@@ -11,6 +11,8 @@ struct State {
   float absLevel = 0.0f;
   float rollingRadius = 0.34f;
   float wheelSlip = 0.0f;
+  float temperature = 0.0f;
+  float fadeLevel = 0.0f;
   bool wheelDataValid = false;
 };
 
@@ -23,6 +25,8 @@ float UpdateABS(Vehicle vehicle, VehicleData &data, float brakeInput,
 
 void ToggleABS();
 bool IsABSActive();
+float GetTemperature();
+float GetFadeLevel();
 const State &GetState();
 
 } // namespace BrakeSystem

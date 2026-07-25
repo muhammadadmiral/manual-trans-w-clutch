@@ -51,6 +51,8 @@ bool StallEnabled = true;
 float StallRate = 1.20f;
 float StallClutchThreshold = 0.65f;
 float IdleTorqueFraction = 0.18f;
+bool StarterInterlock = true;
+bool AutomaticStartRequiresBrake = true;
 
 float ClutchBiteStart = 0.18f;
 float ClutchBiteEnd = 0.43f;
@@ -207,6 +209,11 @@ void ReadConfig(HMODULE module) {
         ReadFloat("Engine", "StallClutchThreshold", 0.65f, ini);
     IdleTorqueFraction =
         ReadFloat("Engine", "IdleTorqueFraction", 0.18f, ini);
+    StarterInterlock =
+        GetPrivateProfileIntA("Engine", "StarterInterlock", 1, ini) != 0;
+    AutomaticStartRequiresBrake =
+        GetPrivateProfileIntA("Engine", "AutomaticStartRequiresBrake", 1,
+                              ini) != 0;
     ConnectedRPMSync =
         ReadFloat("Engine", "ConnectedRPMSync", 0.25f, ini);
 
@@ -332,6 +339,9 @@ void SaveConfig(HMODULE module) {
     WriteFloat("Engine", "StallRate", StallRate, ini);
     WriteFloat("Engine", "StallClutchThreshold", StallClutchThreshold, ini);
     WriteFloat("Engine", "IdleTorqueFraction", IdleTorqueFraction, ini);
+    WriteInt("Engine", "StarterInterlock", StarterInterlock ? 1 : 0, ini);
+    WriteInt("Engine", "AutomaticStartRequiresBrake",
+             AutomaticStartRequiresBrake ? 1 : 0, ini);
     WriteFloat("Engine", "ConnectedRPMSync", ConnectedRPMSync, ini);
 
     WriteInt("Automatic", "BrakeInterlock",

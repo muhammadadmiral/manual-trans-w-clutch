@@ -16,6 +16,7 @@ struct State {
   bool revMatched = false;
   bool clashActive = false;
   bool pendingEngagement = false;
+  bool moneyShift = false;
   int lastFromGear = 0;
   int lastToGear = 0;
 };

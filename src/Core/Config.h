@@ -49,6 +49,8 @@ extern bool StallEnabled;
 extern float StallRate;
 extern float StallClutchThreshold;
 extern float IdleTorqueFraction;
+extern bool StarterInterlock;
+extern bool AutomaticStartRequiresBrake;
 
 extern float ClutchBiteStart;
 extern float ClutchBiteEnd;
