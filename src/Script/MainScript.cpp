@@ -491,7 +491,8 @@ void ScriptMain() {
     }
 
     // Memory writes + lights
-    GearLogic::ApplyToMemory(vehicle, data, manualGear, simulatedClutch);
+    GearLogic::ApplyToMemory(vehicle, data, manualGear, simulatedClutch,
+                             throttle);
     LightsLogic::Update(vehicle, data, manualGear,
                         InputHandler::GetSmoothedBrake(), throttle);
 

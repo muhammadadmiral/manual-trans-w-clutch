@@ -146,7 +146,8 @@ bool UpdatePostGear(Vehicle vehicle, VehicleData &data, int manualGear,
     float slipProb = (kGearboxSlipThreshold - gs.health) * 0.003f;
     float noise    = std::fmod(rpm * 7919.0f, 1.0f);
     if (noise < slipProb) {
-      data.SetClutch(0.0f);
+      // Do not write the unverified Clutch offset. Torque interruption is
+      // handled safely through vehicle controls by InputHandler.
       AUDIO::PLAY_SOUND_FROM_ENTITY(-1, "GEAR_CHANGE", vehicle, "0", 0, 0);
       gs.slipCooldown = 180;
       grindTimerOut   = 60;

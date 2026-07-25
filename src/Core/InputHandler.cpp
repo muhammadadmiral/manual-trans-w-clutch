@@ -224,7 +224,9 @@ void ApplyGameControls(int manualGear, float clutch, float rpm, int /*maxGear*/,
     // Steer injection
     const float finalSteer = GetSmoothedSteer();
     if (finalSteer > 0.005f || finalSteer < -0.005f)
-        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 0, finalSteer);
+        // INPUT_VEH_MOVE_LR is control 59.  Control 0 is NEXT_CAMERA and was
+        // the reason the camera changed while the player was only steering.
+        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 59, finalSteer);
 
     if (manualGear == 0) {
         // True neutral must never let GTA's stock automatic apply forward
@@ -236,16 +238,22 @@ void ApplyGameControls(int manualGear, float clutch, float rpm, int /*maxGear*/,
                 forwardSpeed > 0.1f ? 72 : 76, finalBrake);
     } else if (manualGear == -1) {
         // Reverse gear — swap throttle/brake controls
+        const float coupledThrottle = finalThrottle * (1.0f - Clamp01(clutch));
         PAD::DISABLE_CONTROL_ACTION(0, 71, true);
-        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, finalThrottle);
+        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, coupledThrottle);
         if (finalBrake > 0.02f) {
             PAD::SET_CONTROL_VALUE_NEXT_FRAME(0,
                 forwardSpeed > 0.1f ? 72 : 76, finalBrake);
         }
     } else {
+        // The calibrated clutch offset is not trustworthy on this game build.
+        // Disconnect torque at the input layer instead: pedal down (1.0)
+        // progressively removes all drive throttle while still allowing the
+        // engine RPM to be simulated independently.
+        const float coupledThrottle = finalThrottle * (1.0f - Clamp01(clutch));
         if (forwardSpeed <= 0.1f)
             PAD::DISABLE_CONTROL_ACTION(0, 72, true);
-        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalThrottle);
+        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, coupledThrottle);
         if (finalBrake > 0.02f) {
             if      (forwardSpeed >  0.1f) PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, finalBrake);
             else if (forwardSpeed < -0.1f) PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalBrake);

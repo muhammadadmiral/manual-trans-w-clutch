@@ -199,10 +199,8 @@ bool VehicleData::LoadOffsetsFromIni(HMODULE pluginModule, VehicleOffsets& resul
             out.TopGear = out.NextGear + 2;
         }
         
-        // Hardcode DriveForce if missing (0x60 is stable across all known GTA V builds)
-        if (out.DriveForce == 0) {
-            out.DriveForce = 0x60;
-        }
+        // Never invent writable offsets. DriveForce=0 means unsupported until
+        // a build-specific pattern resolves it safely.
     };
 
     // Prefer version-specific section (e.g. [Offsets.1.0.3274.0])

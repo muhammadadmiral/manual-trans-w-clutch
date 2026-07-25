@@ -116,12 +116,8 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
 }
 
 void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
-                   float clutch) {
+                   float clutch, float throttle) {
   // We do not override engine torque here. 
-
-  // GTA V fClutch: 1.0 = Engaged (Plates clamped), 0.0 = Open (Plates separated)
-  // simulatedClutch (clutch parameter): 1.0 = Pedal pressed (Open), 0.0 = Pedal released (Engaged)
-  const float memoryClutch = 1.0f - clutch;
 
   if (manualGear == 0) {
     // 0xFF is GTA V's neutral sentinel.  Do not emulate neutral by selecting
@@ -129,21 +125,41 @@ void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
     // transmission pull away and shift normally.
     data.SetGear(0xFF);
     data.SetNextGear(0xFF);
-    data.SetClutch(0.0f); 
-    data.SetDriveForce(0.0f);
   } else if (manualGear == -1) {
     // Reverse: GTA V uses Gear 0 for reverse.
     data.SetGear(0);
     data.SetNextGear(0);
-    data.SetClutch(memoryClutch); 
-    data.SetDriveForce(data.GetOriginalDriveForce());
   } else {
     // Forward gears
     const uint8_t targetGear = static_cast<uint8_t>(manualGear);
     data.SetGear(targetGear);
     data.SetNextGear(targetGear);
-    data.SetClutch(memoryClutch);
-    data.SetDriveForce(data.GetOriginalDriveForce());
+  }
+
+  // 0x8CC follows RPM in the captured log, so it is not a safe writable
+  // clutch field on this build.  For neutral or a fully depressed clutch,
+  // synthesize a free-revving engine while ApplyGameControls removes wheel
+  // torque. This also avoids fighting GTA's native hard-cut limiter.
+  const bool disconnected = manualGear == 0 || clutch > 0.90f;
+  if (disconnected) {
+    static float freeRevRPM = 0.20f;
+    const float targetRPM = 0.20f + std::clamp(throttle, 0.0f, 1.0f) * 0.78f;
+    const float response = targetRPM > freeRevRPM ? 0.16f : 0.08f;
+    freeRevRPM += (targetRPM - freeRevRPM) * response;
+    data.SetRPM(std::clamp(freeRevRPM, 0.20f, 0.98f));
+  } else {
+    // Once a driven gear reaches redline, hold just below GTA's native hard
+    // cut instead of allowing the stock limiter to drop and rebuild RPM.
+    static int heldGear = 0;
+    static bool holdingRedline = false;
+    if (manualGear != heldGear || throttle < 0.85f) {
+      heldGear = manualGear;
+      holdingRedline = false;
+    }
+    if (manualGear > 0 && throttle >= 0.85f && data.GetRPM() >= 0.94f)
+      holdingRedline = true;
+    if (holdingRedline)
+      data.SetRPM(0.98f);
   }
 }
 
