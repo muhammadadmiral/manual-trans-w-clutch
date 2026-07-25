@@ -10,7 +10,7 @@ void Update();
 
 // Apply computed control values to the GTA V input system.
 void ApplyGameControls(int manualGear, float clutch, float driveThrottle,
-                       int maxGear,
+                       float driveBrake, int maxGear,
                        float forwardSpeed);
 
 // Reset edge-detect state (call when player exits vehicle)

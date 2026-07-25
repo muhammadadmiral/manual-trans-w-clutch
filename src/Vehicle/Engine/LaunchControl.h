@@ -11,7 +11,8 @@ struct State {
 
 void Reset();
 void Update(VehicleData &data, int gear, float clutchDisengagement,
-            float throttle, float speedMps, bool engineOn);
+            float throttle, float brake, float speedMps, bool engineOn,
+            bool automaticMode = false);
 bool IsActive();
 const State &GetState();
 

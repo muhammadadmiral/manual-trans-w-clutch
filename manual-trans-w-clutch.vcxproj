@@ -30,10 +30,12 @@
     <ClCompile Include="src\Vehicle\Engine\EngineModel.cpp" />
     <ClCompile Include="src\Vehicle\Engine\FuelSystem.cpp" />
     <ClCompile Include="src\Vehicle\Engine\LaunchControl.cpp" />
+    <ClCompile Include="src\Vehicle\Engine\PedalModel.cpp" />
     <ClCompile Include="src\Vehicle\Engine\TractionControl.cpp" />
     <ClCompile Include="src\Vehicle\Engine\TurboSystem.cpp" />
     <ClCompile Include="src\Vehicle\Clutch\ClutchSystem.cpp" />
     <ClCompile Include="src\Vehicle\Gears\GearboxSystem.cpp" />
+    <ClCompile Include="src\Vehicle\Gears\AutomaticGearbox.cpp" />
     <ClCompile Include="src\Vehicle\Gears\GearLogic.cpp" />
     <ClCompile Include="src\Vehicle\Brakes\BrakeSystem.cpp" />
     <ClCompile Include="src\Vehicle\Brakes\ParkingBrake.cpp" />
@@ -59,10 +61,12 @@
     <ClInclude Include="src\Vehicle\Engine\EngineModel.h" />
     <ClInclude Include="src\Vehicle\Engine\FuelSystem.h" />
     <ClInclude Include="src\Vehicle\Engine\LaunchControl.h" />
+    <ClInclude Include="src\Vehicle\Engine\PedalModel.h" />
     <ClInclude Include="src\Vehicle\Engine\TractionControl.h" />
     <ClInclude Include="src\Vehicle\Engine\TurboSystem.h" />
     <ClInclude Include="src\Vehicle\Clutch\ClutchSystem.h" />
     <ClInclude Include="src\Vehicle\Gears\GearboxSystem.h" />
+    <ClInclude Include="src\Vehicle\Gears\AutomaticGearbox.h" />
     <ClInclude Include="src\Vehicle\Gears\GearLogic.h" />
     <ClInclude Include="src\Vehicle\Brakes\BrakeSystem.h" />
     <ClInclude Include="src\Vehicle\Brakes\ParkingBrake.h" />

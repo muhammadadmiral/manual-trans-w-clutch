@@ -164,11 +164,12 @@ void Update() {
 // ApplyGameControls
 // =============================================================================
 void ApplyGameControls(int manualGear, float clutch, float driveThrottle,
+                       float driveBrake,
                        int /*maxGear*/,
                        float forwardSpeed)
 {
     const float finalThrottle = Clamp01(driveThrottle);
-    const float finalBrake = GetSmoothedBrake();
+    const float finalBrake = Clamp01(driveBrake);
     const bool hardDisconnect = IsClutchDown() || clutch >= 0.98f;
     const float clutchCoupling =
         hardDisconnect ? 0.0f : (1.0f - Clamp01(clutch));
@@ -183,7 +184,11 @@ void ApplyGameControls(int manualGear, float clutch, float driveThrottle,
             // Di reverse, axis accelerate GTA jadi rem lawan arah.
             PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalBrake);
         }
+    } else if (std::fabs(finalThrottle - s_smoothedThrottle) > 0.005f) {
+        PAD::DISABLE_CONTROL_ACTION(0, 71, true);
+        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalThrottle);
     }
+    (void)forwardSpeed;
 }
 
 // =============================================================================

@@ -6,6 +6,9 @@
 
 namespace Config {
 
+// 0 = drivetrain mod off, 1 = automatic P-R-N-D-S, 2 = manual sequential.
+extern int TransmissionMode;
+
 // ── Digital keys (virtual-key codes) ─────────────────────────────────────────
 extern int KeyShiftUp;
 extern int KeyShiftDown;
@@ -59,6 +62,16 @@ extern float GearGrindDamage;
 extern float ShiftShockStrength;
 extern float NoLiftShiftPenalty;
 extern float ConnectedRPMSync;
+extern bool AutomaticBrakeInterlock;
+extern float AutomaticShiftDelay;
+extern float AutomaticDUpRPM;
+extern float AutomaticDDownRPM;
+extern float AutomaticSUpRPM;
+extern float AutomaticSDownRPM;
+extern float AutomaticKickdownThrottle;
+extern bool BrakeThrottleOverride;
+extern float BrakeOverrideDelay;
+extern float BrakeOverrideCut;
 
 // ── Analog smoothing — time constants τ in seconds ────────────────────────────
 // See header comment above for interpretation.

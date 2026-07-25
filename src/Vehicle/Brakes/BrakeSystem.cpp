@@ -20,7 +20,7 @@ void Reset() {
 }
 
 float UpdateABS(Vehicle vehicle, VehicleData &data, float brakeInput,
-                float speedMps) {
+                float speedMps, bool reverse) {
   s_state.absEnabled = Config::AbsEnabled;
   const uint8_t count = data.GetWheelCount();
   float weightedOmega = 0.0f;
@@ -67,8 +67,9 @@ float UpdateABS(Vehicle vehicle, VehicleData &data, float brakeInput,
     const float pressure =
         brakeInput *
         (1.0f - Clamp01(Config::AbsMaxRelease) * s_state.absLevel);
-    PAD::DISABLE_CONTROL_ACTION(0, 72, true);
-    PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, pressure);
+    const int brakeControl = reverse ? 71 : 72;
+    PAD::DISABLE_CONTROL_ACTION(0, brakeControl, true);
+    PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, brakeControl, pressure);
     return pressure;
   }
 

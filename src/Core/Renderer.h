@@ -11,7 +11,9 @@ void DrawTextOverlay(const char *text, float x, float y, float scale = 0.42f,
 void DrawBar(float x, float y, float width, float height, float fraction, int r,
              int g, int b, const char *label);
 
-void DrawGearHUD(int manualGear, int maxGear, int activeSignal, bool isEngineOn);
+void DrawGearHUD(int manualGear, int maxGear, int activeSignal, bool isEngineOn,
+                 int transmissionMode = 2,
+                 const char *automaticSelector = nullptr);
 
 void DrawGrindWarning();
 

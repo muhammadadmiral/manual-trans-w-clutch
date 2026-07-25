@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <utility>
 #include <vector>
 
 class Menu {
@@ -19,7 +20,7 @@ private:
 
   struct MenuItem {
     std::string name;
-    enum Type { Bool, Float, Submenu, Action, KeyBind } type;
+    enum Type { Bool, Float, IntChoice, Submenu, Action, KeyBind } type;
 
     bool *boolVal = nullptr;
 
@@ -29,6 +30,9 @@ private:
     float floatMax = 1.0f;
 
     int *keyVal = nullptr;
+    int intMin = 0;
+    int intMax = 0;
+    std::vector<std::string> choiceLabels;
 
     int targetSubmenu = -1;
 
@@ -48,6 +52,11 @@ private:
     // Constructor for KeyBind. Pass the address of one of the Config::KeyXxx
     // ints (e.g. &Config::KeyShiftUp) and it becomes rebindable in-menu.
     MenuItem(std::string n, Type t, int *k) : name(n), type(t), keyVal(k) {}
+
+    MenuItem(std::string n, Type t, int *value, int minV, int maxV,
+             std::vector<std::string> labels)
+        : name(n), type(t), keyVal(value), intMin(minV), intMax(maxV),
+          choiceLabels(std::move(labels)) {}
   };
 
   struct Submenu {

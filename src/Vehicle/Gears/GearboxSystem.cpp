@@ -108,6 +108,30 @@ void NotifyShift(VehicleData &data, int fromGear, int toGear,
   }
 }
 
+void NotifyAutomaticShift(VehicleData &data, int fromGear, int toGear,
+                          bool sportMode) {
+  const float fromRatio =
+      std::fabs(data.GetGearRatio(static_cast<uint8_t>(fromGear)));
+  const float toRatio =
+      std::fabs(data.GetGearRatio(static_cast<uint8_t>(toGear)));
+  const float rpm = data.GetRPM();
+
+  s_state.lastFromGear = fromGear;
+  s_state.lastToGear = toGear;
+  s_state.shiftTargetRPM =
+      fromRatio > 0.01f && toRatio > 0.01f
+          ? std::clamp(rpm * toRatio / fromRatio, 0.15f, 1.0f)
+          : rpm;
+  s_state.syncError = std::fabs(s_state.shiftTargetRPM - rpm);
+  s_state.clashSeverity =
+      std::clamp((sportMode ? 0.16f : 0.08f) +
+                     s_state.syncError * (sportMode ? 0.35f : 0.20f),
+                 0.0f, 0.45f);
+  s_state.clashActive = false;
+  s_state.pendingEngagement = false;
+  s_state.shockRemaining = sportMode ? 0.12f : 0.16f;
+}
+
 void NotifyRevMatch(float currentRPM, float targetRPM) {
   s_state.revMatchTarget = targetRPM;
   s_state.revMatched = std::fabs(currentRPM - targetRPM) < 0.15f;

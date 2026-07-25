@@ -24,7 +24,8 @@ void Reset();
 // Return true kalau beban drivetrain sukses bikin mesin mati.
 bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
             float clutchDisengagement, float clutchEngagement,
-            float throttle, float speedMps, bool engineOn);
+            float throttle, float brake, float speedMps, bool engineOn,
+            bool automaticMode = false);
 
 float GetLoad();
 float GetStallProgress();

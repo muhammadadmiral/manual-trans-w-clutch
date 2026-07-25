@@ -47,7 +47,8 @@ void DrawBar(float x, float y, float width, float height, float fraction, int r,
     DrawTextOverlay(label, x, y - 0.016f, 0.28f, 255, 255, 255, 255, 0, true, false);
 }
 
-void DrawGearHUD(int manualGear, int maxGear, int activeSignal, bool isEngineOn) {
+void DrawGearHUD(int manualGear, int maxGear, int activeSignal, bool isEngineOn,
+                 int transmissionMode, const char *automaticSelector) {
     // Positioning - Bottom right corner, sleek and minimalist
     const float badgeX = 0.12f;
     const float badgeY = 0.85f;
@@ -68,6 +69,25 @@ void DrawGearHUD(int manualGear, int maxGear, int activeSignal, bool isEngineOn)
     if (!isEngineOn) {
         strcpy_s(gearStr, "OFF");
         r = 120; g = 120; b = 120;
+    } else if (transmissionMode == 1 && automaticSelector &&
+               (automaticSelector[0] == 'P' ||
+                automaticSelector[0] == 'N' ||
+                automaticSelector[0] == 'R')) {
+        strcpy_s(gearStr, automaticSelector);
+        if (automaticSelector[0] == 'R') {
+            r = 255; g = 60; b = 60;
+        } else if (automaticSelector[0] == 'P') {
+            r = 150; g = 190; b = 255;
+        } else {
+            r = 255; g = 180; b = 40;
+        }
+    } else if (transmissionMode == 1 && automaticSelector) {
+        sprintf_s(gearStr, "%s%d", automaticSelector, manualGear);
+        if (automaticSelector[0] == 'S') {
+            r = 255; g = 150; b = 40;
+        } else {
+            r = 60; g = 200; b = 255;
+        }
     } else if (manualGear == -1) {
         strcpy_s(gearStr, "R");
         r = 255; g = 60; b = 60; // Red Reverse

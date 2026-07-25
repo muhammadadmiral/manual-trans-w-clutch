@@ -13,10 +13,13 @@ void Reset() {
 }
 
 void Update(VehicleData &data, int gear, float clutchDisengagement,
-            float throttle, float speedMps, bool engineOn) {
+            float throttle, float brake, float speedMps, bool engineOn,
+            bool automaticMode) {
   s_state.targetRPM = std::clamp(Config::LaunchControlRPM, 0.40f, 0.95f);
+  const bool drivelineHeld =
+      automaticMode ? brake > 0.70f : clutchDisengagement > 0.80f;
   s_state.active = Config::LaunchControl && engineOn && gear == 1 &&
-                   clutchDisengagement > 0.80f &&
+                   drivelineHeld &&
                    throttle > 0.90f && std::fabs(speedMps) < 1.0f;
   if (s_state.active && data.GetRPM() > s_state.targetRPM) {
     data.SetRPM(s_state.targetRPM);

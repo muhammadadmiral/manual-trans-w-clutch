@@ -19,7 +19,7 @@ void Reset();
 // Modul cuma modulasi kalau telemetry CWheel valid. Kalau resolver gagal,
 // pedal diserahin utuh ke ABS bawaan GTA.
 float UpdateABS(Vehicle vehicle, VehicleData &data, float brakeInput,
-                float speedMps);
+                float speedMps, bool reverse = false);
 
 void ToggleABS();
 bool IsABSActive();

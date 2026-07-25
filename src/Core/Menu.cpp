@@ -72,11 +72,15 @@ void Menu::Initialize() {
   main.items.push_back(MenuItem("Clutch", MenuItem::Submenu, 6));
   main.items.push_back(MenuItem("ABS / TCS", MenuItem::Submenu, 7));
   main.items.push_back(MenuItem("Gearbox Penalty", MenuItem::Submenu, 8));
+  main.items.push_back(MenuItem("Automatic D / S", MenuItem::Submenu, 9));
   menus.push_back(main);
 
   // 1: Main Settings
   Submenu settings;
   settings.title = "MAIN SETTINGS";
+  settings.items.push_back(MenuItem(
+      "Transmission Mode", MenuItem::IntChoice, &Config::TransmissionMode,
+      0, 2, {"OFF", "AUTOMATIC", "MANUAL"}));
   settings.items.push_back(MenuItem("Recalibrate Transmission", MenuItem::Bool,
                                     &Config::ForceRecalibrate));
   settings.items.push_back(MenuItem("Require Cold Start", MenuItem::Bool,
@@ -218,6 +222,39 @@ void Menu::Initialize() {
                                    &Config::NoLiftShiftPenalty,
                                    0.01f, 0.00f, 1.00f));
   menus.push_back(gearbox);
+
+  Submenu automatic;
+  automatic.title = "AUTOMATIC D / S";
+  automatic.items.push_back(MenuItem(
+      "Brake Interlock", MenuItem::Bool, &Config::AutomaticBrakeInterlock));
+  automatic.items.push_back(MenuItem(
+      "Shift Delay", MenuItem::Float, &Config::AutomaticShiftDelay,
+      0.01f, 0.10f, 1.20f));
+  automatic.items.push_back(MenuItem(
+      "D Upshift RPM", MenuItem::Float, &Config::AutomaticDUpRPM,
+      0.01f, 0.40f, 0.95f));
+  automatic.items.push_back(MenuItem(
+      "D Downshift RPM", MenuItem::Float, &Config::AutomaticDDownRPM,
+      0.01f, 0.10f, 0.70f));
+  automatic.items.push_back(MenuItem(
+      "S Upshift RPM", MenuItem::Float, &Config::AutomaticSUpRPM,
+      0.01f, 0.50f, 0.99f));
+  automatic.items.push_back(MenuItem(
+      "S Downshift RPM", MenuItem::Float, &Config::AutomaticSDownRPM,
+      0.01f, 0.15f, 0.80f));
+  automatic.items.push_back(MenuItem(
+      "Kickdown Pedal", MenuItem::Float, &Config::AutomaticKickdownThrottle,
+      0.01f, 0.40f, 0.98f));
+  automatic.items.push_back(MenuItem(
+      "Brake Overrides Gas", MenuItem::Bool,
+      &Config::BrakeThrottleOverride));
+  automatic.items.push_back(MenuItem(
+      "Override Delay", MenuItem::Float, &Config::BrakeOverrideDelay,
+      0.01f, 0.00f, 1.00f));
+  automatic.items.push_back(MenuItem(
+      "Override Cut", MenuItem::Float, &Config::BrakeOverrideCut,
+      0.01f, 0.00f, 1.00f));
+  menus.push_back(automatic);
 
   menuStack.push_back(0); // Push Main Menu
 }
@@ -368,6 +405,19 @@ void Menu::Update() {
         *selectedItem.floatVal = selectedItem.floatMax;
     }
   }
+
+  if (selectedItem.type == MenuItem::IntChoice && selectedItem.keyVal) {
+    if (PAD::IS_DISABLED_CONTROL_JUST_PRESSED(0, 174)) {
+      *selectedItem.keyVal =
+          (std::max)(selectedItem.intMin, *selectedItem.keyVal - 1);
+      Config::SaveConfig(g_pluginModule);
+    }
+    if (PAD::IS_DISABLED_CONTROL_JUST_PRESSED(0, 175)) {
+      *selectedItem.keyVal =
+          (std::min)(selectedItem.intMax, *selectedItem.keyVal + 1);
+      Config::SaveConfig(g_pluginModule);
+    }
+  }
 }
 
 void Menu::Draw() {
@@ -410,6 +460,14 @@ void Menu::Draw() {
       sprintf_s(valBuf, "%s", *item.boolVal ? "ON" : "OFF");
     } else if (item.type == MenuItem::Float && item.floatVal) {
       sprintf_s(valBuf, "< %.2f >", *item.floatVal);
+    } else if (item.type == MenuItem::IntChoice && item.keyVal) {
+      const int index = *item.keyVal - item.intMin;
+      if (index >= 0 &&
+          index < static_cast<int>(item.choiceLabels.size())) {
+        sprintf_s(valBuf, "< %s >", item.choiceLabels[index].c_str());
+      } else {
+        sprintf_s(valBuf, "< %d >", *item.keyVal);
+      }
     } else if (item.type == MenuItem::Submenu) {
       sprintf_s(valBuf, ">>>");
     } else if (item.type == MenuItem::KeyBind && item.keyVal) {

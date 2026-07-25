@@ -26,6 +26,8 @@ void Update(VehicleData &data, int gear, int maxGear,
 void NotifyGrind();
 void NotifyShift(VehicleData &data, int fromGear, int toGear,
                  float clutchDisengagement, float throttle);
+void NotifyAutomaticShift(VehicleData &data, int fromGear, int toGear,
+                          bool sportMode);
 void NotifyRevMatch(float currentRPM, float targetRPM);
 
 float GetHealth();

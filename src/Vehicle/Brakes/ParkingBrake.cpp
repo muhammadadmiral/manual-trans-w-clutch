@@ -3,18 +3,16 @@
 // =============================================================================
 #include "ParkingBrake.h"
 #include "../VehicleData.h"
+#include "../../Core/Config.h"
 #include "../../../sdk/inc/natives.h"
 #include <Windows.h>
-
-// Key default (0x50 = 'P'). Updated at runtime by ParkingBrake::SetKey().
-static int s_parkingBrakeKey = 0x50;
 
 namespace ParkingBrake {
 
 static ParkingBrakeState s_state;
 
-void SetKey(int vk) { s_parkingBrakeKey = vk; }
-int  GetKey()       { return s_parkingBrakeKey; }
+void SetKey(int vk) { Config::KeyParkingBrake = vk; }
+int  GetKey()       { return Config::KeyParkingBrake; }
 
 void Reset() {
   s_state = ParkingBrakeState{};
@@ -23,7 +21,8 @@ void Reset() {
 bool Update(Vehicle vehicle, VehicleData &data, float speedKmH,
             float throttle, int manualGear, bool isEngineOn) {
 
-  const bool keyDown    = (GetAsyncKeyState(s_parkingBrakeKey) & 0x8000) != 0;
+  const bool keyDown =
+      (GetAsyncKeyState(Config::KeyParkingBrake) & 0x8000) != 0;
   const bool justPressed = keyDown && !s_state.wasKeyDown;
   s_state.wasKeyDown    = keyDown;
 

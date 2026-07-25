@@ -8,11 +8,14 @@
 // 30 Hz vs 60 Hz vs 120 Hz.  These τ values give the same feel at any frame rate.
 // =============================================================================
 #include "Config.h"
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
 
 namespace Config {
+
+int TransmissionMode = 2;
 
 // ── Digital keys ──────────────────────────────────────────────────────────────
 int KeyShiftUp      = VK_LSHIFT;
@@ -61,6 +64,16 @@ float GearGrindDamage = 0.04f;
 float ShiftShockStrength = 0.65f;
 float NoLiftShiftPenalty = 0.35f;
 float ConnectedRPMSync = 0.25f;
+bool AutomaticBrakeInterlock = true;
+float AutomaticShiftDelay = 0.35f;
+float AutomaticDUpRPM = 0.68f;
+float AutomaticDDownRPM = 0.28f;
+float AutomaticSUpRPM = 0.90f;
+float AutomaticSDownRPM = 0.42f;
+float AutomaticKickdownThrottle = 0.72f;
+bool BrakeThrottleOverride = true;
+float BrakeOverrideDelay = 0.20f;
+float BrakeOverrideCut = 0.85f;
 
 // ── Analog smoothing — τ in seconds ──────────────────────────────────────────
 // Recommended defaults for keyboard play:
@@ -151,6 +164,11 @@ void ReadConfig(HMODULE module) {
     char ini[MAX_PATH]{};
     if (!BuildIniPath(module, ini)) return;
 
+    TransmissionMode = std::clamp(
+        static_cast<int>(
+            GetPrivateProfileIntA("Transmission", "Mode", 2, ini)),
+        0, 2);
+
     // Controls
     KeyShiftUp      = GetPrivateProfileIntA("Controls", "ShiftUp",      VK_LSHIFT,  ini);
     KeyShiftDown    = GetPrivateProfileIntA("Controls", "ShiftDown",    VK_LCONTROL,ini);
@@ -181,6 +199,24 @@ void ReadConfig(HMODULE module) {
         ReadFloat("Engine", "IdleTorqueFraction", 0.18f, ini);
     ConnectedRPMSync =
         ReadFloat("Engine", "ConnectedRPMSync", 0.25f, ini);
+
+    AutomaticBrakeInterlock =
+        GetPrivateProfileIntA("Automatic", "BrakeInterlock", 1, ini) != 0;
+    AutomaticShiftDelay =
+        ReadFloat("Automatic", "ShiftDelay", 0.35f, ini);
+    AutomaticDUpRPM = ReadFloat("Automatic", "DUpRPM", 0.68f, ini);
+    AutomaticDDownRPM = ReadFloat("Automatic", "DDownRPM", 0.28f, ini);
+    AutomaticSUpRPM = ReadFloat("Automatic", "SUpRPM", 0.90f, ini);
+    AutomaticSDownRPM = ReadFloat("Automatic", "SDownRPM", 0.42f, ini);
+    AutomaticKickdownThrottle =
+        ReadFloat("Automatic", "KickdownThrottle", 0.72f, ini);
+
+    BrakeThrottleOverride =
+        GetPrivateProfileIntA("Pedals", "BrakeThrottleOverride", 1, ini) != 0;
+    BrakeOverrideDelay =
+        ReadFloat("Pedals", "BrakeOverrideDelay", 0.20f, ini);
+    BrakeOverrideCut =
+        ReadFloat("Pedals", "BrakeOverrideCut", 0.85f, ini);
 
     TcsEnabled = GetPrivateProfileIntA("Assists", "TCS", 1, ini) != 0;
     TcsSlipTarget = ReadFloat("Assists", "TCSSlipTarget", 0.12f, ini);
@@ -244,6 +280,8 @@ void SaveConfig(HMODULE module) {
     char ini[MAX_PATH]{};
     if (!BuildIniPath(module, ini)) return;
 
+    WriteInt("Transmission", "Mode", TransmissionMode, ini);
+
     WriteInt("Controls", "ShiftUp",              KeyShiftUp,      ini);
     WriteInt("Controls", "ShiftDown",            KeyShiftDown,    ini);
     WriteInt("Controls", "ClutchKey",            KeyClutch,       ini);
@@ -268,6 +306,21 @@ void SaveConfig(HMODULE module) {
     WriteFloat("Engine", "StallClutchThreshold", StallClutchThreshold, ini);
     WriteFloat("Engine", "IdleTorqueFraction", IdleTorqueFraction, ini);
     WriteFloat("Engine", "ConnectedRPMSync", ConnectedRPMSync, ini);
+
+    WriteInt("Automatic", "BrakeInterlock",
+             AutomaticBrakeInterlock ? 1 : 0, ini);
+    WriteFloat("Automatic", "ShiftDelay", AutomaticShiftDelay, ini);
+    WriteFloat("Automatic", "DUpRPM", AutomaticDUpRPM, ini);
+    WriteFloat("Automatic", "DDownRPM", AutomaticDDownRPM, ini);
+    WriteFloat("Automatic", "SUpRPM", AutomaticSUpRPM, ini);
+    WriteFloat("Automatic", "SDownRPM", AutomaticSDownRPM, ini);
+    WriteFloat("Automatic", "KickdownThrottle",
+               AutomaticKickdownThrottle, ini);
+
+    WriteInt("Pedals", "BrakeThrottleOverride",
+             BrakeThrottleOverride ? 1 : 0, ini);
+    WriteFloat("Pedals", "BrakeOverrideDelay", BrakeOverrideDelay, ini);
+    WriteFloat("Pedals", "BrakeOverrideCut", BrakeOverrideCut, ini);
 
     WriteInt("Assists", "TCS", TcsEnabled ? 1 : 0, ini);
     WriteFloat("Assists", "TCSSlipTarget", TcsSlipTarget, ini);

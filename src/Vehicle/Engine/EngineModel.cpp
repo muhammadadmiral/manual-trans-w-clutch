@@ -51,7 +51,8 @@ static void UpdateFreeRev(VehicleData &data, bool drivelineOpen,
 
 static bool UpdateLoadAndStall(VehicleData &data, int gear,
                                float engagement, float throttle,
-                               float speedMps, bool engineOn, float dt) {
+                               float brake, float speedMps, bool engineOn, float dt,
+                               bool automaticMode) {
   if (!engineOn || gear == 0) {
     s_state.load = 0.0f;
     s_state.creepThrottle = 0.0f;
@@ -87,11 +88,15 @@ static bool UpdateLoadAndStall(VehicleData &data, int gear,
   s_state.load = engagement * speedGap;
 
   s_state.creepThrottle = 0.0f;
-  if (Config::IdleCreep && gear == 1 && throttle < 0.02f &&
+  if (Config::IdleCreep && std::abs(gear) == 1 && throttle < 0.02f &&
+      brake < 0.05f &&
       engagement > 0.50f && speedGap > 0.01f) {
     s_state.creepThrottle =
         Clamp01(Config::IdleCreepThrottle) * speedGap * engagement;
-    PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, s_state.creepThrottle);
+    const int driveControl = gear < 0 ? 72 : 71;
+    PAD::DISABLE_CONTROL_ACTION(0, driveControl, true);
+    PAD::SET_CONTROL_VALUE_NEXT_FRAME(
+        0, driveControl, s_state.creepThrottle);
   }
 
   const float firstRatio = std::fabs(data.GetGearRatio(1));
@@ -115,7 +120,8 @@ static bool UpdateLoadAndStall(VehicleData &data, int gear,
   const float rpm = data.GetRPM();
   const float stallClutch =
       std::clamp(Config::StallClutchThreshold, 0.30f, 0.95f);
-  const bool bogging = Config::StallEnabled && engagement > stallClutch &&
+  const bool bogging = !automaticMode && Config::StallEnabled &&
+                       engagement > stallClutch &&
                        rpm <= s_state.idleRPM + 0.012f &&
                        usefulSpeed < idleRoadSpeed &&
                        s_state.torqueReserve < 0.0f;
@@ -140,7 +146,8 @@ static bool UpdateLoadAndStall(VehicleData &data, int gear,
 
 bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
             float clutchDisengagement, float clutchEngagement,
-            float throttle, float speedMps, bool engineOn) {
+            float throttle, float brake, float speedMps, bool engineOn,
+            bool automaticMode) {
   const float dt = std::clamp(MISC::GET_FRAME_TIME(), 0.001f, 0.05f);
   const float rpm = data.GetRPM();
 
@@ -200,7 +207,8 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
   }
 
   const bool stalled = UpdateLoadAndStall(
-      data, gear, clutchEngagement, throttle, speedMps, engineOn, dt);
+      data, gear, clutchEngagement, throttle, brake, speedMps, engineOn, dt,
+      automaticMode);
   if (stalled)
     VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
   return stalled;
