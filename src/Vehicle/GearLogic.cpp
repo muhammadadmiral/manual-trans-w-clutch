@@ -1,5 +1,6 @@
 #include "GearLogic.h"
 #include "../../sdk/inc/natives.h"
+#include "../Core/ModLogger.h"
 #include "VehicleData.h"
 #include <algorithm>
 
@@ -142,6 +143,10 @@ void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
   if (clutchWasOpen && !clutchOpen && shiftArmed) {
     nativeShiftUntil = GetTickCount() + 240;
     shiftArmed = false;
+    LOG_INFO(Gear,
+             "NATIVE_SHIFT_REQUEST: from=%d to=%d rpm=%.3f clutch=%.3f "
+             "windowMs=240",
+             shiftFromGear, shiftToGear, data.GetRPM(), clutch);
   }
   clutchWasOpen = clutchOpen;
 
