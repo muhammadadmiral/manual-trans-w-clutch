@@ -26,6 +26,14 @@ BOOL APIENTRY DllMain(HMODULE instance, DWORD reason, LPVOID) {
         g_pluginModule = instance;
         DisableThreadLibraryCalls(instance);
         ModLogger::Initialize(instance);
+        {
+            char modulePath[MAX_PATH]{};
+            GetModuleFileNameA(instance, modulePath, MAX_PATH);
+            LOG_INFO(Init,
+                     "Runtime=driveline-r3 built=%s %s module=%s",
+                     __DATE__, __TIME__,
+                     modulePath[0] ? modulePath : "?");
+        }
         LOG_INFO(Init, "DLL_PROCESS_ATTACH — registering ScriptMain with ScriptHookV");
         scriptRegister(instance, ScriptMain);
         break;

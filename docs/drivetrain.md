@@ -2,10 +2,12 @@
 
 ## Netral
 
-`Gear` dan `NextGear` memakai sentinel netral GTA. W tetap masuk sebagai
-throttle native, jadi engine bebas rev sementara drivetrain nol. Mod tidak
-menulis RPM atau field throttle internal. Drag, inertia, limiter, dashboard,
-dan audio engine berasal dari state mesin GTA yang sama.
+Logical gear netral memakai gear 1 sebagai carrier fisik dan actuator clutch
+negatif sebagai hard-open. GTA tidak free-rev konsisten pada clutch terputus,
+terutama di gear 2+, jadi `EngineModel` memegang RPM hanya selama driveline
+terbuka. Target free-rev memakai input throttle GTA, RPM GTA saat ownership
+dimulai, frame time, serta drive inertia/karakter akselerasi kendaraan. Roda dan
+vehicle speed tidak pernah ditulis.
 
 ## Clutch
 
@@ -14,8 +16,8 @@ diubah dengan smoothstep menjadi engagement `0..1`.
 
 - logical gear tetap terpilih ketika pedal diinjak;
 - engagement model membentuk torque capacity di bite range;
-- pedal mentok juga menulis physical gear netral sebagai hard-disconnect,
-  lalu logical gear masuk kembali saat pedal melewati bite point;
+- pedal mentok menulis actuator negatif sebagai hard-disconnect sementara
+  physical gear 1 menjadi carrier; logical gear tetap tersimpan;
 - pelepasan pelan menaikkan torque capacity bertahap;
 - pelepasan cepat menghasilkan perubahan capacity cepat;
 - dump terdeteksi dari laju release pedal, bukan hanya posisi akhirnya;
@@ -100,9 +102,11 @@ jadi injeksi W di R tidak menyalakan rem pada frame berikutnya.
 
 Gas+rem yang ditahan bersamaan memicu brake-throttle override setelah delay,
 kecuali clutch manual sedang terbuka untuk heel-toe/rev-match atau launch
-control sedang berada di launch window. ABS tetap fail-open bila telemetry roda
-tidak valid. Temperatur rem tetap dihitung dari brake input dan road speed;
-setelah ambang fade, tekanan maksimum berkurang sampai rem kembali dingin.
+control sedang berada di launch window. Gear 1 pada kecepatan rendah juga
+dikecualikan supaya power-brake/burnout tidak memotong throttle dan memicu
+stall palsu. ABS tetap fail-open bila telemetry roda tidak valid. Temperatur
+rem tetap dihitung dari brake input dan road speed; setelah ambang fade,
+tekanan maksimum berkurang sampai rem kembali dingin.
 
 ## TCS dan ABS
 

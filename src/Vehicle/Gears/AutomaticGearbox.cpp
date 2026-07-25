@@ -20,6 +20,32 @@ static bool IsDriveSelector(Selector selector) {
          selector == Selector::Low2 || selector == Selector::Low1;
 }
 
+static float ResolveFlatVelocity(Vehicle vehicle, VehicleData &data,
+                                 int maxGear) {
+  const float memoryValue = std::fabs(data.GetDriveMaxFlatVel());
+  if (std::isfinite(memoryValue) && memoryValue > 1.0f)
+    return memoryValue;
+  const float estimatedTop =
+      (std::max)(8.0f, VEHICLE::GET_VEHICLE_ESTIMATED_MAX_SPEED(vehicle));
+  const float topRatio = std::fabs(
+      data.GetGearRatio(static_cast<uint8_t>((std::max)(1, maxGear))));
+  return topRatio > 0.01f ? estimatedTop * topRatio : estimatedTop;
+}
+
+static float RoadRPM(Vehicle vehicle, VehicleData &data, int maxGear,
+                     int gear, float signedSpeedMps) {
+  if (gear < 1)
+    return 0.2f;
+  const float ratio =
+      std::fabs(data.GetGearRatio(static_cast<uint8_t>(gear)));
+  const float flatVelocity =
+      ResolveFlatVelocity(vehicle, data, maxGear);
+  if (ratio <= 0.01f || flatVelocity <= 1.0f)
+    return std::clamp(data.GetRPM(), 0.0f, 1.0f);
+  return std::clamp(std::fabs(signedSpeedMps) * ratio / flatVelocity,
+                    0.0f, 1.25f);
+}
+
 static bool CanSelect(Vehicle vehicle, Selector from, Selector target,
                       float brake, float signedSpeedMps) {
   const float absSpeed = std::fabs(signedSpeedMps);
@@ -57,7 +83,9 @@ static bool DownshiftIsSafe(Vehicle vehicle, VehicleData &data,
       std::fabs(data.GetGearRatio(static_cast<uint8_t>(toGear)));
   if (fromRatio <= 0.01f || toRatio <= 0.01f)
     return true;
-  if (data.GetRPM() * toRatio / fromRatio >= 0.98f)
+  const float projectedRPM =
+      RoadRPM(vehicle, data, vehicleMaxGear, toGear, signedSpeedMps);
+  if (projectedRPM >= 0.98f)
     return false;
 
   const float topRatio = std::fabs(
@@ -156,7 +184,11 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
     return s_state.currentGear;
 
   const bool sport = s_state.selector == Selector::Sport;
-  const float rpm = data.GetRPM();
+  const float nativeRPM = data.GetRPM();
+  const float rpm =
+      RoadRPM(vehicle, data, vehicleMaxGear, s_state.currentGear,
+              signedSpeedMps);
+  s_state.decisionRPM = rpm;
   const float upBase = sport ? Config::AutomaticSUpRPM
                              : Config::AutomaticDUpRPM;
   const float downBase = sport ? Config::AutomaticSDownRPM
@@ -209,8 +241,11 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
     s_state.lastShiftTime = now;
     s_state.lastShiftDirection = direction;
     GearboxSystem::NotifyAutomaticShift(data, previous, targetGear, sport);
-    LOG_INFO(Gear, "Automatic %s shift: %d -> %d rpm=%.3f throttle=%.3f",
-             sport ? "S" : "D", previous, targetGear, rpm, throttle);
+    LOG_INFO(Gear,
+             "Automatic %s shift: %d -> %d roadRPM=%.3f nativeRPM=%.3f "
+             "throttle=%.3f",
+             sport ? "S" : "D", previous, targetGear, rpm, nativeRPM,
+             throttle);
   }
 
   (void)vehicle;

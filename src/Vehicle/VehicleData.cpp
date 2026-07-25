@@ -221,11 +221,11 @@ bool VehicleData::LoadOffsetsFromIni(HMODULE pluginModule, VehicleOffsets& resul
                      out.Clutch, out.RPM + 0xC);
             out.Clutch = out.RPM + 0xC;
         }
-        if (out.Throttle != 0) {
+        if (out.RPM != 0 && out.Throttle != out.RPM + 0x10) {
             LOG_WARN(Memory,
-                     "Unsafe legacy throttle offset ignored: THR=0x%X",
-                     out.Throttle);
-            out.Throttle = 0;
+                     "Correcting engine throttle relation: 0x%X -> 0x%X",
+                     out.Throttle, out.RPM + 0x10);
+            out.Throttle = out.RPM + 0x10;
         }
         if (out.GearRatios == 0 && out.NextGear != 0 &&
             out.Gear == out.NextGear + 2 &&
@@ -432,7 +432,7 @@ bool VehicleData::HasPlausibleLayout(int maxGear) const {
     const float   rpm      = GetRPM();
     const bool clutchOk =
         resolvedOffsets.Clutch == 0 ||
-        (std::isfinite(GetClutch()) && GetClutch() >= -0.25f &&
+        (std::isfinite(GetClutch()) && GetClutch() >= -6.0f &&
          GetClutch() <= 2.0f);
 
     // 0xFF == invalid / neutral on some vehicles

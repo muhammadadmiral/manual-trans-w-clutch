@@ -15,7 +15,11 @@ struct State {
   float creepThrottle = 0.0f;
   float torqueReserve = 0.0f;
   float previousRPM = 0.2f;
+  float controlledRPM = 0.2f;
+  float wheelRPM = 0.2f;
+  float estimatedFlatVelocity = 0.0f;
   bool freeRevActive = false;
+  bool rpmOwned = false;
   bool handlingBacked = false;
 };
 

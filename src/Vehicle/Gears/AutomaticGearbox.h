@@ -23,6 +23,7 @@ struct State {
   DWORD lastShiftTime = 0;
   int lastShiftDirection = 0;
   float coupling = 0.0f;
+  float decisionRPM = 0.2f;
   bool kickdown = false;
   bool selectorRejected = false;
 };

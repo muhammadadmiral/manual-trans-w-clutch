@@ -240,7 +240,7 @@ void ScriptMain() {
       const VehicleOffsets &off = VehicleData::GetResolvedOffsets();
       const std::string bv = VehicleData::GetGameBuildVersion();
       char notify[256]{};
-      sprintf_s(notify, "Manual trans: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
+      sprintf_s(notify, "Manual trans r3: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
                 VehicleData::GetOffsetSourceName(),
                 bv.empty() ? "?" : bv.c_str(), off.Gear, off.NextGear, off.RPM,
                 off.Clutch);
@@ -715,8 +715,10 @@ void ScriptMain() {
           Gear,
           "STATUS: Mode=%d Profile=%s Selector=%s Selected=%d Mem=%u Next=%u "
           "PedalClutch=%.3f Key=%d Coupling=%.3f PowerMul=%.3f "
-          "MemClutch=%.3f Actuator=%.3f Throttle=%.3f Brake=%.3f RPM=%.3f "
-          "SpeedKmH=%.1f SignedMps=%.2f Ratio=%.4f MaxVel=%.2f "
+          "MemClutch=%.3f Actuator=%.3f Throttle=%.3f MemThrottle=%.3f "
+          "Brake=%.3f RPM=%.3f AutoRPM=%.3f "
+          "FreeRev=%d FreeRPM=%.3f WheelRPM=%.3f "
+          "SpeedKmH=%.1f SignedMps=%.2f Ratio=%.4f MaxVel=%.2f EstFlat=%.2f "
           "Handling=%d Load=%.3f TorqueReserve=%.3f Stall=%.3f "
           "Clash=%.3f Shock=%.3f Money=%d Engine=%d Actual=%d Start=%d "
           "TCS=%d ABS=%d",
@@ -728,8 +730,14 @@ void ScriptMain() {
           InputHandler::GetDriveCoupling(), powerMultiplier, data.GetClutch(),
           automaticMode ? AutomaticGearbox::GetCoupling()
                         : ClutchSystem::GetNativeActuator(),
-          driveThrottle, absBrake, data.GetRPM(), speedKmH, forwardSpeed,
-          data.GetGearRatio(ratioIndex), data.GetDriveMaxFlatVel(),
+          driveThrottle, data.GetThrottle(), absBrake, data.GetRPM(),
+          automaticMode ? AutomaticGearbox::GetState().decisionRPM : -1.0f,
+          EngineModel::GetState().rpmOwned ? 1 : 0,
+          EngineModel::GetState().controlledRPM,
+          EngineModel::GetState().wheelRPM,
+          speedKmH, forwardSpeed, data.GetGearRatio(ratioIndex),
+          data.GetDriveMaxFlatVel(),
+          EngineModel::GetState().estimatedFlatVelocity,
           EngineModel::GetState().handlingBacked ? 1 : 0,
           EngineModel::GetLoad(), EngineModel::GetTorqueReserve(),
           EngineModel::GetStallProgress(),

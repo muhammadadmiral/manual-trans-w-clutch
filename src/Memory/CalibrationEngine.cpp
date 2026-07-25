@@ -472,8 +472,7 @@ bool Update(int vehicleHandle, bool isEngineOn, bool isRevving, uint8_t maxGear,
         s_idleValues    = std::move(nextIdle);
 
         // ── Gear layout search ────────────────────────────────────────────
-        // SearchGearLayout cuma menerima field gear yang tervalidasi. Actuator
-        // clutch mengikuti displacement signature RPM; throttle tetap native.
+        // Cluster mesin nempel ke RPM; pedal input tetap dicari terpisah.
         LOG_INFO(Calib, "Starting gear layout search for %zu RPM candidates...",
                  s_rpmCandidates.size());
 
@@ -495,7 +494,7 @@ bool Update(int vehicleHandle, bool isEngineOn, bool isRevving, uint8_t maxGear,
             VehicleOffsets cand = VehicleData::GetResolvedOffsets();
             cand.RPM       = rpmOff;
             cand.Clutch = rpmOff + 0xC;
-            cand.Throttle = 0;
+            cand.Throttle = rpmOff + 0x10;
 
             cand.Gear      = cluster.gearOff;
             cand.NextGear  = cluster.nextGearOff;

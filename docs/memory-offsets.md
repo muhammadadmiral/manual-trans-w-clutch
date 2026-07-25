@@ -5,9 +5,9 @@ bukan alamat absolut.
 
 | Field | Object | Resolver / relasi | Akses |
 |---|---|---|---|
-| Current RPM | `CVehicle` | pola engine | read-only saat runtime |
+| Current RPM | `CVehicle` | pola/kalibrasi engine | read; write hanya saat driveline open |
 | Clutch actuator | `CVehicle` | displacement RPM `+0xC` | read/write |
-| Engine throttle | `CVehicle` | belum tervalidasi di Enhanced | nonaktif |
+| Engine throttle | `CVehicle` | displacement RPM `+0x10` | read; write hanya saat driveline open |
 | Throttle pedal | `CVehicle` | kelompok steering input `+0x10` | opsional read |
 | Gear / NextGear | `CVehicle` | pola transmission | read/write |
 | Gear ratios | `CVehicle` | inline `NextGear + 0xC`, atau pointer build lama | read |
@@ -20,8 +20,8 @@ bukan alamat absolut.
 | Load / brake / power | `CWheel` | kelompok steering-angle wheel | read |
 
 Offset INI dipisah per build GTA. Resolver memperkaya field opsional walau
-cluster gear harus memakai fallback INI. Nilai `Clutch` lama dikoreksi ke
-`RPM+0xC`; `Throttle` lama dijadikan nol. Core layout wajib punya `Gear`,
+cluster gear harus memakai fallback INI. Nilai lama dikoreksi ke relasi cluster
+`Clutch=RPM+0xC` dan `Throttle=RPM+0x10`. Core layout wajib punya `Gear`,
 `NextGear`, `RPM`, dan `Clutch`; field opsional nol selalu no-op.
 
 Kalibrasi gear Enhanced wajib mencocokkan `TopGear` dengan jumlah gear native
@@ -33,5 +33,6 @@ Field baru harus punya signature, relasi struct yang konsisten, range check, dan
 jalur no-op ketika resolver gagal.
 
 Runtime menulis clutch dengan semantik signed GTA: `1` terhubung, nilai negatif
-hard-open. Setter RPM/throttle tidak dipanggil; RPM/audio/limiter wajib berasal
-dari state engine GTA.
+hard-open. Setter RPM/engine-throttle hanya aktif pada netral atau saat pedal
+clutch membuka driveline. Ini diperlukan karena engine GTA tidak free-rev
+konsisten di gear 2+; setter tidak pernah dipakai untuk mengubah kecepatan roda.

@@ -32,12 +32,13 @@ bool OffsetResolver::ScanPatterns(VehicleOffsets &outOffsets,
   VehicleOffsets offsets{};
   uintptr_t addr = 0;
 
-  // Signature ini memberi RPM dan actuator clutch. Throttle internal sengaja
-  // tetap nonaktif karena runtime cukup memakai control native GTA.
+  // Tiga field ini satu cluster di CVehicle. Throttle di sini adalah state
+  // mesin/audio, beda dengan pedal input GTA.
   addr = AOBScanner::FindUnique(
       "76 03 0F 28 F0 F3 44 0F 10 93 ? ? ? ?");
   if (addr != 0 && TryReadU32(addr + 10, offsets.RPM)) {
     offsets.Clutch = offsets.RPM + 0xC;
+    offsets.Throttle = offsets.RPM + 0x10;
   } else {
     // Older fallback retained for builds whose surrounding code changed.
     addr = AOBScanner::FindUnique("F6 83 ? ? ? ? 07 75 ? 44 0F");
@@ -46,6 +47,7 @@ bool OffsetResolver::ScanPatterns(VehicleOffsets &outOffsets,
       return false;
     }
     offsets.Clutch = offsets.RPM + 0xC;
+    offsets.Throttle = offsets.RPM + 0x10;
   }
 
   // 2. Core Transmission (Gear / NextGear / TopGear / GearRatios)
@@ -122,8 +124,10 @@ bool OffsetResolver::ScanPatterns(VehicleOffsets &outOffsets,
 }
 
 void OffsetResolver::EnrichOptionalOffsets(VehicleOffsets &offsets) {
-  if (offsets.RPM != 0)
+  if (offsets.RPM != 0) {
     offsets.Clutch = offsets.RPM + 0xC;
+    offsets.Throttle = offsets.RPM + 0x10;
+  }
 
   // CVehicle::m_handlingData. The handling fields below are offsets inside
   // CHandlingData, not displacements from CVehicle.

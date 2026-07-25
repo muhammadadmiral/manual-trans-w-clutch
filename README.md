@@ -10,7 +10,9 @@ assist yang hanya aktif kalau telemetry memory-nya tervalidasi.
 Sprint drivetrain aktif. Fokus saat ini:
 
 - netral dan clutch memutus drivetrain tanpa mematikan throttle mesin;
-- RPM, limiter, audio mesin, dan top speed tetap dihitung engine native GTA;
+- saat drivetrain terhubung, RPM, limiter, audio, dan top speed tetap milik
+  GTA; saat netral/clutch-open, controller hanya melanjutkan RPM mesin karena
+  GTA tidak free-rev konsisten di gear 2+;
 - pelepasan clutch gradual memakai actuator clutch internal GTA;
 - clutch mentok melakukan hard-disconnect tanpa menghapus logical gear pilihan;
 - dump clutch, bog, dan stall memakai RPM, rasio/handling yang tervalidasi,
@@ -63,6 +65,10 @@ dijelaskan di [docs/configuration.md](docs/configuration.md).
 5. Salin `x64/Release/manual-trans-w-clutch.asi` ke folder GTA V yang sudah
    memuat ScriptHookV.
 
+Sesudah mengganti ASI, cek awal `manual-trans.log`. Build sprint ini wajib
+mencetak `Runtime=driveline-r3` dan path file yang benar-benar dimuat. Kalau
+baris itu tidak ada, GTA masih memakai salinan ASI lama.
+
 Artefak yang sudah diverifikasi pada sprint ini:
 
 ```text
@@ -100,15 +106,16 @@ SportTorqueBoost=0.10
 P-R-N-D-S-L2-L1, dan `Mode=2` mengaktifkan manual sequential. Kendaraan
 listrik dan scooter CVT selalu memakai automatic.
 
-Throttle, brake, steer, RPM, limiter, dan engine audio tetap berasal dari GTA.
-`ClutchAttack` dan `ClutchRelease` membentuk travel clutch digital. S di gear
-maju/netral diblok dari reverse axis GTA sehingga fungsinya tetap rem saja.
+Throttle, brake, dan steer tetap berasal dari control GTA. RPM hanya dipegang
+mod ketika netral atau clutch terbuka; roda dan vehicle speed tidak pernah
+ditulis. `ClutchAttack` dan `ClutchRelease` membentuk travel clutch digital. S
+di gear maju/netral diblok dari reverse axis GTA sehingga fungsinya tetap rem.
 
 ## Batas keselamatan memory
 
 Write hanya dilakukan pada offset yang punya pola atau relasi layout
 terverifikasi. TCS/ABS otomatis tidak mengintervensi bila `CWheel` tidak
-ter-resolve. Clutch wajib mengikuti relasi signature `RPM+0xC`, sedangkan
-offset throttle lama diabaikan karena input engine tetap dari control native.
-Runtime hanya menulis gear/next gear/clutch. Native power multiplier bernilai
-`1.0` kecuali mode S dan selalu dipulihkan saat mod Off/keluar mobil.
+ter-resolve. Cluster engine memakai `Clutch=RPM+0xC` dan
+`EngineThrottle=RPM+0x10`; field throttle ini bukan pedal input. Write RPM dan
+engine-throttle dibatasi ke netral/clutch-open. Native power multiplier
+bernilai `1.0` kecuali mode S dan selalu dipulihkan saat mod Off/keluar mobil.

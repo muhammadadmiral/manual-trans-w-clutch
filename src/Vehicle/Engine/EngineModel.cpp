@@ -13,6 +13,35 @@ static float Clamp01(float value) {
   return std::clamp(value, 0.0f, 1.0f);
 }
 
+static float ResolveFlatVelocity(Vehicle vehicle, VehicleData &data,
+                                 int maxGear) {
+  const float memoryValue = std::fabs(data.GetDriveMaxFlatVel());
+  if (std::isfinite(memoryValue) && memoryValue > 1.0f)
+    return memoryValue;
+
+  const float estimatedTop =
+      std::max(1.0f, VEHICLE::GET_VEHICLE_ESTIMATED_MAX_SPEED(vehicle));
+  const float topRatio =
+      maxGear > 0
+          ? std::fabs(data.GetGearRatio(static_cast<uint8_t>(maxGear)))
+          : 0.0f;
+  return topRatio > 0.01f ? estimatedTop * topRatio : estimatedTop;
+}
+
+static float ResolveWheelRPM(Vehicle vehicle, VehicleData &data, int gear,
+                             int maxGear, float speedMps, float idleRPM) {
+  if (gear == 0)
+    return idleRPM;
+  const uint8_t ratioIndex =
+      gear < 0 ? 0 : static_cast<uint8_t>(gear);
+  const float ratio = std::fabs(data.GetGearRatio(ratioIndex));
+  const float flatVelocity = ResolveFlatVelocity(vehicle, data, maxGear);
+  if (ratio <= 0.01f || flatVelocity <= 1.0f)
+    return idleRPM;
+  return std::clamp(std::fabs(speedMps) * ratio / flatVelocity, idleRPM,
+                    1.25f);
+}
+
 void Reset() {
   s_state = State{};
 }
@@ -34,7 +63,7 @@ static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
   const uint8_t ratioIndex =
       gear < 0 ? 0 : static_cast<uint8_t>(gear);
   const float ratio = std::fabs(data.GetGearRatio(ratioIndex));
-  const float maxFlatVel = std::fabs(data.GetDriveMaxFlatVel());
+  const float maxFlatVel = ResolveFlatVelocity(vehicle, data, maxGear);
   const bool hasDrivelineData =
       std::isfinite(ratio) && ratio > 0.01f &&
       std::isfinite(maxFlatVel) && maxFlatVel > 1.0f;
@@ -141,26 +170,68 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
   const float inertia = data.GetDriveInertia();
   s_state.handlingBacked =
       std::isfinite(inertia) && inertia >= 0.05f && inertia <= 10.0f;
-  s_state.inertia = s_state.handlingBacked ? inertia : 1.0f;
-
-  const bool open = gear == 0 || clutchDisengagement > 0.40f;
-  s_state.freeRevActive = engineOn && open;
-  s_state.previousRPM = rpm;
-
-  // expectedRPM cuma telemetry. Jangan tulis RPM/throttle internal: audio,
-  // limiter, inertia, dan perbedaan handling kendaraan harus tetap milik GTA.
-  const uint8_t ratioIndex =
-      gear < 0 ? 0 : static_cast<uint8_t>(gear);
-  const float connectedRatio = std::fabs(data.GetGearRatio(ratioIndex));
-  const float maxFlatVel = std::fabs(data.GetDriveMaxFlatVel());
-  if (!open && connectedRatio > 0.01f && maxFlatVel > 1.0f) {
-    s_state.expectedRPM = std::clamp(
-        std::max(s_state.idleRPM,
-                 std::fabs(speedMps) * connectedRatio / maxFlatVel),
-        s_state.idleRPM, 1.0f);
+  if (s_state.handlingBacked) {
+    s_state.inertia = inertia;
   } else {
-    s_state.expectedRPM = rpm;
+    const float nativeAcceleration =
+        std::max(0.01f, VEHICLE::GET_VEHICLE_ACCELERATION(vehicle));
+    s_state.inertia =
+        std::clamp(0.72f + nativeAcceleration * 1.10f, 0.65f, 1.60f);
   }
+
+  const bool open = gear == 0 || clutchDisengagement > 0.35f;
+  s_state.freeRevActive = engineOn && open;
+
+  s_state.estimatedFlatVelocity =
+      ResolveFlatVelocity(vehicle, data, maxGear);
+  s_state.wheelRPM =
+      ResolveWheelRPM(vehicle, data, gear, maxGear, speedMps,
+                      s_state.idleRPM);
+  s_state.expectedRPM = open ? rpm : std::min(1.0f, s_state.wheelRPM);
+
+  if (!engineOn) {
+    s_state.rpmOwned = false;
+    s_state.controlledRPM = 0.0f;
+  } else if (open) {
+    if (!s_state.rpmOwned) {
+      s_state.controlledRPM =
+          std::clamp(std::max(rpm, s_state.idleRPM), s_state.idleRPM, 1.0f);
+      s_state.rpmOwned = true;
+    }
+
+    // GTA memutus tenaga di field clutch, tapi tidak free-rev konsisten di
+    // gear 2+. Di fase terbuka saja kita lanjutkan state RPM mesin memakai
+    // inertia kendaraan; kecepatan roda tidak pernah ditulis.
+    const float pedal = Clamp01(throttle);
+    const float freeTarget =
+        s_state.idleRPM +
+        std::pow(pedal, 0.62f) * (1.0f - s_state.idleRPM);
+    const float clutchDrag =
+        gear == 0 ? 0.0f : Clamp01(clutchEngagement * clutchEngagement * 0.65f);
+    const float target =
+        freeTarget + (s_state.wheelRPM - freeTarget) * clutchDrag;
+    const float inertiaScale = std::clamp(s_state.inertia, 0.30f, 3.0f);
+    const float response =
+        target >= s_state.controlledRPM
+            ? 1.45f + inertiaScale * 1.65f
+            : 0.85f + 1.15f / std::sqrt(inertiaScale);
+    const float alpha = 1.0f - std::exp(-response * dt);
+
+    if (pedal > 0.01f && rpm > s_state.controlledRPM)
+      s_state.controlledRPM = std::min(rpm, 1.0f);
+    s_state.controlledRPM +=
+        (target - s_state.controlledRPM) * Clamp01(alpha);
+    s_state.controlledRPM =
+        std::clamp(s_state.controlledRPM, s_state.idleRPM, 1.0f);
+
+    data.SetRPM(s_state.controlledRPM);
+    data.SetThrottle(pedal);
+    s_state.expectedRPM = s_state.controlledRPM;
+  } else {
+    s_state.rpmOwned = false;
+    s_state.controlledRPM = rpm;
+  }
+  s_state.previousRPM = rpm;
 
   const float ratio =
       gear > 0 ? std::fabs(data.GetGearRatio(static_cast<uint8_t>(gear)))
