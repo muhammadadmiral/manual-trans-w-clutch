@@ -15,12 +15,12 @@ namespace FuelSystem {
 // ─── Fuel Configuration ───────────────────────────────────────────────────────
 // Consumption rates in fuel-fraction per second (0.0 to 1.0 is full tank).
 // At full throttle a typical car does ~12L/100km; translate to game units.
-constexpr float kIdleConsumptionRate     = 0.000010f; // per frame at idle RPM
-constexpr float kCruiseConsumptionRate   = 0.000035f; // per frame at cruise
-constexpr float kFullThrottleConsumptionRate = 0.000095f; // WOT per frame
+constexpr float kIdleConsumptionRate     = 0.0000010f; // per frame at idle RPM
+constexpr float kCruiseConsumptionRate   = 0.0000035f; // per frame at cruise
+constexpr float kFullThrottleConsumptionRate = 0.0000095f; // WOT per frame
 constexpr float kLowFuelThreshold        = 0.15f;     // 15% = low fuel warning
 constexpr float kCriticalFuelThreshold   = 0.05f;     // 5% = critical
-constexpr float kRefuelRate              = 0.008f;    // per frame when refueling
+constexpr float kRefuelRate              = 0.001f;    // per frame when refueling
 constexpr float kEngineKillThreshold     = 0.005f;    // engine dies below this
 
 // ─── Oil Temperature ──────────────────────────────────────────────────────────

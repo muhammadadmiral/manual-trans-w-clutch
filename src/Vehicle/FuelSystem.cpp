@@ -44,6 +44,10 @@ bool Update(Vehicle vehicle, VehicleData &data, float throttle, float rpm,
   }
 
   // ── Refueling ─────────────────────────────────────────────────────────────
+  if (!isEngineOn && speedKmH < 1.0f && s_state.fuelLevel < 1.0f) {
+    s_state.isRefueling = true;
+  }
+
   if (s_state.isRefueling) {
     s_state.fuelLevel += kRefuelRate;
     if (s_state.fuelLevel >= 1.0f) {

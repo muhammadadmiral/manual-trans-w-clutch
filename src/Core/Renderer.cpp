@@ -49,7 +49,7 @@ void DrawBar(float x, float y, float width, float height, float fraction, int r,
 
 void DrawGearHUD(int manualGear, int maxGear, int activeSignal, bool isEngineOn) {
     // Positioning - Bottom right corner, sleek and minimalist
-    const float badgeX = 0.88f;
+    const float badgeX = 0.12f;
     const float badgeY = 0.85f;
     const float badgeW = 0.055f;
     const float badgeH = 0.085f;

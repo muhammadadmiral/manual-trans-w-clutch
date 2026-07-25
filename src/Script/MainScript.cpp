@@ -419,12 +419,7 @@ void ScriptMain() {
     const float throttle = InputHandler::GetSmoothedThrottle();
     const float rpm = data.GetRPM();
 
-    LOG_DEBUG_T(Input, 500,
-                "throttle=%.3f brake=%.3f clutch=%.3f steer=%.3f rpm=%.4f "
-                "spd=%.1fkm/h gear=%d",
-                throttle, InputHandler::GetSmoothedBrake(), clutch,
-                InputHandler::GetSmoothedSteer(), rpm, speedKmH, manualGear);
-
+    // (Spammy input logging removed)
     // ── Subsystem updates ─────────────────────────────────────────────────
     float simulatedClutch =
         PhysicsEngine::UpdateClutch(clutch, throttle, rpm, isEngineOn);
@@ -507,7 +502,7 @@ void ScriptMain() {
                         InputHandler::GetSmoothedBrake(), throttle);
 
     // ── HUD ───────────────────────────────────────────────────────────────
-    Renderer::DrawGearHUD(manualGear, maxGear, activeSignal, isEngineOn);
+    // Renderer::DrawGearHUD(manualGear, maxGear, activeSignal, isEngineOn);
 
     if (grindWarningTimer > 0) {
       --grindWarningTimer;

@@ -125,11 +125,11 @@ void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
   if (manualGear == 0) {
     data.SetGear(1);
     data.SetNextGear(1);
-    data.SetClutch(0.0f);
+    data.SetClutch(1.0f); // 1.0f is fully open/disengaged in GTA V
   } else if (manualGear == -1) {
     data.SetGear(0);
     data.SetNextGear(0);
-    data.SetClutch(1.0f - clutch);
+    data.SetClutch(1.0f - clutch); // 0.0f is fully engaged in GTA V
   } else {
     const uint8_t targetGear = static_cast<uint8_t>(manualGear);
     data.SetGear(targetGear);
