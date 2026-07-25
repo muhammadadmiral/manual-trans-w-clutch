@@ -199,9 +199,14 @@ static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
   const PhysicalRPMRange rpmRange = ResolvePhysicalRPMRange(vehicle);
   s_state.estimatedIdlePhysicalRPM = rpmRange.idle;
   s_state.estimatedRedlineRPM = rpmRange.redline;
+  // Torque converter memindahkan torsi tanpa menyamakan putaran poros.
+  // Mencampur RPM roda di sini bikin mesin matic terbaca 300-400 RPM saat
+  // diam, lalu model torsinya sendiri menganggap mesin lug parah.
   const float engineSpeedForLoad =
-      s_state.wheelRPM * Clamp01(engagement) +
-      data.GetRPM() * (1.0f - Clamp01(engagement));
+      automaticMode
+          ? data.GetRPM()
+          : s_state.wheelRPM * Clamp01(engagement) +
+                data.GetRPM() * (1.0f - Clamp01(engagement));
   s_state.estimatedEngineRPM =
       ToPhysicalRPM(engineSpeedForLoad, s_state.idleRPM, rpmRange);
   const float lugThreshold =
@@ -339,7 +344,7 @@ static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
 
 static void UpdateDriveTorque(int gear, int maxGear, float engagement,
                               float throttle, float brake, bool engineOn,
-                              float dt) {
+                              bool automaticMode, float dt) {
   s_state.driveTorqueFactor = 1.0f;
   s_state.redlineCut = false;
   if (!engineOn || gear == 0 || engagement < 0.08f ||
@@ -399,6 +404,15 @@ static void UpdateDriveTorque(int gear, int maxGear, float engagement,
       1.0f - torqueDeficit * (0.32f + (1.0f - Clamp01(throttle)) * 0.18f);
   float output =
       (1.0f + lowRpmAssist + s_state.lowRpmRecovery) * lugFactor;
+
+  if (automaticMode && gear > 0) {
+    const float converterSlip = 1.0f - Clamp01(engagement);
+    const float launchBand =
+        1.0f - SmoothStep(s_state.wheelRPM / 0.42f);
+    const float converterMultiplication =
+        1.0f + converterSlip * launchBand * Clamp01(throttle) * 0.90f;
+    output *= converterMultiplication;
+  }
 
   // RPM boleh mentok limiter, tapi gaya roda wajib habis setelah rasio gigi
   // mencapai redline. Ini yang mencegah gigi 1 narik tanpa batas.
@@ -536,8 +550,10 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
       // Converter D boleh slip sedikit, tapi RPM utamanya tetap ikut rasio
       // dan kecepatan jalan. Hasilnya upshift menurunkan RPM, bukan rebound.
       const float converterSlip = 1.0f - Clamp01(clutchEngagement);
-      target += converterSlip *
-                (0.035f + std::pow(pedal, 0.70f) * 0.20f);
+      const float stallRise =
+          0.04f + std::pow(pedal, 0.70f) * 0.24f;
+      target =
+          std::max(target, s_state.idleRPM + converterSlip * stallRise);
     } else if (clutchEngagement < 0.995f) {
       const float discSlip =
           std::pow(1.0f - Clamp01(clutchEngagement), 1.35f);
@@ -608,7 +624,7 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
       vehicle, data, gear, maxGear, clutchEngagement, throttle, brake,
       speedMps, engineOn, dt, automaticMode);
   UpdateDriveTorque(gear, maxGear, clutchEngagement, throttle, brake,
-                    engineOn, dt);
+                    engineOn, automaticMode, dt);
   return stalled || environmentStall;
 }
 

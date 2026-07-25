@@ -87,7 +87,7 @@ float AutomaticSUpRPM = 0.84f;
 float AutomaticSDownRPM = 0.34f;
 float AutomaticKickdownThrottle = 0.72f;
 float AutomaticSTorqueBoost = 0.10f;
-float AutomaticDKeyboardThrottle = 0.62f;
+float AutomaticDKeyboardThrottle = 1.00f;
 float AutomaticKickdownDelay = 0.65f;
 bool AutomaticTCC = true;
 bool AutomaticFluidOverheat = true;
@@ -277,7 +277,9 @@ void ReadConfig(HMODULE module) {
     AutomaticSTorqueBoost =
         ReadFloat("Automatic", "SportTorqueBoost", 0.10f, ini);
     AutomaticDKeyboardThrottle =
-        ReadFloat("Automatic", "DKeyboardThrottle", 0.62f, ini);
+        ReadFloat("Automatic", "DKeyboardThrottle", 1.00f, ini);
+    if (drivetrainSchema < 8)
+        AutomaticDKeyboardThrottle = 1.00f;
     AutomaticKickdownDelay =
         ReadFloat("Automatic", "KickdownDelay", 0.65f, ini);
     AutomaticTCC =
@@ -391,9 +393,9 @@ void ReadConfig(HMODULE module) {
 
     // Auto-create if the file doesn't exist yet
     if (GetFileAttributesA(ini) == INVALID_FILE_ATTRIBUTES ||
-        drivetrainSchema < 7) {
+        drivetrainSchema < 8) {
         SaveConfig(module);
-        WriteInt("Internal", "DrivetrainSchema", 7, ini);
+        WriteInt("Internal", "DrivetrainSchema", 8, ini);
     }
 }
 

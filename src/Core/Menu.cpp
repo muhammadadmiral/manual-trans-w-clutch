@@ -319,9 +319,9 @@ void Menu::Initialize() {
       "S Pedal Response", MenuItem::Float, &Config::AutomaticSTorqueBoost,
       0.01f, 0.00f, 0.50f));
   automatic.items.push_back(MenuItem(
-      "D Keyboard Pedal", MenuItem::Float,
+      "D Keyboard Ceiling", MenuItem::Float,
       &Config::AutomaticDKeyboardThrottle,
-      0.01f, 0.30f, 0.90f));
+      0.01f, 0.30f, 1.00f));
   automatic.items.push_back(MenuItem(
       "Kickdown Delay", MenuItem::Float, &Config::AutomaticKickdownDelay,
       0.05f, 0.20f, 1.50f));

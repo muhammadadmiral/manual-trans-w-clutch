@@ -251,7 +251,7 @@ void ScriptMain() {
       const VehicleOffsets &off = VehicleData::GetResolvedOffsets();
       const std::string bv = VehicleData::GetGameBuildVersion();
       char notify[256]{};
-      sprintf_s(notify, "Manual trans r20: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
+      sprintf_s(notify, "Manual trans r21: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
                 VehicleData::GetOffsetSourceName(),
                 bv.empty() ? "?" : bv.c_str(), off.Gear, off.NextGear, off.RPM,
                 off.Clutch);
@@ -660,7 +660,7 @@ void ScriptMain() {
       rawThrottle =
           std::min(rawThrottle,
                    std::clamp(Config::AutomaticDKeyboardThrottle,
-                              0.30f, 0.90f));
+                              0.30f, 1.00f));
     }
 
     // ── Subsystem updates ─────────────────────────────────────────────────

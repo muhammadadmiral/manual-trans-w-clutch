@@ -243,14 +243,10 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
                                throttle * 0.08f - unlockAmount,
                            sport ? 0.58f : 0.48f, 1.0f)
                : 0.0f;
-  float nativeCoupling = converterCoupling;
-  if (engineOn && std::fabs(signedSpeedMps) < 8.0f) {
-    const float transferFloor =
-        (sport ? 0.66f : 0.62f) + throttle * (sport ? 0.22f : 0.18f);
-    nativeCoupling =
-        (std::max)(nativeCoupling,
-                   std::clamp(transferFloor, 0.0f, 0.92f));
-  }
+  // Field clutch GTA bukan torque converter. Kalau nilainya ikut slip
+  // hidraulik, Enhanced nggak meneruskan torsi sama sekali saat launch.
+  // Carrier native dikunci; slip dan beban converter tetap dihitung terpisah.
+  const float nativeCoupling = engineOn ? 1.0f : 0.0f;
   s_state.tccLocked =
       Config::AutomaticTCC && s_state.currentGear >= 3 &&
       std::fabs(signedSpeedMps) > 14.0f && throttle > 0.05f &&
@@ -350,7 +346,6 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
   if (s_state.hillCreepFailure) {
     s_state.hydraulicCoupling =
         (std::min)(s_state.hydraulicCoupling, 0.42f);
-    s_state.coupling = (std::min)(s_state.coupling, 0.42f);
   }
   const DWORD elapsedSinceShift = now - s_state.lastShiftTime;
   if (elapsedSinceShift < delayMs)
