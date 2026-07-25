@@ -643,8 +643,13 @@ void ScriptMain() {
     // Memory writes + lights
     LightsLogic::Update(vehicle, data, manualGear,
                         InputHandler::GetSmoothedBrake(), throttle);
-    if (!automaticMode)
+    if (automaticMode) {
+      AutomaticGearbox::ApplyToMemory(vehicle, data, manualGear);
+    } else {
+      GearLogic::ApplyToMemory(vehicle, data, manualGear, maxGear,
+                               simulatedClutch, throttle, speedKmH);
       ClutchSystem::ApplyToVehicle(data, manualGear, forwardSpeed);
+    }
 
     static DWORD s_lastStatusLog = 0;
     if (GetTickCount() - s_lastStatusLog > 1000) {
@@ -704,7 +709,7 @@ void ScriptMain() {
 
     if (Config::OverlayBars && !Menu::IsOpen()) {
       Renderer::DrawPedalsOverlay(rpm,
-                                  automaticMode ? 0.0f : simulatedClutch,
+                                  automaticMode ? -1.0f : simulatedClutch,
                                   throttle,
                                   InputHandler::GetSmoothedBrake());
       Renderer::DrawSimulationOverlay(

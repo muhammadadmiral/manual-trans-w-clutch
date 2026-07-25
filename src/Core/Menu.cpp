@@ -107,6 +107,18 @@ void Menu::Initialize() {
       MenuItem("Overlay Status UI", MenuItem::Bool, &Config::DebugOverlay));
   hud.items.push_back(
       MenuItem("Overlay Pedal Bars", MenuItem::Bool, &Config::OverlayBars));
+  hud.items.push_back(MenuItem("Overlay X", MenuItem::Float,
+                               &Config::OverlayPosX,
+                               0.01f, 0.00f, 0.85f));
+  hud.items.push_back(MenuItem("Overlay Y", MenuItem::Float,
+                               &Config::OverlayPosY,
+                               0.01f, 0.05f, 0.85f));
+  hud.items.push_back(MenuItem("Bar Width", MenuItem::Float,
+                               &Config::OverlayBarWidth,
+                               0.01f, 0.06f, 0.20f));
+  hud.items.push_back(MenuItem("Bar Height", MenuItem::Float,
+                               &Config::OverlayBarHeight,
+                               0.002f, 0.008f, 0.030f));
   menus.push_back(hud);
 
   // 4: Controls / Keybinds
@@ -255,7 +267,7 @@ void Menu::Initialize() {
   menus.push_back(gearbox);
 
   Submenu automatic;
-  automatic.title = "AUTOMATIC D / S";
+  automatic.title = "AUTOMATIC D/S/L";
   automatic.items.push_back(MenuItem(
       "Brake Interlock", MenuItem::Bool, &Config::AutomaticBrakeInterlock));
   automatic.items.push_back(MenuItem(

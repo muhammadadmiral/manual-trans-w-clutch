@@ -114,6 +114,9 @@
     <ClCompile Include="src\Vehicle\Engine\LaunchControl.cpp">
       <Filter>Source Files\Vehicle\Engine</Filter>
     </ClCompile>
+    <ClCompile Include="src\Vehicle\Engine\PedalModel.cpp">
+      <Filter>Source Files\Vehicle\Engine</Filter>
+    </ClCompile>
     <ClCompile Include="src\Vehicle\Engine\TractionControl.cpp">
       <Filter>Source Files\Vehicle\Engine</Filter>
     </ClCompile>
@@ -124,6 +127,9 @@
       <Filter>Source Files\Vehicle\Gears</Filter>
     </ClCompile>
     <ClCompile Include="src\Vehicle\Gears\GearboxSystem.cpp">
+      <Filter>Source Files\Vehicle\Gears</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Vehicle\Gears\AutomaticGearbox.cpp">
       <Filter>Source Files\Vehicle\Gears</Filter>
     </ClCompile>
     <ClCompile Include="src\Vehicle\LightsLogic.cpp">
@@ -188,6 +194,9 @@
     <ClInclude Include="src\Vehicle\Engine\LaunchControl.h">
       <Filter>Header Files\Vehicle\Engine</Filter>
     </ClInclude>
+    <ClInclude Include="src\Vehicle\Engine\PedalModel.h">
+      <Filter>Header Files\Vehicle\Engine</Filter>
+    </ClInclude>
     <ClInclude Include="src\Vehicle\Engine\TractionControl.h">
       <Filter>Header Files\Vehicle\Engine</Filter>
     </ClInclude>
@@ -198,6 +207,9 @@
       <Filter>Header Files\Vehicle\Gears</Filter>
     </ClInclude>
     <ClInclude Include="src\Vehicle\Gears\GearboxSystem.h">
+      <Filter>Header Files\Vehicle\Gears</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vehicle\Gears\AutomaticGearbox.h">
       <Filter>Header Files\Vehicle\Gears</Filter>
     </ClInclude>
     <ClInclude Include="src\Vehicle\LightsLogic.h">

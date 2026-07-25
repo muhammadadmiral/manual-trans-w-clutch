@@ -9,6 +9,7 @@
 // =============================================================================
 #include "Config.h"
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
@@ -117,7 +118,7 @@ std::vector<int> ExcludedVehicleClasses;
 // ── Overlay ───────────────────────────────────────────────────────────────────
 bool  OverlayBars      = true;
 float OverlayPosX      = 0.02f;
-float OverlayPosY      = 0.60f;
+float OverlayPosY      = 0.22f;
 float OverlayBarWidth  = 0.12f;
 float OverlayBarHeight = 0.014f;
 
@@ -301,9 +302,14 @@ void ReadConfig(HMODULE module) {
     // Overlay
     OverlayBars      = GetPrivateProfileIntA("Overlay", "Bars",  1,   ini) != 0;
     OverlayPosX      = ReadFloat("Overlay", "PosX",      0.02f,  ini);
-    OverlayPosY      = ReadFloat("Overlay", "PosY",      0.60f,  ini);
+    OverlayPosY      = ReadFloat("Overlay", "PosY",      0.22f,  ini);
     OverlayBarWidth  = ReadFloat("Overlay", "BarWidth",  0.12f,  ini);
     OverlayBarHeight = ReadFloat("Overlay", "BarHeight", 0.014f, ini);
+    // Pindahkan layout default lama yang numpuk minimap/notifikasi.
+    if (std::fabs(OverlayPosX - 0.02f) < 0.001f &&
+        std::fabs(OverlayPosY - 0.60f) < 0.001f) {
+        OverlayPosY = 0.22f;
+    }
 
     // Auto-create if the file doesn't exist yet
     if (GetFileAttributesA(ini) == INVALID_FILE_ATTRIBUTES)

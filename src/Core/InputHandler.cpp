@@ -179,7 +179,10 @@ void ApplyGameControls(Vehicle vehicle, int manualGear, float clutch,
     // GTA memakai axis brake sebagai throttle mundur. Kita putus jalur itu
     // supaya S selalu rem, termasuk waktu mobil berhenti di gear maju/netral.
     const bool braking = finalBrake > 0.02f;
-    VEHICLE::SET_VEHICLE_BRAKE(vehicle, braking ? TRUE : FALSE);
+    const bool needsNativeBrake =
+        manualGear == -1 ? braking
+                         : (braking && forwardSpeed < 0.35f);
+    VEHICLE::SET_VEHICLE_BRAKE(vehicle, needsNativeBrake ? TRUE : FALSE);
 
     if (manualGear == -1) {
         PAD::DISABLE_CONTROL_ACTION(0, 71, true);
@@ -195,8 +198,11 @@ void ApplyGameControls(Vehicle vehicle, int manualGear, float clutch,
             PAD::DISABLE_CONTROL_ACTION(0, 71, true);
             PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalThrottle);
         }
-        if (braking) {
+        if (needsNativeBrake) {
             PAD::DISABLE_CONTROL_ACTION(0, 72, true);
+        } else if (std::fabs(finalBrake - s_smoothedBrake) > 0.005f) {
+            PAD::DISABLE_CONTROL_ACTION(0, 72, true);
+            PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, finalBrake);
         }
     }
     (void)forwardSpeed;

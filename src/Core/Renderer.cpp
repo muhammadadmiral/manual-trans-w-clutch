@@ -183,8 +183,10 @@ void DrawPedalsOverlay(float rpm, float clutch, float throttle, float brake) {
 
     DrawBar(barX, y, barWidth, barHeight, rpm, 255, 60, 60, "RPM");
     y += gap;
-    DrawBar(barX, y, barWidth, barHeight, clutch, 60, 200, 255, "CLUTCH");
-    y += gap;
+    if (clutch >= 0.0f) {
+        DrawBar(barX, y, barWidth, barHeight, clutch, 60, 200, 255, "CLUTCH");
+        y += gap;
+    }
     DrawBar(barX, y, barWidth, barHeight, throttle, 60, 255, 100, "THROTTLE");
     y += gap;
     DrawBar(barX, y, barWidth, barHeight, brake, 255, 100, 100, "BRAKE");
