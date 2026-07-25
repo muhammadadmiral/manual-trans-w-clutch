@@ -389,21 +389,7 @@ void ScriptMain() {
       continue;
     }
 
-    // Continuous mid-session sanity check (calibration offsets can drift)
-    if (!data.HasPlausibleLayout(maxGear > 0 ? maxGear : 6)) {
-      activeLayoutValid = false;
-      LOG_ERROR(Memory,
-                "Mid-session plausibility FAILED: G=%u N=%u RPM=%.4f CLT=%.4f "
-                "maxGear=%d "
-                "Disabling for this vehicle.",
-                data.GetGear(), data.GetNextGear(), data.GetRPM(),
-                data.GetClutch(), maxGear);
-      Renderer::ShowNotification("Manual trans: memory layout invalid — "
-                                 "disabling. Try recalibrating.");
-      Menu::Draw();
-      continue;
-    }
-
+    // Removed mid-session plausibility check to prevent false positives when spawning new vehicles
     // Deluxo hover-mode: skip manual trans logic when hovering
     if (data.GetHoverTransformRatioLerp() > 0.0f) {
       LOG_DEBUG_T(Script, 3000, "Deluxo hover active — skipping");
@@ -438,8 +424,10 @@ void ScriptMain() {
 
     static DWORD s_lastStatusLog = 0;
     if (GetTickCount() - s_lastStatusLog > 1000) {
-      LOG_INFO(Gear, "STATUS: Gear=%d SimClutch=%.3f MemClutch=%.3f Throttle=%.3f RPM=%.3f Speed=%.1f",
-               manualGear, simulatedClutch, data.GetClutch(), tcsThrottle, rpm, speedKmH);
+      LOG_INFO(Gear, "STATUS: Gear=%d SimClutch=%.3f MemClutch=%.3f Throttle=%.3f Brake=%.3f RPM=%.3f SpeedKmH=%.1f | TCS=%.2f ABS=%.2f | Sig=%d Rev=%d",
+               manualGear, simulatedClutch, data.GetClutch(), tcsThrottle, absBrake, rpm, speedKmH, 
+               TractionControl::IsTCSActive() ? 1.0f : 0.0f, TractionControl::IsABSActive() ? 1.0f : 0.0f,
+               activeSignal, (manualGear == -1) ? 1 : 0);
       s_lastStatusLog = GetTickCount();
     }
 
