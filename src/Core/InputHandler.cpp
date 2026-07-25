@@ -226,7 +226,15 @@ void ApplyGameControls(int manualGear, float clutch, float rpm, int /*maxGear*/,
     if (finalSteer > 0.005f || finalSteer < -0.005f)
         PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 0, finalSteer);
 
-    if (manualGear == -1) {
+    if (manualGear == 0) {
+        // True neutral must never let GTA's stock automatic apply forward
+        // drive. Engine RPM remains handled by the transmission memory state.
+        PAD::DISABLE_CONTROL_ACTION(0, 71, true);
+        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, 0.0f);
+        if (finalBrake > 0.02f)
+            PAD::SET_CONTROL_VALUE_NEXT_FRAME(0,
+                forwardSpeed > 0.1f ? 72 : 76, finalBrake);
+    } else if (manualGear == -1) {
         // Reverse gear — swap throttle/brake controls
         PAD::DISABLE_CONTROL_ACTION(0, 71, true);
         PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, finalThrottle);

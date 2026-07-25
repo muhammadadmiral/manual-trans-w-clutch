@@ -60,6 +60,7 @@ public:
   float GetGearRatio(uint8_t gearIndex) const;
 
   float GetDriveForce() const;
+  void SetDriveForce(float force);
 
 private:
   uintptr_t m_address;

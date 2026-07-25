@@ -87,6 +87,7 @@ public:
     float   GetClutch()                  const;
     float   GetRPM()                     const;
     float   GetDriveForce()              const;
+    float   GetOriginalDriveForce()      const;
     float   GetFuelLevel()               const;
     uint8_t GetLightsBroken()            const;
     uint8_t GetLightsVisuallyBroken()    const;
@@ -99,6 +100,7 @@ public:
     bool SetTopGear(uint8_t gear);
     bool SetClutch(float clutch);
     bool SetRPM(float rpm);
+    bool SetDriveForce(float force);
     bool SetLightsBroken(uint8_t state);
     bool SetLightsVisuallyBroken(uint8_t state);
 
@@ -116,6 +118,10 @@ private:
     static std::string         lastFailureReason;
 
     // ── Private helpers ───────────────────────────────────────────────────────
+    // Cache for original handling values
+    float m_originalDriveForce = -1.0f;
+
+    // Helpers
     static bool ResolveOffsetsByPattern(VehicleOffsets& result);
     static bool LoadOffsetsFromIni     (HMODULE pluginModule, VehicleOffsets& result);
     static void SaveOffsetsToIni       (HMODULE pluginModule, const VehicleOffsets& offsets);

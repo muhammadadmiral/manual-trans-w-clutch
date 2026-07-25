@@ -193,6 +193,16 @@ bool VehicleData::LoadOffsetsFromIni(HMODULE pluginModule, VehicleOffsets& resul
         out.LightsVisuallyBroken  = ReadHexOffset(iniPath, section, "LightsVisuallyBroken");
         out.HoverTransformRatioLerp = ReadHexOffset(iniPath, section, "HoverTransformRatioLerp");
         out.GearRatios            = ReadHexOffset(iniPath, section, "GearRatios");
+        
+        // Backwards compatibility for old INIs that didn't save TopGear
+        if (out.TopGear == 0 && out.NextGear != 0) {
+            out.TopGear = out.NextGear + 2;
+        }
+        
+        // Hardcode DriveForce if missing (0x60 is stable across all known GTA V builds)
+        if (out.DriveForce == 0) {
+            out.DriveForce = 0x60;
+        }
     };
 
     // Prefer version-specific section (e.g. [Offsets.1.0.3274.0])
@@ -353,7 +363,14 @@ VehicleData::VehicleData(int vehicleHandle)
     : m_vehicle(reinterpret_cast<uintptr_t>(getScriptHandleBaseAddress(vehicleHandle)),
                 &resolvedOffsets),
       m_isValid(m_vehicle.IsValid())
-{}
+{
+    auto h = m_vehicle.GetHandlingData();
+    if (h.IsValid()) {
+        m_originalDriveForce = h.GetDriveForce();
+    } else {
+        m_originalDriveForce = -1.0f;
+    }
+}
 
 bool VehicleData::CanRead (uint32_t offset, size_t) const { return m_isValid && offset != 0; }
 bool VehicleData::CanWrite(uint32_t offset, size_t) const { return m_isValid && offset != 0; }
@@ -393,6 +410,10 @@ float VehicleData::GetDriveForce() const {
     return h.IsValid() ? h.GetDriveForce() : 0.0f;
 }
 
+float VehicleData::GetOriginalDriveForce() const {
+    return m_originalDriveForce;
+}
+
 float VehicleData::GetGearRatio(uint8_t gear) const {
     if (!m_isValid) return 0.0f;
     auto h = m_vehicle.GetHandlingData();
@@ -423,6 +444,13 @@ bool VehicleData::SetClutch(float clutch) {
 bool VehicleData::SetRPM(float rpm) {
     if (!m_isValid || !std::isfinite(rpm)) return false;
     m_vehicle.SetRPM(rpm);
+    return true;
+}
+bool VehicleData::SetDriveForce(float force) {
+    if (!m_isValid) return false;
+    auto h = m_vehicle.GetHandlingData();
+    if (!h.IsValid()) return false;
+    h.SetDriveForce(force);
     return true;
 }
 bool VehicleData::SetLightsBroken(uint8_t state) {

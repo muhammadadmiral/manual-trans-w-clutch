@@ -124,26 +124,26 @@ void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
   const float memoryClutch = 1.0f - clutch;
 
   if (manualGear == 0) {
-    // Neutral: 0xFF is the actual neutral gear in GTA V memory.
-    // We force the clutch to fully OPEN (0.0f) so no torque can reach the wheels,
-    // regardless of whether the pedal is pressed or not.
+    // 0xFF is GTA V's neutral sentinel.  Do not emulate neutral by selecting
+    // first gear: when DriveForce is unavailable that lets the stock automatic
+    // transmission pull away and shift normally.
     data.SetGear(0xFF);
     data.SetNextGear(0xFF);
-    data.SetTopGear(0xFF);
     data.SetClutch(0.0f); 
+    data.SetDriveForce(0.0f);
   } else if (manualGear == -1) {
     // Reverse: GTA V uses Gear 0 for reverse.
     data.SetGear(0);
     data.SetNextGear(0);
-    data.SetTopGear(0);
     data.SetClutch(memoryClutch); 
+    data.SetDriveForce(data.GetOriginalDriveForce());
   } else {
     // Forward gears
     const uint8_t targetGear = static_cast<uint8_t>(manualGear);
     data.SetGear(targetGear);
     data.SetNextGear(targetGear);
-    data.SetTopGear(targetGear);
     data.SetClutch(memoryClutch);
+    data.SetDriveForce(data.GetOriginalDriveForce());
   }
 }
 

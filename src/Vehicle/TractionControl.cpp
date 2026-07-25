@@ -31,11 +31,13 @@ void Update(Vehicle vehicle, VehicleData &data, float speedKmH, float rpm,
   // pattern scanning for CWheel. We simulate it using Engine RPM, Gear Ratio, 
   // and Ground Speed.
   
-  float gearRatio = data.GetGearRatio(gear > 0 ? gear : 1);
-  if (gearRatio <= 0.0f) gearRatio = 1.0f;
+  const float gearRatio = data.GetGearRatio(gear > 0 ? gear : 1);
+  const bool hasReliableRatio = std::isfinite(gearRatio) && gearRatio > 0.05f;
   
   // Theoretical ground speed if wheels have 100% grip (RPM -> Speed)
-  float theoreticalSpeed = (rpm * 8000.0f) / (gearRatio * 100.0f); 
+  const float theoreticalSpeed = hasReliableRatio
+      ? (rpm * 8000.0f) / (gearRatio * 100.0f)
+      : speedKmH;
   
   // Slip is the difference between theoretical wheel speed and actual ground speed
   float slip = theoreticalSpeed - speedKmH;
@@ -43,7 +45,11 @@ void Update(Vehicle vehicle, VehicleData &data, float speedKmH, float rpm,
   // ── 2. Traction Control System (TCS) ─────────────────────────────────────
   // If clutch is open (pedal pressed > 0.5f), power isn't going to wheels, so no TCS.
   // Also disable TCS at very low speeds (< 15 km/h) to allow launching and rev-matching without throttle cut!
-  if (s_state.tcsEnabled && gear > 0 && finalThrottle > 0.1f && clutch < 0.5f && speedKmH > 15.0f) {
+  // Never synthesize a ratio when GearRatios was not resolved.  The old
+  // fallback (ratio=1) interpreted normal engine RPM as permanent wheelspin
+  // and cut forward throttle to zero every frame.
+  if (s_state.tcsEnabled && hasReliableRatio && gear > 0 &&
+      finalThrottle > 0.1f && clutch < 0.5f && speedKmH > 15.0f) {
     // If wheels are spinning much faster than we are moving
     if (slip > 15.0f) { 
       // Calculate how much we need to cut throttle

@@ -83,7 +83,8 @@ bool UpdatePostGear(Vehicle vehicle, VehicleData &data, int manualGear,
 
   // ── 1. Engine Braking ────────────────────────────────────────────────────
   EngineBrakeState &ebs = s_state.engineBrake;
-  if (manualGear > 0 && isEngineOn && clutch > 0.6f) {
+  // Engine braking happens when clutch is ENGAGED (simulatedClutch < 0.4f)
+  if (manualGear > 0 && isEngineOn && clutch < 0.4f) {
     float gearRatio    = data.GetGearRatio(static_cast<uint8_t>(manualGear));
     float topGearRatio = data.GetGearRatio(static_cast<uint8_t>(maxGear));
     if (gearRatio > 0.0f && topGearRatio > 0.0f) {

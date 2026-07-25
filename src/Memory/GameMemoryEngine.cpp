@@ -141,6 +141,15 @@ uint8_t CVehicle::GetLightsBroken() const {
   }
 }
 
+void CHandlingData::SetDriveForce(float force) {
+  if (!IsValid() || m_offsets->DriveForce == 0)
+    return;
+  __try {
+    *reinterpret_cast<float *>(m_address + m_offsets->DriveForce) = force;
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+  }
+}
+
 uint8_t CVehicle::GetLightsVisuallyBroken() const {
   if (!IsValid())
     return 0;
