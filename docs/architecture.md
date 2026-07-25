@@ -9,7 +9,7 @@ GTA controls
     ├── PedalModel ─────> brake-throttle override / heel-toe window
     ├── GearLogic ──────> manual Gear / NextGear
     ├── AutomaticGearbox> selector P-R-N-D-S-L2-L1 dan shift map
-    ├── ClutchSystem ───> fClutch
+    ├── ClutchSystem ───> engagement / slip / heat / signed actuator
     ├── EngineModel ────> observasi RPM, load, creep, stall
     ├── TractionControl > throttle cut bila CWheel valid
     └── BrakeSystem ────> brake modulation bila CWheel valid
@@ -23,8 +23,8 @@ GTA controls
    EV/scooter dikunci ke automatic; mode Off tidak menulis gear.
 3. Bentuk travel clutch manual atau coupling torque-converter automatic.
 4. Proses selector/shift, pedal overlap, TCS, dan ABS.
-5. Tulis gear dan kapasitas clutch. Pedal clutch mentok membuat physical gear
-   netral, tetapi logical gear tidak berubah.
+5. Tulis gear dan signed clutch actuator. Pedal clutch mentok memakai gear 1
+   sebagai carrier free-rev, tetapi logical gear tidak berubah.
 6. Jalankan load/stall, launch soft-cut, turbo telemetry, dan shift shock.
 7. Ulangi write drivetrain sebagai write terakhir, lalu update lampu, HUD, log,
    dan telemetry.
@@ -34,11 +34,11 @@ alamat pointer sendiri.
 
 ## Otoritas engine
 
-Mod tidak menulis `fCurrentRPM`, throttle internal, atau cheat-power multiplier.
-Ini mencegah satu template RPM/kecepatan diterapkan ke semua kendaraan dan
-menjaga first-person tachometer memakai state yang sama dengan audio engine.
-Write memory aktif dibatasi ke gear, next gear, dan clutch; field RPM/throttle
-tetap tersedia di facade hanya untuk kompatibilitas resolver dan kalibrasi.
+Mod tidak menulis `fCurrentRPM` atau throttle internal. Ini mencegah satu
+template RPM/kecepatan diterapkan ke semua kendaraan dan menjaga first-person
+tachometer memakai state yang sama dengan audio engine. Write memory aktif
+dibatasi ke gear, next gear, dan clutch. Native power multiplier hanya memberi
+karakter torsi S dan kembali `1.0` saat mode Off atau sesi selesai.
 
 ## Aturan fail-open
 

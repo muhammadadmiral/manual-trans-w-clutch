@@ -108,5 +108,7 @@ maju/netral diblok dari reverse axis GTA sehingga fungsinya tetap rem saja.
 
 Write hanya dilakukan pada offset yang punya pola atau relasi layout
 terverifikasi. TCS/ABS otomatis tidak mengintervensi bila `CWheel` tidak
-ter-resolve. INI lama yang menyimpan clutch sebagai `RPM+0x4` dikoreksi menjadi
-`RPM+0xC` saat load.
+ter-resolve. Clutch wajib mengikuti relasi signature `RPM+0xC`, sedangkan
+offset throttle lama diabaikan karena input engine tetap dari control native.
+Runtime hanya menulis gear/next gear/clutch. Native power multiplier bernilai
+`1.0` kecuali mode S dan selalu dipulihkan saat mod Off/keluar mobil.

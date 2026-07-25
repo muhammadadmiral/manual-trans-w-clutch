@@ -200,7 +200,7 @@ float CVehicle::GetFuelLevel() const {
 }
 
 float CVehicle::GetHoverTransformRatioLerp() const {
-  if (!IsValid())
+  if (!IsValid() || m_offsets->HoverTransformRatioLerp == 0)
     return 0.0f;
   __try {
     return *reinterpret_cast<float *>(m_address +
@@ -211,7 +211,7 @@ float CVehicle::GetHoverTransformRatioLerp() const {
 }
 
 uint8_t CVehicle::GetLightsBroken() const {
-  if (!IsValid())
+  if (!IsValid() || m_offsets->LightsBroken == 0)
     return 0;
   __try {
     return *reinterpret_cast<uint8_t *>(m_address + m_offsets->LightsBroken);
@@ -230,7 +230,7 @@ void CHandlingData::SetDriveForce(float force) {
 }
 
 uint8_t CVehicle::GetLightsVisuallyBroken() const {
-  if (!IsValid())
+  if (!IsValid() || m_offsets->LightsVisuallyBroken == 0)
     return 0;
   __try {
     return *reinterpret_cast<uint8_t *>(m_address +

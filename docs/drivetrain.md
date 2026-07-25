@@ -13,15 +13,20 @@ Pedal bernilai `0` saat dilepas dan `1` saat diinjak. Free play dan bite range
 diubah dengan smoothstep menjadi engagement `0..1`.
 
 - logical gear tetap terpilih ketika pedal diinjak;
-- `fClutch` membentuk torque capacity di bite range;
+- engagement model membentuk torque capacity di bite range;
 - pedal mentok juga menulis physical gear netral sebagai hard-disconnect,
   lalu logical gear masuk kembali saat pedal melewati bite point;
 - pelepasan pelan menaikkan torque capacity bertahap;
 - pelepasan cepat menghasilkan perubahan capacity cepat;
 - dump terdeteksi dari laju release pedal, bukan hanya posisi akhirnya;
-- dump memberi shock feedback; hentakan fisik utamanya tetap berasal dari
-  perubahan kapasitas clutch native;
+- dump memberi shock feedback; hentakan fisik mengikuti perubahan coupling;
 - slip menambah heat dan heat tinggi mengurangi capacity.
+
+Actuator clutch GTA bersifat signed: `1` terhubung penuh, sedangkan nilai
+negatif dipakai untuk hard-open. Saat netral/kopling penuh, physical gear 1
+menjadi carrier agar throttle GTA tetap bisa free-rev tanpa menulis RPM.
+Sentinel `255` tidak dipakai karena Enhanced dapat menafsirkannya sebagai
+permintaan auto-forward.
 
 Keyboard hanya punya dua state, jadi kecepatan release berasal dari
 `ClutchRelease`. Pedal analog dibutuhkan untuk membedakan release pelan dan dump
@@ -90,7 +95,8 @@ driveline sebentar pada shift. EV tetap automatic dan tidak menyediakan manual.
 W selalu dibaca sebagai throttle. Di R, W dipetakan ke reverse axis GTA. S
 selalu menjadi brake: pada gear maju/netral, reverse axis diblok saat kendaraan
 nyaris berhenti sehingga menahan S tidak bisa mengambil alih dan memundurkan
-kendaraan.
+kendaraan. Echo reverse-axis dari frame sebelumnya dibuang dari pembacaan brake,
+jadi injeksi W di R tidak menyalakan rem pada frame berikutnya.
 
 Gas+rem yang ditahan bersamaan memicu brake-throttle override setelah delay,
 kecuali clutch manual sedang terbuka untuk heel-toe/rev-match atau launch

@@ -178,7 +178,7 @@ void ApplyGameControls(Vehicle vehicle, int manualGear, float clutch,
 {
     const float finalThrottle = Clamp01(driveThrottle);
     const float finalBrake = Clamp01(driveBrake);
-    const bool hardDisconnect = IsClutchDown() || clutch >= 0.98f;
+    const bool hardDisconnect = IsClutchDown() || clutch >= 0.88f;
     const float clutchCoupling =
         hardDisconnect ? 0.0f : (1.0f - Clamp01(clutch));
     s_driveCoupling = manualGear == 0 ? 0.0f : clutchCoupling;
@@ -192,14 +192,25 @@ void ApplyGameControls(Vehicle vehicle, int manualGear, float clutch,
     VEHICLE::SET_VEHICLE_BRAKE(vehicle, needsNativeBrake ? TRUE : FALSE);
 
     if (manualGear == -1) {
-        PAD::DISABLE_CONTROL_ACTION(0, 71, true);
-        if (braking) {
-            PAD::DISABLE_CONTROL_ACTION(0, 72, true);
+        if (hardDisconnect) {
+            // Saat clutch terbuka, carrier ada di gear 1 supaya GTA bisa
+            // free-rev lewat axis throttle biasa.
+            if (std::fabs(finalThrottle - s_smoothedThrottle) > 0.005f) {
+                PAD::DISABLE_CONTROL_ACTION(0, 71, true);
+                PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalThrottle);
+            }
+            if (braking)
+                PAD::DISABLE_CONTROL_ACTION(0, 72, true);
         } else {
-            // W dibaca dari control 71, tapi drivetrain reverse GTA bergerak
-            // lewat control 72. Jangan disable target sebelum reinjection.
-            PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, finalThrottle);
-            s_reverseInjectedBrakeAxis = finalThrottle;
+            PAD::DISABLE_CONTROL_ACTION(0, 71, true);
+            if (braking) {
+                PAD::DISABLE_CONTROL_ACTION(0, 72, true);
+            } else {
+                // W dibaca dari control 71, tapi drivetrain reverse GTA
+                // bergerak lewat control 72 setelah clutch mulai menggigit.
+                PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, finalThrottle);
+                s_reverseInjectedBrakeAxis = finalThrottle;
+            }
         }
     } else {
         if (std::fabs(finalThrottle - s_smoothedThrottle) > 0.005f) {

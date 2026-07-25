@@ -6,7 +6,7 @@
 #include <cstring>
 
 bool VehicleOffsets::IsCompleteCore() const {
-  return Gear != 0 && NextGear != 0 && RPM != 0;
+  return Gear != 0 && NextGear != 0 && Clutch != 0 && RPM != 0;
 }
 
 static bool TryReadU32(uintptr_t address, uint32_t &value) {
@@ -32,11 +32,12 @@ bool OffsetResolver::ScanPatterns(VehicleOffsets &outOffsets,
   VehicleOffsets offsets{};
   uintptr_t addr = 0;
 
-  // RPM aman dibaca. Offset di sebelahnya jangan langsung dianggap clutch
-  // atau throttle; layout Enhanced sudah beda dan salah tulis di sini fatal.
+  // Signature ini memberi RPM dan actuator clutch. Throttle internal sengaja
+  // tetap nonaktif karena runtime cukup memakai control native GTA.
   addr = AOBScanner::FindUnique(
       "76 03 0F 28 F0 F3 44 0F 10 93 ? ? ? ?");
   if (addr != 0 && TryReadU32(addr + 10, offsets.RPM)) {
+    offsets.Clutch = offsets.RPM + 0xC;
   } else {
     // Older fallback retained for builds whose surrounding code changed.
     addr = AOBScanner::FindUnique("F6 83 ? ? ? ? 07 75 ? 44 0F");
@@ -44,6 +45,7 @@ bool OffsetResolver::ScanPatterns(VehicleOffsets &outOffsets,
       outFailureReason = "Could not resolve the RPM pattern.";
       return false;
     }
+    offsets.Clutch = offsets.RPM + 0xC;
   }
 
   // 2. Core Transmission (Gear / NextGear / TopGear / GearRatios)
@@ -120,6 +122,9 @@ bool OffsetResolver::ScanPatterns(VehicleOffsets &outOffsets,
 }
 
 void OffsetResolver::EnrichOptionalOffsets(VehicleOffsets &offsets) {
+  if (offsets.RPM != 0)
+    offsets.Clutch = offsets.RPM + 0xC;
+
   // CVehicle::m_handlingData. The handling fields below are offsets inside
   // CHandlingData, not displacements from CVehicle.
   uintptr_t addr = AOBScanner::FindUnique(

@@ -150,6 +150,7 @@ bool VehicleData::AreOffsetsSane(const VehicleOffsets& v) {
     const uint32_t gDist = v.Gear > v.NextGear ? v.Gear - v.NextGear
                                                 : v.NextGear - v.Gear;
     if (gDist == 0 || gDist > 0x20) return false;
+    if (v.Clutch != v.RPM + 0xC) return false;
 
     if ((v.RPM & 3) != 0) return false;
     if (v.Clutch != 0 &&
@@ -211,14 +212,19 @@ bool VehicleData::LoadOffsetsFromIni(HMODULE pluginModule, VehicleOffsets& resul
         
         // Backwards compatibility for old INIs that didn't save TopGear
         if (out.TopGear == 0 && out.NextGear != 0) {
-            out.TopGear = out.NextGear + 2;
+            out.TopGear = out.NextGear + 6;
         }
 
-        if (out.Clutch != 0 || out.Throttle != 0) {
+        if (out.RPM != 0 && out.Clutch != out.RPM + 0xC) {
             LOG_WARN(Memory,
-                     "Unsafe legacy actuator offsets ignored: CLT=0x%X THR=0x%X",
-                     out.Clutch, out.Throttle);
-            out.Clutch = 0;
+                     "Correcting clutch relation: 0x%X -> 0x%X",
+                     out.Clutch, out.RPM + 0xC);
+            out.Clutch = out.RPM + 0xC;
+        }
+        if (out.Throttle != 0) {
+            LOG_WARN(Memory,
+                     "Unsafe legacy throttle offset ignored: THR=0x%X",
+                     out.Throttle);
             out.Throttle = 0;
         }
         if (out.GearRatios == 0 && out.NextGear != 0 &&
@@ -333,6 +339,7 @@ bool VehicleData::Initialize(HMODULE pluginModule) {
         initialized     = true;
         LOG_INFO(Init, "INI fallback OK — G=0x%X N=0x%X RPM=0x%X CLT=0x%X",
                  candidate.Gear, candidate.NextGear, candidate.RPM, candidate.Clutch);
+        SaveOffsetsToIni(pluginModule, candidate);
         return true;
     }
 
@@ -421,6 +428,7 @@ bool VehicleData::HasPlausibleLayout(int maxGear) const {
 
     const uint8_t gear     = GetGear();
     const uint8_t nextGear = GetNextGear();
+    const uint8_t topGear  = GetTopGear();
     const float   rpm      = GetRPM();
     const bool clutchOk =
         resolvedOffsets.Clutch == 0 ||
@@ -430,8 +438,20 @@ bool VehicleData::HasPlausibleLayout(int maxGear) const {
     // 0xFF == invalid / neutral on some vehicles
     const bool gearOk     = gear     <= static_cast<uint8_t>(maxGear + 1) || gear     == 0xFF;
     const bool nextGearOk = nextGear <= static_cast<uint8_t>(maxGear + 1) || nextGear == 0xFF;
+    const bool topGearOk =
+        resolvedOffsets.TopGear == 0 ||
+        topGear == static_cast<uint8_t>(maxGear);
+    bool ratiosOk = true;
+    if (resolvedOffsets.GearRatios != 0 && maxGear >= 2) {
+        const float reverse = GetGearRatio(0);
+        const float first = GetGearRatio(1);
+        const float second = GetGearRatio(2);
+        ratiosOk = std::isfinite(reverse) && std::isfinite(first) &&
+                   std::isfinite(second) && reverse < -0.05f &&
+                   first > second && second > 0.05f && first < 15.0f;
+    }
 
-    return gearOk && nextGearOk && clutchOk &&
+    return gearOk && nextGearOk && topGearOk && ratiosOk && clutchOk &&
            std::isfinite(rpm)    && rpm    >= -0.25f && rpm    <= 2.5f;
 }
 

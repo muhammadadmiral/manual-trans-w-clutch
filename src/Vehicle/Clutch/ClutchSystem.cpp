@@ -94,15 +94,13 @@ void ApplyToVehicle(VehicleData &data, int gear, float speedMps) {
   const bool drivelineOpen = s_state.disengagement >= 0.88f;
 
   if (gear == 0 || drivelineOpen) {
-    s_state.nativeActuator = 0.0f;
+    s_state.nativeActuator =
+        std::fabs(speedMps) < 1.0f ? -1.0f : -0.35f;
   } else {
     s_state.nativeActuator = s_state.engagement;
   }
 
-  // Jangan tulis field sekitar RPM sebelum offset actuator-nya terbukti.
-  // Coupling roda diterapkan lewat native drivetrain di orchestrator.
-  (void)data;
-  (void)speedMps;
+  data.SetClutch(s_state.nativeActuator);
 }
 
 float GetEngagement() { return s_state.engagement; }

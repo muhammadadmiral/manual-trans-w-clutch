@@ -197,24 +197,30 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
 }
 
 void ApplyToMemory(Vehicle vehicle, VehicleData &data, int activeGear) {
+  const float openClutch =
+      ENTITY::GET_ENTITY_SPEED(vehicle) < 1.0f ? -1.0f : -0.35f;
   if (s_state.selector == Selector::Park) {
-    data.SetGear(0xFF);
-    data.SetNextGear(0xFF);
+    data.SetGear(1);
+    data.SetNextGear(1);
+    data.SetClutch(openClutch);
     VEHICLE::SET_VEHICLE_HANDBRAKE(vehicle, TRUE);
     PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 76, 1.0f);
     return;
   }
 
   if (activeGear == 0) {
-    data.SetGear(0xFF);
-    data.SetNextGear(0xFF);
+    data.SetGear(1);
+    data.SetNextGear(1);
+    data.SetClutch(openClutch);
   } else if (activeGear < 0) {
     data.SetGear(0);
     data.SetNextGear(0);
+    data.SetClutch(s_state.coupling);
   } else {
     const uint8_t gear = static_cast<uint8_t>(activeGear);
     data.SetGear(gear);
     data.SetNextGear(gear);
+    data.SetClutch(s_state.coupling);
   }
 }
 

@@ -67,11 +67,14 @@ static bool OffsetsAreSane(const VehicleOffsets& v) {
     auto inRange = [&](uint32_t x){ return x >= kMin && x < kMax; };
     auto delta   = [](uint32_t a, uint32_t b){ return a > b ? a-b : b-a; };
 
-    if (!inRange(v.Gear) || !inRange(v.NextGear) || !inRange(v.RPM))
+    if (!inRange(v.Gear) || !inRange(v.NextGear) ||
+        !inRange(v.RPM) || !inRange(v.Clutch))
         return false;
     if (delta(v.Gear, v.NextGear) == 0 || delta(v.Gear, v.NextGear) > 0x20)
         return false;
-    if ((v.RPM & 3) != 0)
+    if (v.Clutch != v.RPM + 0xC)
+        return false;
+    if ((v.RPM & 3) != 0 || (v.Clutch & 3) != 0)
         return false;
     return true;
 }
@@ -240,7 +243,7 @@ static bool SearchGearLayout(uintptr_t vehicleBase,
 
 // ── SEH-safe wrapper for SearchGearLayout ────────────────────────────────────
 // MSVC C2712: __try cannot appear in a function that requires object unwinding.
-// This wrapper has ONLY POD locals (GearCluster = 4x uint32_t, no destructor),
+// This wrapper has ONLY POD locals (GearCluster = 5x uint32_t, no destructor),
 // so __try is valid here.  Never call LOG_ inside this function — std::string
 // internally used by ModLogger would violate the same rule.
 static bool SafeCallSearchGearLayout(uintptr_t vehicleBase, uint32_t rpmOffset, uint8_t realMaxGear,
@@ -469,9 +472,8 @@ bool Update(int vehicleHandle, bool isEngineOn, bool isRevving, uint8_t maxGear,
         s_idleValues    = std::move(nextIdle);
 
         // ── Gear layout search ────────────────────────────────────────────
-        // SearchGearLayout cuma menerima field yang tervalidasi. Offset
-        // actuator clutch/throttle dibiarkan nonaktif sampai ada signature
-        // terpisah yang benar-benar membuktikannya.
+        // SearchGearLayout cuma menerima field gear yang tervalidasi. Actuator
+        // clutch mengikuti displacement signature RPM; throttle tetap native.
         LOG_INFO(Calib, "Starting gear layout search for %zu RPM candidates...",
                  s_rpmCandidates.size());
 
@@ -492,7 +494,7 @@ bool Update(int vehicleHandle, bool isEngineOn, bool isRevving, uint8_t maxGear,
             // that weren't scanned here (like LightsBroken or DriveForce).
             VehicleOffsets cand = VehicleData::GetResolvedOffsets();
             cand.RPM       = rpmOff;
-            cand.Clutch = 0;
+            cand.Clutch = rpmOff + 0xC;
             cand.Throttle = 0;
 
             cand.Gear      = cluster.gearOff;

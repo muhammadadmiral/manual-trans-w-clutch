@@ -40,7 +40,7 @@ class OffsetResolver {
 public:
   // Scans the GTA V process memory to find and resolve all known CVehicle
   // offsets. Returns true if at least the core transmission offsets (Gear,
-  // NextGear, RPM) were found.
+  // NextGear, Clutch, RPM) were found.
   static bool ScanPatterns(VehicleOffsets &outOffsets,
                            std::string &outFailureReason);
 
