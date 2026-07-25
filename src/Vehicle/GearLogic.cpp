@@ -124,21 +124,25 @@ void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
   const float memoryClutch = 1.0f - clutch;
 
   if (manualGear == 0) {
-    // Neutral: GTA V doesn't have a true neutral gear value. 
-    // We simulate it by putting it in Gear 1 and forcing the clutch to OPEN (0.0).
-    data.SetGear(1);
-    data.SetNextGear(1);
+    // Neutral: 0xFF is the actual neutral gear in GTA V memory.
+    // We force the clutch to fully OPEN (0.0f) so no torque can reach the wheels,
+    // regardless of whether the pedal is pressed or not.
+    data.SetGear(0xFF);
+    data.SetNextGear(0xFF);
+    data.SetTopGear(0xFF);
     data.SetClutch(0.0f); 
   } else if (manualGear == -1) {
     // Reverse: GTA V uses Gear 0 for reverse.
     data.SetGear(0);
     data.SetNextGear(0);
+    data.SetTopGear(0);
     data.SetClutch(memoryClutch); 
   } else {
     // Forward gears
     const uint8_t targetGear = static_cast<uint8_t>(manualGear);
     data.SetGear(targetGear);
     data.SetNextGear(targetGear);
+    data.SetTopGear(targetGear);
     data.SetClutch(memoryClutch);
   }
 }

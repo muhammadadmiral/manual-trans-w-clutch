@@ -410,6 +410,11 @@ bool VehicleData::SetNextGear(uint8_t gear) {
     m_vehicle.SetNextGear(gear);
     return true;
 }
+bool VehicleData::SetTopGear(uint8_t gear) {
+    if (!m_isValid) return false;
+    m_vehicle.SetTopGear(gear);
+    return true;
+}
 bool VehicleData::SetClutch(float clutch) {
     if (!m_isValid || !std::isfinite(clutch)) return false;
     m_vehicle.SetClutch(clutch);

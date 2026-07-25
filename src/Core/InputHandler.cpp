@@ -217,9 +217,9 @@ void ApplyGameControls(int manualGear, float clutch, float rpm, int /*maxGear*/,
     float finalThrottle = GetSmoothedThrottle();
     float finalBrake    = GetSmoothedBrake();
 
-    // Rev limiter (engine protection at 98 % RPM)
-    if (manualGear > 0 && rpm > 0.98f)
-        finalThrottle = 0.0f;
+    // We removed the aggressive custom rev limiter. 
+    // Since we now set TopGear to current gear, the native GTA V auto-upshift is disabled,
+    // so we can let the game's natural rev limiter bounce quickly at redline.
 
     // Steer injection
     const float finalSteer = GetSmoothedSteer();

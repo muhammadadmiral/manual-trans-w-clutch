@@ -170,6 +170,15 @@ void CVehicle::SetNextGear(uint8_t gear) {
   }
 }
 
+void CVehicle::SetTopGear(uint8_t gear) {
+  if (!IsValid() || m_offsets->TopGear == 0)
+    return;
+  __try {
+    *reinterpret_cast<uint8_t *>(m_address + m_offsets->TopGear) = gear;
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+  }
+}
+
 void CVehicle::SetClutch(float clutch) {
   if (!IsValid() || m_offsets->Clutch == 0)
     return;

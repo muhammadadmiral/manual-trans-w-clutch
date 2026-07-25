@@ -96,6 +96,7 @@ public:
     // Setters — return false when the underlying write would be unsafe
     bool SetGear(uint8_t gear);
     bool SetNextGear(uint8_t gear);
+    bool SetTopGear(uint8_t gear);
     bool SetClutch(float clutch);
     bool SetRPM(float rpm);
     bool SetLightsBroken(uint8_t state);

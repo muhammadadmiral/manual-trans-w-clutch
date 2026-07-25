@@ -89,6 +89,7 @@ public:
 
   void SetGear(uint8_t gear);
   void SetNextGear(uint8_t gear);
+  void SetTopGear(uint8_t gear);
   void SetClutch(float clutch);
   void SetRPM(float rpm);
   void SetLightsBroken(uint8_t state);
