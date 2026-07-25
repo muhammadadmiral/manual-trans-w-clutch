@@ -150,5 +150,13 @@ native, bukan lewat write velocity. Ia hanya aktif saat throttle terbuka,
 brake lepas, clutch cukup terkunci, dan RPM berada di band bawah; ketika
 kendaraan sudah merespons atau pedal dilepas nilainya turun cepat.
 
+`wheelRPM` tidak lagi dipaksa minimum ke idle. Nilai mentah ini dipetakan ke
+RPM fisik estimasi dengan idle/redline berbeda untuk mobil biasa, performance,
+heavy vehicle, dan motor. Torque curve masih menghasilkan gaya di bawah 1500
+RPM. Bila akselerasi pulih, stall timer dilepas; bila clutch tetap terkunci dan
+defisit torsi/deceleration bertahan, timer naik sampai mesin mati. Partial
+clutch mengurangi load sehingga start dari gear 2 tetap mungkin, tetapi lebih
+lama dan lebih panas.
+
 Automatic D membuka torque converter lebih banyak pada low RPM supaya mesin
 tidak langsung terkunci ke putaran roda. S tetap lebih rapat dan agresif.

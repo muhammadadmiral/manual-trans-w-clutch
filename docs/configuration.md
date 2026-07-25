@@ -21,6 +21,11 @@ Motor non-scooter tetap sequential dan memakai auto-clutch.
 - `Engine Stall`, `Stall Rate`, `Stall Clutch`: waktu dan bite minimum sebelum
   stall.
 - `Idle Torque`: cadangan torsi kendaraan saat throttle nol.
+- `Lug Stall RPM`: batas zona lugging dalam RPM fisik estimasi. Default 1500
+  RPM; mesin masih boleh menarik di bawah angka ini.
+- `Lug Stall Delay`: waktu dasar sebelum lugging yang tidak pulih menjadi
+  stall. Timer melambat saat defisit kecil dan dipercepat brake, tanjakan,
+  clutch lock, serta gear tinggi.
 - `Starter Interlock`: manual wajib netral/clutch; automatic wajib P/N.
 - `Auto Start Needs Brake`: menambah syarat brake pada starter automatic.
 - `Launch Control` dan `Launch RPM`: limiter launch manual atau automatic.
@@ -78,7 +83,9 @@ fiturnya mati. Cek `TCSEn`/`ABSEn` untuk konfigurasi dan
 2. Manual gear 1 + clutch + W: RPM naik; release pelan creep/berangkat, release
    cepat memberi dump; throttle kecil dapat stall.
 3. Manual N ke gear 2 dan low-RPM upshift: gear tetap masuk dan throttle tetap
-   aktif, tetapi acceleration berat sesuai torque reserve.
+   aktif, tetapi acceleration berat sesuai torque reserve. Di bawah 1500 RPM,
+   `Lug` boleh naik; `Stall` harus turun lagi kalau kendaraan berhasil
+   berakselerasi atau clutch diinjak.
 4. Manual R: W mundur, S mengerem dan tidak menaikkan RPM.
 5. Automatic: tahan brake, tekan LShift dari P sampai D, lepas brake untuk
    creep. L2 hanya memakai gear 1-2 dan L1 mengunci gear 1.

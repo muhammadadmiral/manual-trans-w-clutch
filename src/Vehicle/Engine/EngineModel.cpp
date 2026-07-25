@@ -19,6 +19,53 @@ static float SmoothStep(float value) {
   return t * t * (3.0f - 2.0f * t);
 }
 
+struct PhysicalRPMRange {
+  float idle;
+  float redline;
+};
+
+static PhysicalRPMRange ResolvePhysicalRPMRange(Vehicle vehicle) {
+  const int vehicleClass = VEHICLE::GET_VEHICLE_CLASS(vehicle);
+  if (vehicleClass == 8)
+    return {1200.0f, 10500.0f};
+  if (vehicleClass == 6 || vehicleClass == 7)
+    return {900.0f, 7800.0f};
+  if (vehicleClass == 10 || vehicleClass == 11 ||
+      vehicleClass == 12 || vehicleClass == 20)
+    return {750.0f, 4800.0f};
+  return {800.0f, 6800.0f};
+}
+
+static float ToPhysicalRPM(float normalizedRPM, float idleNormalized,
+                           const PhysicalRPMRange &range) {
+  const float normalized = std::max(0.0f, normalizedRPM);
+  const float idlePoint = std::clamp(idleNormalized, 0.08f, 0.35f);
+  if (normalized <= idlePoint)
+    return range.idle * normalized / idlePoint;
+  const float aboveIdle =
+      (normalized - idlePoint) / std::max(0.05f, 1.0f - idlePoint);
+  return range.idle +
+         aboveIdle * (range.redline - range.idle);
+}
+
+static float ResolveTorqueCurve(float engineRPM,
+                                const PhysicalRPMRange &range) {
+  if (engineRPM <= 0.0f)
+    return 0.0f;
+  if (engineRPM < range.idle) {
+    const float subIdle = Clamp01(engineRPM / range.idle);
+    return 0.18f + subIdle * 0.54f;
+  }
+
+  const float span = std::max(1000.0f, range.redline - range.idle);
+  const float band = Clamp01((engineRPM - range.idle) / span);
+  const float lowRise = SmoothStep(band / 0.30f);
+  const float highFall = SmoothStep((band - 0.72f) / 0.28f);
+  return std::clamp((0.72f + lowRise * 0.28f) *
+                        (1.0f - highFall * 0.30f),
+                    0.18f, 1.0f);
+}
+
 static float ResolveFlatVelocity(Vehicle vehicle, VehicleData &data,
                                  int maxGear) {
   const float memoryValue = std::fabs(data.GetDriveMaxFlatVel());
@@ -44,8 +91,7 @@ static float ResolveWheelRPM(Vehicle vehicle, VehicleData &data, int gear,
   const float flatVelocity = ResolveFlatVelocity(vehicle, data, maxGear);
   if (ratio <= 0.01f || flatVelocity <= 1.0f)
     return idleRPM;
-  return std::clamp(std::fabs(speedMps) * ratio / flatVelocity, idleRPM,
-                    1.25f);
+  return std::clamp(std::fabs(speedMps) * ratio / flatVelocity, 0.0f, 1.25f);
 }
 
 void Reset() {
@@ -61,6 +107,7 @@ static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
     s_state.load = 0.0f;
     s_state.creepThrottle = 0.0f;
     s_state.torqueReserve = 0.0f;
+    s_state.lugSeverity = 0.0f;
     s_state.stallProgress =
         std::max(0.0f, s_state.stallProgress - dt * 3.0f);
     return false;
@@ -95,6 +142,23 @@ static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
           : 0.0f;
   s_state.load = engagement * speedGap;
 
+  const PhysicalRPMRange rpmRange = ResolvePhysicalRPMRange(vehicle);
+  s_state.estimatedIdlePhysicalRPM = rpmRange.idle;
+  s_state.estimatedRedlineRPM = rpmRange.redline;
+  const float engineSpeedForLoad =
+      s_state.wheelRPM * Clamp01(engagement) +
+      data.GetRPM() * (1.0f - Clamp01(engagement));
+  s_state.estimatedEngineRPM =
+      ToPhysicalRPM(engineSpeedForLoad, s_state.idleRPM, rpmRange);
+  const float lugThreshold =
+      std::clamp(Config::LugStallRPM, rpmRange.idle + 100.0f,
+                 rpmRange.redline * 0.45f);
+  s_state.lugSeverity =
+      Clamp01((lugThreshold - s_state.estimatedEngineRPM) /
+              std::max(250.0f, lugThreshold - rpmRange.idle * 0.55f));
+  s_state.torqueCurve =
+      ResolveTorqueCurve(s_state.estimatedEngineRPM, rpmRange);
+
   s_state.creepThrottle = 0.0f;
   if (Config::IdleCreep && std::abs(gear) == 1 && throttle < 0.02f &&
       brake < 0.05f &&
@@ -125,35 +189,55 @@ static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
       std::clamp(Config::IdleTorqueFraction, 0.02f, 0.60f);
   const float availableTorque =
       (idleTorque + effectiveThrottle * (1.0f - idleTorque)) *
-      driveScale * gearLeverage;
-  const float torqueDemand = engagement * speedGap;
-  s_state.torqueReserve = availableTorque - torqueDemand;
-
-  const float rpm = data.GetRPM();
-  const float stallClutch =
-      std::clamp(Config::StallClutchThreshold, 0.30f, 0.95f);
+      s_state.torqueCurve * driveScale * gearLeverage;
+  const float gearSpan =
+      static_cast<float>((std::max)(1, maxGear - 1));
+  const float gearWeight =
+      Clamp01(static_cast<float>((std::max)(0, std::abs(gear) - 1)) /
+              gearSpan);
   const float uphillLoad =
       Clamp01(std::max(0.0f, ENTITY::GET_ENTITY_PITCH(vehicle)) / 18.0f);
+  const float launchDemand =
+      speedGap * (0.55f + gearWeight * 0.20f);
+  const float lugDemand =
+      s_state.lugSeverity * (0.06f + gearWeight * 0.12f);
+  const float externalLoad =
+      uphillLoad * 0.35f + Clamp01(brake) * 0.75f;
+  const float torqueDemand =
+      engagement * (launchDemand + lugDemand + externalLoad);
+  s_state.torqueReserve = availableTorque - torqueDemand;
+
+  const float stallClutch =
+      std::clamp(Config::StallClutchThreshold, 0.30f, 0.95f);
+  const float netReserve = s_state.torqueReserve - uphillLoad * 0.20f;
+  const float decelerationRisk =
+      Clamp01((-s_state.longitudinalAcceleration - 0.15f) / 2.50f);
+  const bool unresolvedLug =
+      netReserve < 0.0f ||
+      (s_state.lugSeverity > 0.20f && decelerationRisk > 0.05f);
   const bool bogging = !automaticMode && Config::StallEnabled &&
                        engagement > stallClutch &&
-                       rpm <= s_state.idleRPM + 0.035f &&
-                       usefulSpeed < idleRoadSpeed &&
-                       (s_state.torqueReserve - uphillLoad * 0.35f) < 0.0f;
+                       s_state.estimatedEngineRPM < lugThreshold &&
+                       unresolvedLug;
   if (bogging) {
     const float clutchLoad =
         Clamp01((engagement - stallClutch) / (1.0f - stallClutch));
-    const float torqueDeficit =
-        Clamp01(-(s_state.torqueReserve - uphillLoad * 0.35f));
+    const float torqueDeficit = Clamp01(-netReserve / 0.65f);
     const float brakeLoad = 1.0f + Clamp01(brake) * 1.25f;
     const float highGearLoad =
-        1.0f + 0.30f * static_cast<float>(
-                          (std::max)(0, std::abs(gear) - 1));
+        1.0f + gearWeight * 0.65f;
+    const float unresolvedLoad =
+        Clamp01(torqueDeficit + decelerationRisk * 0.55f);
+    const float stallDelay =
+        std::clamp(Config::LugStallDelay, 0.40f, 8.0f);
     s_state.stallProgress +=
-        clutchLoad * speedGap * torqueDeficit * brakeLoad * highGearLoad * dt *
-        std::max(0.10f, Config::StallRate);
+        clutchLoad * s_state.lugSeverity *
+        (0.30f + unresolvedLoad * 1.70f) * brakeLoad * highGearLoad *
+        dt * std::max(0.10f, Config::StallRate) / stallDelay;
   } else {
     s_state.stallProgress =
-        std::max(0.0f, s_state.stallProgress - dt * 3.0f);
+        std::max(0.0f, s_state.stallProgress -
+                           dt * (engagement < stallClutch ? 3.5f : 1.25f));
   }
 
   if (s_state.stallProgress >= 1.0f) {
@@ -217,7 +301,10 @@ static void UpdateDriveTorque(int gear, int maxGear, float engagement,
       (recoveryTarget - s_state.lowRpmRecovery) *
       Clamp01(dt * recoveryRate);
 
-  const float lugFactor = 1.0f - torqueDeficit * 0.78f;
+  // Defisit torsi bikin mesin berat, bukan mematikan throttle seketika.
+  // Stall timer yang memutus mesin kalau kondisi ini dibiarkan.
+  const float lugFactor =
+      1.0f - torqueDeficit * (0.32f + (1.0f - Clamp01(throttle)) * 0.18f);
   float output =
       (1.0f + lowRpmAssist + s_state.lowRpmRecovery) * lugFactor;
 
@@ -227,7 +314,7 @@ static void UpdateDriveTorque(int gear, int maxGear, float engagement,
       SmoothStep((s_state.wheelRPM - 1.0f) / 0.08f);
   output *= 1.0f - limiter;
   s_state.redlineCut = limiter >= 0.98f;
-  s_state.driveTorqueFactor = std::clamp(output, 0.0f, 1.65f);
+  s_state.driveTorqueFactor = std::clamp(output, 0.0f, 1.80f);
 }
 
 bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,

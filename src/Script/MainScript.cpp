@@ -744,7 +744,8 @@ void ScriptMain() {
           "NativePatch=%d RPMOwned=%d ControlledRPM=%.3f RPMTarget=%.3f "
           "WheelRPM=%.3f CutFix=%d MemPedal=%.3f "
           "SpeedKmH=%.1f SignedMps=%.2f Ratio=%.4f MaxVel=%.2f EstFlat=%.2f "
-          "Handling=%d Load=%.3f TorqueReserve=%.3f Stall=%.3f "
+          "Handling=%d Load=%.3f TorqueReserve=%.3f TorqueCurve=%.3f "
+          "EngineRPM=%.0f IdleRPM=%.0f RedlineRPM=%.0f Lug=%.3f Stall=%.3f "
           "Accel=%.3f LowRec=%.3f "
           "Clash=%.3f Shock=%.3f Money=%d Engine=%d Actual=%d Start=%d "
           "TCSEn=%d TCSReady=%d TCSWheels=%d TCSDriven=%d "
@@ -777,6 +778,11 @@ void ScriptMain() {
           EngineModel::GetState().estimatedFlatVelocity,
           EngineModel::GetState().handlingBacked ? 1 : 0,
           EngineModel::GetLoad(), EngineModel::GetTorqueReserve(),
+          EngineModel::GetState().torqueCurve,
+          EngineModel::GetState().estimatedEngineRPM,
+          EngineModel::GetState().estimatedIdlePhysicalRPM,
+          EngineModel::GetState().estimatedRedlineRPM,
+          EngineModel::GetState().lugSeverity,
           EngineModel::GetStallProgress(),
           EngineModel::GetState().longitudinalAcceleration,
           EngineModel::GetState().lowRpmRecovery,

@@ -67,7 +67,7 @@ dijelaskan di [docs/configuration.md](docs/configuration.md).
    memuat ScriptHookV.
 
 Sesudah mengganti ASI, cek awal `manual-trans.log`. Build sprint ini wajib
-mencetak `Runtime=driveline-r11` dan path file yang benar-benar dimuat. Kalau
+mencetak `Runtime=driveline-r12` dan path file yang benar-benar dimuat. Kalau
 baris itu tidak ada, GTA masih memakai salinan ASI lama.
 
 Artefak yang sudah diverifikasi pada sprint ini:
@@ -96,6 +96,8 @@ LaunchControl=0
 LaunchControlRPM=0.72
 IdleCreep=1
 StallEnabled=1
+LugStallRPM=1500
+LugStallDelay=2.20
 
 [Automatic]
 DUpRPM=0.50

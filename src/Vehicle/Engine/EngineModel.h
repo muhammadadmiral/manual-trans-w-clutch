@@ -14,6 +14,7 @@ struct State {
   float expectedRPM = 0.2f;
   float creepThrottle = 0.0f;
   float torqueReserve = 0.0f;
+  float torqueCurve = 1.0f;
   float previousRPM = 0.2f;
   float controlledRPM = 0.2f;
   float wheelRPM = 0.2f;
@@ -22,6 +23,10 @@ struct State {
   float driveTorqueFactor = 1.0f;
   float longitudinalAcceleration = 0.0f;
   float lowRpmRecovery = 0.0f;
+  float estimatedEngineRPM = 800.0f;
+  float estimatedIdlePhysicalRPM = 800.0f;
+  float estimatedRedlineRPM = 6800.0f;
+  float lugSeverity = 0.0f;
   float previousDirectionalSpeed = 0.0f;
   bool freeRevActive = false;
   bool rpmOwned = false;
