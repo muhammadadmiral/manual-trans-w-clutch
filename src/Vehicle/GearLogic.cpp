@@ -117,24 +117,29 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
 
 void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
                    float clutch) {
-  // We no longer use cheat power to kill torque because negative values cause
-  // the car to reverse. Instead, the clutch logic is handled by cutting
-  // throttle input in InputHandler.
-  VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, 0.0f);
+  // We do not override engine torque here. 
+
+  // GTA V fClutch: 1.0 = Engaged (Plates clamped), 0.0 = Open (Plates separated)
+  // simulatedClutch (clutch parameter): 1.0 = Pedal pressed (Open), 0.0 = Pedal released (Engaged)
+  const float memoryClutch = 1.0f - clutch;
 
   if (manualGear == 0) {
+    // Neutral: GTA V doesn't have a true neutral gear value. 
+    // We simulate it by putting it in Gear 1 and forcing the clutch to OPEN (0.0).
     data.SetGear(1);
     data.SetNextGear(1);
-    data.SetClutch(1.0f); // 1.0f is fully open/disengaged in GTA V
+    data.SetClutch(0.0f); 
   } else if (manualGear == -1) {
+    // Reverse: GTA V uses Gear 0 for reverse.
     data.SetGear(0);
     data.SetNextGear(0);
-    data.SetClutch(clutch); 
+    data.SetClutch(memoryClutch); 
   } else {
+    // Forward gears
     const uint8_t targetGear = static_cast<uint8_t>(manualGear);
     data.SetGear(targetGear);
     data.SetNextGear(targetGear);
-    data.SetClutch(clutch);
+    data.SetClutch(memoryClutch);
   }
 }
 

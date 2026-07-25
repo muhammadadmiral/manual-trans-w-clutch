@@ -533,7 +533,21 @@ bool Update(int vehicleHandle, bool isEngineOn, bool isRevving, uint8_t maxGear,
             // that weren't scanned here (like LightsBroken or DriveForce).
             VehicleOffsets cand = VehicleData::GetResolvedOffsets();
             cand.RPM       = rpmOff;
-            cand.Clutch    = rpmOff + 12;
+            
+            // In older builds (e.g. 1.0.1180), Clutch was RPM + 12.
+            // In newer builds (e.g. 3095), Clutch is RPM + 4.
+            // Since fClutch mimics fRPM in neutral, the true Clutch offset MUST be in s_rpmCandidates!
+            cand.Clutch = rpmOff + 12; // fallback
+            for (uint32_t c : s_rpmCandidates) {
+                if (c == rpmOff + 4) {
+                    cand.Clutch = rpmOff + 4;
+                    break;
+                } else if (c == rpmOff + 12) {
+                    cand.Clutch = rpmOff + 12;
+                    break;
+                }
+            }
+
             cand.Gear      = cluster.gearOff;
             cand.NextGear  = cluster.nextGearOff;
             cand.TopGear   = cluster.topGearOff;
