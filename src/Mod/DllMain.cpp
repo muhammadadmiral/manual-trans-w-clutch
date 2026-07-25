@@ -31,7 +31,7 @@ BOOL APIENTRY DllMain(HMODULE instance, DWORD reason, LPVOID) {
             char modulePath[MAX_PATH]{};
             GetModuleFileNameA(instance, modulePath, MAX_PATH);
             LOG_INFO(Init,
-        "Runtime=driveline-r16-crashfix built=%s %s module=%s",
+        "Runtime=driveline-r17-atomic-jump built=%s %s module=%s",
                      __DATE__, __TIME__,
                      modulePath[0] ? modulePath : "?");
         }

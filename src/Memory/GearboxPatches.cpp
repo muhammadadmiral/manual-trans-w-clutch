@@ -17,6 +17,7 @@ constexpr size_t kMaxPatchBytes = 13;
 
 enum class PatchKind {
   Nop,
+  ForceShortJump,
   LowRpmRedirect,
 };
 
@@ -39,10 +40,10 @@ std::array<Patch, 4> s_patches{{
     {"shift-up + clutch",
      "75 0D 66 41 FF 45 ? 41 C7 45 54 CD CC CC 3D 41 C7 85 ? 00 00 00 "
      "00 00 00 00",
-     2, 13, true, PatchKind::Nop},
+     0, 1, true, PatchKind::ForceShortJump},
     {"shift-down + clutch",
      "75 0D 66 41 FF 4D ? 41 C7 45 54 CD CC CC 3D 66 41 C7 45 04 06 00",
-     2, 13, true, PatchKind::Nop},
+     0, 1, true, PatchKind::ForceShortJump},
     {"clutch low RPM", "C7 43 ? CD CC CC 3D 66", 0, 7, false,
      PatchKind::LowRpmRedirect},
     {"throttle lift", "89 4F 58 F3 44 0F 11", 0, 3, false,
@@ -100,7 +101,11 @@ bool WriteBytes(uintptr_t address, const uint8_t *bytes, size_t length) {
 
   bool copied = false;
   __try {
-    std::memcpy(reinterpret_cast<void *>(address), bytes, length);
+    if (length == 1) {
+      *reinterpret_cast<volatile uint8_t *>(address) = bytes[0];
+    } else {
+      std::memcpy(reinterpret_cast<void *>(address), bytes, length);
+    }
     copied = true;
   } __except (EXCEPTION_EXECUTE_HANDLER) {
     copied = false;
@@ -123,6 +128,13 @@ bool WriteNops(uintptr_t address, size_t length) {
 
 void PrepareReplacement(Patch &patch) {
   patch.replacement.fill(0x90);
+  if (patch.kind == PatchKind::ForceShortJump) {
+    // 75 0D (JNE) -> EB 0D (JMP). Offset rel8 0x0D tetap utuh; cuma opcode
+    // satu byte yang disentuh supaya thread fisika nggak melihat instruksi
+    // setengah tertulis.
+    patch.replacement[0] = 0xEB;
+    return;
+  }
   if (patch.kind != PatchKind::LowRpmRedirect)
     return;
 
@@ -289,7 +301,7 @@ bool ApplyAll() {
   s_failure.clear();
   LOG_INFO(Memory,
            "Gearbox native override aktif (critical=2/2, optionalLow=%d, "
-           "optionalLift=%d, velocity untouched)",
+           "optionalLift=%d, atomicJump=1, velocity untouched)",
            s_patches[2].applied ? 1 : 0, s_patches[3].applied ? 1 : 0);
   return true;
 }

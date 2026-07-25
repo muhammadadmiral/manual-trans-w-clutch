@@ -76,7 +76,7 @@ dijelaskan di [docs/configuration.md](docs/configuration.md).
    memuat ScriptHookV.
 
 Sesudah mengganti ASI, cek awal `manual-trans.log`. Build sprint ini wajib
-mencetak `Runtime=driveline-r16-crashfix` dan path file yang benar-benar dimuat. Kalau
+mencetak `Runtime=driveline-r17-atomic-jump` dan path file yang benar-benar dimuat. Kalau
 baris itu tidak ada, GTA masih memakai salinan ASI lama.
 
 Artefak yang sudah diverifikasi pada sprint ini:

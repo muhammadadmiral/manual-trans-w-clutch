@@ -141,4 +141,4 @@ menambah `TCC`, `ATF`, `Limp`, `KDPending`, `NeutralDrop`, `BrakeBoost`,
 
 `Condition` berasal dari engine health. Nilai upgrade dibaca langsung dari mod
 kendaraan, bukan INI. `LowRec` dan `PowerMul` adalah satu-satunya jalur
-recovery low-RPM pada r16-crashfix; tidak ada write runtime drive-force.
+recovery low-RPM pada r17-atomic-jump; tidak ada write runtime drive-force.
