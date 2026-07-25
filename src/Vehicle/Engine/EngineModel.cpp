@@ -1,5 +1,6 @@
 #include "EngineModel.h"
 #include "../VehicleData.h"
+#include "../VehicleUpgrades.h"
 #include "../../Core/Config.h"
 #include "../../Memory/GearboxPatches.h"
 #include "../../../sdk/inc/natives.h"
@@ -98,6 +99,17 @@ void Reset() {
   s_state = State{};
 }
 
+void RestoreRuntimeDriveForce(VehicleData &data) {
+  if (s_state.runtimeDriveForceOwned &&
+      s_state.runtimeDriveForceBase > 0.001f) {
+    data.SetRuntimeDriveForce(s_state.runtimeDriveForceBase);
+  }
+  s_state.runtimeDriveForceOwned = false;
+  s_state.runtimeDriveForceBase = 0.0f;
+  s_state.runtimeDriveForceApplied = 0.0f;
+  s_state.runtimeDriveForceMultiplier = 1.0f;
+}
+
 static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
                                int maxGear,
                                float engagement, float throttle,
@@ -185,11 +197,19 @@ static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
           : std::clamp(nativeAcceleration / 0.30f, 0.45f, 1.80f);
   const float effectiveThrottle =
       std::max(Clamp01(throttle), s_state.creepThrottle);
+  const float engineHealth =
+      VEHICLE::GET_VEHICLE_ENGINE_HEALTH(vehicle);
+  s_state.engineCondition =
+      std::clamp(engineHealth / 1000.0f, 0.20f, 1.0f);
+  const float conditionTorque =
+      0.45f + s_state.engineCondition * 0.55f;
   const float idleTorque =
-      std::clamp(Config::IdleTorqueFraction, 0.02f, 0.60f);
+      std::clamp(Config::IdleTorqueFraction +
+                     VehicleUpgrades::GetState().engineStage * 0.035f,
+                 0.02f, 0.65f);
   const float availableTorque =
       (idleTorque + effectiveThrottle * (1.0f - idleTorque)) *
-      s_state.torqueCurve * driveScale * gearLeverage;
+      s_state.torqueCurve * conditionTorque * driveScale * gearLeverage;
   const float gearSpan =
       static_cast<float>((std::max)(1, maxGear - 1));
   const float gearWeight =
@@ -229,7 +249,9 @@ static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
     const float unresolvedLoad =
         Clamp01(torqueDeficit + decelerationRisk * 0.55f);
     const float stallDelay =
-        std::clamp(Config::LugStallDelay, 0.40f, 8.0f);
+        std::clamp(Config::LugStallDelay, 0.40f, 8.0f) *
+        VehicleUpgrades::GetState().stallResistance *
+        (0.55f + s_state.engineCondition * 0.45f);
     s_state.stallProgress +=
         clutchLoad * s_state.lugSeverity *
         (0.30f + unresolvedLoad * 1.70f) * brakeLoad * highGearLoad *
@@ -315,6 +337,69 @@ static void UpdateDriveTorque(int gear, int maxGear, float engagement,
   output *= 1.0f - limiter;
   s_state.redlineCut = limiter >= 0.98f;
   s_state.driveTorqueFactor = std::clamp(output, 0.0f, 1.80f);
+}
+
+static void UpdateRuntimeDriveForce(VehicleData &data, int gear, int maxGear,
+                                    float engagement, float throttle,
+                                    float brake, bool engineOn, float dt) {
+  const float currentForce = data.GetRuntimeDriveForce();
+  const bool currentValid =
+      std::isfinite(currentForce) && currentForce > 0.001f &&
+      currentForce < 10.0f;
+  if (!currentValid) {
+    s_state.runtimeDriveForceOwned = false;
+    s_state.runtimeDriveForceMultiplier = 1.0f;
+    return;
+  }
+
+  if (!s_state.runtimeDriveForceOwned) {
+    s_state.runtimeDriveForceBase = currentForce;
+  } else {
+    const float tolerance =
+        std::max(0.002f, s_state.runtimeDriveForceBase * 0.06f);
+    if (std::fabs(currentForce - s_state.runtimeDriveForceApplied) >
+        tolerance) {
+      s_state.runtimeDriveForceBase = currentForce;
+    }
+  }
+
+  const int absoluteGear = std::abs(gear);
+  const float gearSpan =
+      static_cast<float>((std::max)(1, maxGear - 1));
+  const float gearWeight =
+      Clamp01(static_cast<float>((std::max)(0, absoluteGear - 1)) / gearSpan);
+  const float lowBand =
+      1.0f - SmoothStep((s_state.wheelRPM - s_state.idleRPM) /
+                        std::max(0.08f, 0.52f - s_state.idleRPM));
+  const float requestedAcceleration =
+      Clamp01(throttle) * (0.35f + Clamp01(s_state.torqueReserve / 0.45f));
+  const float accelerationDeficit =
+      Clamp01((requestedAcceleration - s_state.longitudinalAcceleration) /
+              2.60f);
+  const bool recoveryAllowed =
+      engineOn && gear != 0 && engagement > 0.58f && throttle > 0.05f &&
+      brake < 0.12f && !s_state.redlineCut;
+  const float targetMultiplier =
+      recoveryAllowed
+          ? 1.0f + lowBand * Clamp01(throttle) * accelerationDeficit *
+                       (0.85f + gearWeight * 1.55f)
+          : 1.0f;
+  const float rate =
+      targetMultiplier > s_state.runtimeDriveForceMultiplier ? 3.8f : 9.0f;
+  s_state.runtimeDriveForceMultiplier +=
+      (targetMultiplier - s_state.runtimeDriveForceMultiplier) *
+      Clamp01(dt * rate);
+  s_state.runtimeDriveForceMultiplier =
+      std::clamp(s_state.runtimeDriveForceMultiplier, 1.0f, 3.25f);
+
+  const float targetForce =
+      std::clamp(s_state.runtimeDriveForceBase *
+                     s_state.runtimeDriveForceMultiplier,
+                 0.001f, 9.5f);
+  if (data.SetRuntimeDriveForce(targetForce)) {
+    s_state.runtimeDriveForceApplied = targetForce;
+    s_state.runtimeDriveForceOwned = true;
+  }
 }
 
 bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
@@ -503,6 +588,8 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
       speedMps, engineOn, dt, automaticMode);
   UpdateDriveTorque(gear, maxGear, clutchEngagement, throttle, brake,
                     engineOn, dt);
+  UpdateRuntimeDriveForce(data, gear, maxGear, clutchEngagement, throttle,
+                          brake, engineOn, dt);
   return stalled;
 }
 

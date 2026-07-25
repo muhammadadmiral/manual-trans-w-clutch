@@ -267,10 +267,16 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
   const float downBase = sport ? Config::AutomaticSDownRPM
                                : Config::AutomaticDDownRPM;
   const float upThreshold =
-      std::clamp(upBase + throttle * (sport ? 0.06f : 0.18f),
+      std::clamp(sport
+                     ? upBase + throttle * 0.06f
+                     : upBase - (1.0f - throttle) * 0.12f +
+                           throttle * 0.16f,
                  0.35f, 0.99f);
   const float downThreshold =
-      std::clamp(downBase + throttle * (sport ? 0.12f : 0.08f),
+      std::clamp(sport
+                     ? downBase + throttle * 0.12f
+                     : downBase - (1.0f - throttle) * 0.06f +
+                           throttle * 0.14f,
                  0.10f, upThreshold - 0.08f);
   const bool kickdownRequest =
       throttle >= std::clamp(Config::AutomaticKickdownThrottle, 0.40f, 0.98f) &&

@@ -485,6 +485,9 @@ float   VehicleData::GetClutch()             const { return m_vehicle.GetClutch(
 float   VehicleData::GetRPM()               const { return m_vehicle.GetRPM(); }
 float   VehicleData::GetThrottle()          const { return m_vehicle.GetThrottle(); }
 float   VehicleData::GetThrottlePedal()     const { return m_vehicle.GetThrottlePedal(); }
+float   VehicleData::GetRuntimeDriveForce() const {
+    return m_isValid ? m_vehicle.GetTransmissionDriveForce() : 0.0f;
+}
 float   VehicleData::GetFuelLevel()          const { return m_vehicle.GetFuelLevel(); }
 uint8_t VehicleData::GetLightsBroken()       const { return m_vehicle.GetLightsBroken(); }
 uint8_t VehicleData::GetLightsVisuallyBroken() const { return m_vehicle.GetLightsVisuallyBroken(); }
@@ -571,6 +574,13 @@ bool VehicleData::SetThrottle(float throttle) {
 bool VehicleData::SetThrottlePedal(float throttle) {
     if (!m_isValid || !std::isfinite(throttle)) return false;
     m_vehicle.SetThrottlePedal(throttle);
+    return true;
+}
+bool VehicleData::SetRuntimeDriveForce(float force) {
+    if (!m_isValid || resolvedOffsets.TransmissionDriveForce == 0 ||
+        !std::isfinite(force) || force < 0.001f || force > 10.0f)
+        return false;
+    m_vehicle.SetTransmissionDriveForce(force);
     return true;
 }
 bool VehicleData::SetDriveForce(float force) {

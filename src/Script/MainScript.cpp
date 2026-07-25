@@ -27,6 +27,7 @@
 #include "../Vehicle/TelemetryLogger.h"
 #include "../Vehicle/VehicleData.h"
 #include "../Vehicle/VehicleProfile.h"
+#include "../Vehicle/VehicleUpgrades.h"
 
 #include <Windows.h>
 #include <algorithm>
@@ -206,6 +207,7 @@ void ScriptMain() {
       if (activeVehicle) {
         if (ENTITY::DOES_ENTITY_EXIST(activeVehicle)) {
           VehicleData previousData(activeVehicle);
+          EngineModel::RestoreRuntimeDriveForce(previousData);
           previousData.SetClutch(1.0f);
           VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(activeVehicle, 1.0f);
         }
@@ -226,6 +228,7 @@ void ScriptMain() {
       GearboxPatches::SetActive(false);
       if (activeVehicle && ENTITY::DOES_ENTITY_EXIST(activeVehicle)) {
         VehicleData previousData(activeVehicle);
+        EngineModel::RestoreRuntimeDriveForce(previousData);
         previousData.SetClutch(1.0f);
         VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(activeVehicle, 1.0f);
       }
@@ -244,7 +247,7 @@ void ScriptMain() {
       const VehicleOffsets &off = VehicleData::GetResolvedOffsets();
       const std::string bv = VehicleData::GetGameBuildVersion();
       char notify[256]{};
-      sprintf_s(notify, "Manual trans r5: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
+      sprintf_s(notify, "Manual trans r13: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
                 VehicleData::GetOffsetSourceName(),
                 bv.empty() ? "?" : bv.c_str(), off.Gear, off.NextGear, off.RPM,
                 off.Clutch);
@@ -268,6 +271,7 @@ void ScriptMain() {
     if (vehicle != activeVehicle) {
       if (activeVehicle && ENTITY::DOES_ENTITY_EXIST(activeVehicle)) {
         VehicleData previousData(activeVehicle);
+        EngineModel::RestoreRuntimeDriveForce(previousData);
         previousData.SetClutch(1.0f);
         VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(activeVehicle, 1.0f);
       }
@@ -293,6 +297,8 @@ void ScriptMain() {
       GearboxSystem::Reset();
       ClutchSystem::Reset();
       EngineModel::Reset();
+      VehicleUpgrades::Reset();
+      VehicleUpgrades::Initialize(vehicle);
       LaunchControl::Reset();
       PedalModel::Reset();
       BrakeSystem::Reset();
@@ -302,8 +308,18 @@ void ScriptMain() {
       TurboSystem::Reset();
       TurboSystem::InitializeForVehicle(vehicle);
       VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, 1.0f);
-      LOG_INFO(Script, "Vehicle profile=%s",
-               VehicleProfile::GetName(vehicleProfile));
+      LOG_INFO(
+          Script,
+          "Vehicle profile=%s engineMod=%d/%d transmissionMod=%d/%d "
+          "race=%d quick=%d power=%d",
+          VehicleProfile::GetName(vehicleProfile),
+          VehicleUpgrades::GetState().engineLevel,
+          VehicleUpgrades::GetState().engineMaxLevel,
+          VehicleUpgrades::GetState().transmissionLevel,
+          VehicleUpgrades::GetState().transmissionMaxLevel,
+          VehicleUpgrades::GetState().raceTransmission ? 1 : 0,
+          VehicleUpgrades::GetState().quickshifter ? 1 : 0,
+          VehicleUpgrades::GetState().powershifter ? 1 : 0);
 
       if (TelemetryLogger::IsLogging()) {
         TelemetryLogger::StopSession();
@@ -535,6 +551,8 @@ void ScriptMain() {
               .c_str());
     }
     if (transmissionMode != activeTransmissionMode) {
+      if (activeTransmissionMode != -1)
+        EngineModel::RestoreRuntimeDriveForce(data);
       if (activeTransmissionMode == 1)
         VEHICLE::SET_VEHICLE_HANDBRAKE(vehicle, FALSE);
       GearLogic::Reset(0);
@@ -572,6 +590,7 @@ void ScriptMain() {
 
     if (transmissionMode == 0) {
       GearboxPatches::SetActive(false);
+      EngineModel::RestoreRuntimeDriveForce(data);
       data.SetClutch(1.0f);
       VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, 1.0f);
       Menu::Draw();
@@ -590,8 +609,15 @@ void ScriptMain() {
         vehicleProfile == VehicleProfile::Drivetrain::MotorcycleSequential;
     const bool shiftUpPressed = InputHandler::IsShiftUpJustPressed();
     const bool shiftDownPressed = InputHandler::IsShiftDownJustPressed();
-    if (motorcycleAutoClutch && (shiftUpPressed || shiftDownPressed))
-      automaticClutchUntil = GetTickCount64() + 170;
+    const bool nativeQuickshift =
+        VehicleUpgrades::GetState().quickshifter && shiftUpPressed &&
+        manualGear > 0;
+    if (motorcycleAutoClutch && (shiftUpPressed || shiftDownPressed) &&
+        !nativeQuickshift) {
+      const ULONGLONG clutchWindow =
+          VehicleUpgrades::GetState().transmissionStage > 0.0f ? 110 : 170;
+      automaticClutchUntil = GetTickCount64() + clutchWindow;
+    }
     const bool automaticClutchOpen =
         motorcycleAutoClutch && GetTickCount64() < automaticClutchUntil;
     const float clutch =
@@ -698,6 +724,7 @@ void ScriptMain() {
     if ((engineStall || shiftStall) && isEngineOn) {
       isEngineOn = false;
       VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, 0.0f);
+      EngineModel::RestoreRuntimeDriveForce(data);
       VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
       LOG_WARN(Physics,
                "Drivetrain stall: gear=%d spd=%.1fkm/h load=%.3f heat=%.3f",
@@ -712,6 +739,7 @@ void ScriptMain() {
 
     if (fuelStall && isEngineOn) {
       isEngineOn = false;
+      EngineModel::RestoreRuntimeDriveForce(data);
       VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
       LOG_ERROR(Fuel, "Fuel stall! fuel=%.3f oilTemp=%.3f",
                 FuelSystem::GetFuelLevel(), FuelSystem::GetOilTemperature());
@@ -745,9 +773,14 @@ void ScriptMain() {
           "WheelRPM=%.3f CutFix=%d MemPedal=%.3f "
           "SpeedKmH=%.1f SignedMps=%.2f Ratio=%.4f MaxVel=%.2f EstFlat=%.2f "
           "Handling=%d Load=%.3f TorqueReserve=%.3f TorqueCurve=%.3f "
-          "EngineRPM=%.0f IdleRPM=%.0f RedlineRPM=%.0f Lug=%.3f Stall=%.3f "
-          "Accel=%.3f LowRec=%.3f "
-          "Clash=%.3f Shock=%.3f Money=%d Engine=%d Actual=%d Start=%d "
+          "EngineRPM=%.0f IdleRPM=%.0f RedlineRPM=%.0f Condition=%.3f "
+          "Lug=%.3f Stall=%.3f "
+          "Accel=%.3f LowRec=%.3f RuntimeForce=%.4f ForceMul=%.3f "
+          "ForceApplied=%.4f "
+          "EngMod=%d/%d TransMod=%d/%d Race=%d Quick=%d PowerShift=%d "
+          "Clash=%.3f Shock=%.3f ShiftPenalty=%.3f ShiftQuick=%d "
+          "ShiftPower=%d ShiftSynchro=%d Money=%d "
+          "Engine=%d Actual=%d Start=%d "
           "TCSEn=%d TCSReady=%d TCSWheels=%d TCSDriven=%d "
           "TCSSlip=%.3f TCSCut=%.3f TCS=%d "
           "ABSEn=%d ABSReady=%d ABSWheels=%d ABSSlip=%.3f ABSLevel=%.3f ABS=%d "
@@ -782,12 +815,27 @@ void ScriptMain() {
           EngineModel::GetState().estimatedEngineRPM,
           EngineModel::GetState().estimatedIdlePhysicalRPM,
           EngineModel::GetState().estimatedRedlineRPM,
+          EngineModel::GetState().engineCondition,
           EngineModel::GetState().lugSeverity,
           EngineModel::GetStallProgress(),
           EngineModel::GetState().longitudinalAcceleration,
           EngineModel::GetState().lowRpmRecovery,
+          EngineModel::GetState().runtimeDriveForceBase,
+          EngineModel::GetState().runtimeDriveForceMultiplier,
+          EngineModel::GetState().runtimeDriveForceApplied,
+          VehicleUpgrades::GetState().engineLevel,
+          VehicleUpgrades::GetState().engineMaxLevel,
+          VehicleUpgrades::GetState().transmissionLevel,
+          VehicleUpgrades::GetState().transmissionMaxLevel,
+          VehicleUpgrades::GetState().raceTransmission ? 1 : 0,
+          VehicleUpgrades::GetState().quickshifter ? 1 : 0,
+          VehicleUpgrades::GetState().powershifter ? 1 : 0,
           GearboxSystem::GetState().clashSeverity,
           GearboxSystem::GetState().shockRemaining,
+          GearboxSystem::GetState().penaltyMultiplier,
+          GearboxSystem::GetState().quickShift ? 1 : 0,
+          GearboxSystem::GetState().powerShift ? 1 : 0,
+          GearboxSystem::GetState().synchroShift ? 1 : 0,
           GearboxSystem::GetState().moneyShift ? 1 : 0,
           isEngineOn ? 1 : 0, actualEngineOn ? 1 : 0,
           engineStarting ? 1 : 0,

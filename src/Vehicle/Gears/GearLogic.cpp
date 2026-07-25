@@ -54,9 +54,11 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
       const int fromGear = s_manualGear;
       const int toGear = s_manualGear + 1;
       const bool clutchless = clutch < 0.35f && isEngineOn;
-      GearboxSystem::NotifyShift(data, fromGear, toGear, clutch, throttle);
+      GearboxSystem::NotifyShift(vehicle, data, fromGear, toGear, clutch,
+                                 throttle);
       s_manualGear = toGear;
-      if (clutchless) {
+      if (clutchless && !GearboxSystem::GetState().quickShift &&
+          !GearboxSystem::GetState().synchroShift) {
         PlayGearGrindSound(vehicle);
         grindWarningTimer = 45;
       } else {
@@ -77,9 +79,11 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
       const int fromGear = s_manualGear;
       const int toGear = s_manualGear - 1;
       const bool clutchless = clutch < 0.35f && isEngineOn;
-      GearboxSystem::NotifyShift(data, fromGear, toGear, clutch, throttle);
+      GearboxSystem::NotifyShift(vehicle, data, fromGear, toGear, clutch,
+                                 throttle);
       s_manualGear = toGear;
-      if (clutchless) {
+      if (clutchless && !GearboxSystem::GetState().quickShift &&
+          !GearboxSystem::GetState().synchroShift) {
         PlayGearGrindSound(vehicle);
         grindWarningTimer = 45;
       } else {

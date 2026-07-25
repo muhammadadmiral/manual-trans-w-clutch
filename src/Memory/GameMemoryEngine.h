@@ -108,6 +108,7 @@ public:
   void SetRPM(float rpm);
   void SetThrottle(float throttle);
   void SetThrottlePedal(float throttle);
+  void SetTransmissionDriveForce(float force);
   void SetLightsBroken(uint8_t state);
   void SetLightsVisuallyBroken(uint8_t state);
 
