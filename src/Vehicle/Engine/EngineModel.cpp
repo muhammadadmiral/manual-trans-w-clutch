@@ -164,11 +164,15 @@ static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
 }
 
 static void UpdateDriveTorque(int gear, int maxGear, float engagement,
-                              float throttle, bool engineOn) {
+                              float throttle, float brake, bool engineOn,
+                              float dt) {
   s_state.driveTorqueFactor = 1.0f;
   s_state.redlineCut = false;
-  if (!engineOn || gear == 0 || engagement < 0.08f)
+  if (!engineOn || gear == 0 || engagement < 0.08f) {
+    s_state.lowRpmRecovery +=
+        (0.0f - s_state.lowRpmRecovery) * Clamp01(dt * 6.0f);
     return;
+  }
 
   const int absoluteGear = std::abs(gear);
   const float gearSpan =
@@ -190,8 +194,32 @@ static void UpdateDriveTorque(int gear, int maxGear, float engagement,
   const float lowRpmAssist =
       Clamp01(throttle) * lowRpmDemand * positiveReserve *
       (0.18f + gearWeight * 0.62f);
+
+  // Kalau GTA masih ngerem forced gear walau cadangan torsinya positif,
+  // naikkan multiplier secara bertahap. Ini tetap gaya drivetrain native:
+  // posisi dan kecepatan kendaraan nggak pernah ditulis.
+  const float requestedAcceleration =
+      Clamp01(throttle) * (0.25f + positiveReserve * 1.10f);
+  const float accelerationDeficit =
+      Clamp01((requestedAcceleration - s_state.longitudinalAcceleration) /
+              3.25f);
+  const bool needsRecovery =
+      throttle > 0.12f && brake < 0.10f && engagement > 0.62f &&
+      positiveReserve > 0.02f && lowRpmDemand > 0.02f;
+  const float recoveryTarget =
+      needsRecovery
+          ? Clamp01(throttle) * lowRpmDemand * positiveReserve *
+                (0.22f + gearWeight * 0.78f) * accelerationDeficit
+          : 0.0f;
+  const float recoveryRate =
+      recoveryTarget > s_state.lowRpmRecovery ? 2.8f : 7.0f;
+  s_state.lowRpmRecovery +=
+      (recoveryTarget - s_state.lowRpmRecovery) *
+      Clamp01(dt * recoveryRate);
+
   const float lugFactor = 1.0f - torqueDeficit * 0.78f;
-  float output = (1.0f + lowRpmAssist) * lugFactor;
+  float output =
+      (1.0f + lowRpmAssist + s_state.lowRpmRecovery) * lugFactor;
 
   // RPM boleh mentok limiter, tapi gaya roda wajib habis setelah rasio gigi
   // mencapai redline. Ini yang mencegah gigi 1 narik tanpa batas.
@@ -208,6 +236,24 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
             bool automaticMode) {
   const float dt = std::clamp(MISC::GET_FRAME_TIME(), 0.001f, 0.05f);
   const float rpm = data.GetRPM();
+  const float directionalSpeed = gear < 0 ? -speedMps : speedMps;
+  if (!engineOn || gear == 0) {
+    s_state.speedSampleValid = false;
+    s_state.longitudinalAcceleration +=
+        (0.0f - s_state.longitudinalAcceleration) * Clamp01(dt * 8.0f);
+  } else if (!s_state.speedSampleValid) {
+    s_state.previousDirectionalSpeed = directionalSpeed;
+    s_state.longitudinalAcceleration = 0.0f;
+    s_state.speedSampleValid = true;
+  } else {
+    const float rawAcceleration =
+        std::clamp((directionalSpeed - s_state.previousDirectionalSpeed) / dt,
+                   -12.0f, 12.0f);
+    const float accelAlpha = 1.0f - std::exp(-5.0f * dt);
+    s_state.longitudinalAcceleration +=
+        (rawAcceleration - s_state.longitudinalAcceleration) * accelAlpha;
+    s_state.previousDirectionalSpeed = directionalSpeed;
+  }
 
   if (engineOn && throttle < 0.01f && rpm > 0.05f && rpm < 0.35f)
     s_state.idleRPM += (rpm - s_state.idleRPM) * Clamp01(dt * 2.0f);
@@ -368,7 +414,8 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
   const bool stalled = UpdateLoadAndStall(
       vehicle, data, gear, maxGear, clutchEngagement, throttle, brake,
       speedMps, engineOn, dt, automaticMode);
-  UpdateDriveTorque(gear, maxGear, clutchEngagement, throttle, engineOn);
+  UpdateDriveTorque(gear, maxGear, clutchEngagement, throttle, brake,
+                    engineOn, dt);
   return stalled;
 }
 

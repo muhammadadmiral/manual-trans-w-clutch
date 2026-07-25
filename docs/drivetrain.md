@@ -135,4 +135,20 @@ tekanan maksimum berkurang sampai rem kembali dingin.
 Keduanya membaca angular velocity, load, power, dan brake pressure dari
 `CWheel`. Rolling radius dipelajari saat kendaraan rolling tanpa input besar.
 Intervensi baru boleh terjadi setelah sedikitnya dua roda menghasilkan sample
-valid.
+valid. TCS memakai roda penggerak yang berputar paling cepat supaya wheelspin
+satu sisi tidak hilang dalam nilai rata-rata. ABS memakai roda valid yang
+melambat paling jauh supaya satu roda yang mulai lock tetap terbaca. Cut dan
+release keduanya diramp untuk mengurangi chatter pada input keyboard.
+
+## Recovery low RPM
+
+RPM poros tetap dihitung dari kecepatan jalan dan rasio kendaraan. Saat
+cadangan torsi positif tetapi GTA masih membuat kendaraan deselerasi di forced
+gear, engine model mengakumulasi `LowRec` dari selisih akselerasi yang diminta
+dan akselerasi aktual. Kompensasi masuk lewat power multiplier drivetrain
+native, bukan lewat write velocity. Ia hanya aktif saat throttle terbuka,
+brake lepas, clutch cukup terkunci, dan RPM berada di band bawah; ketika
+kendaraan sudah merespons atau pedal dilepas nilainya turun cepat.
+
+Automatic D membuka torque converter lebih banyak pada low RPM supaya mesin
+tidak langsung terkunci ke putaran roda. S tetap lebih rapat dan agresif.

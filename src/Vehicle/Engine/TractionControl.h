@@ -10,8 +10,11 @@ struct State {
   bool active = false;
   bool wheelDataValid = false;
   float slipRatio = 0.0f;
+  float rawSlipRatio = 0.0f;
   float cutLevel = 0.0f;
   float rollingRadius = 0.34f;
+  int validWheelCount = 0;
+  int drivenWheelCount = 0;
 };
 
 void Reset();

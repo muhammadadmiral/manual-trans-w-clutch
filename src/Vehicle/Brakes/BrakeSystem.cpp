@@ -48,6 +48,7 @@ float UpdateABS(Vehicle vehicle, VehicleData &data, float brakeInput,
   const uint8_t count = data.GetWheelCount();
   float weightedOmega = 0.0f;
   float totalLoad = 0.0f;
+  float slowestOmega = 1000000.0f;
   int valid = 0;
 
   for (uint8_t i = 0; i < count; ++i) {
@@ -56,15 +57,19 @@ float UpdateABS(Vehicle vehicle, VehicleData &data, float brakeInput,
       continue;
     const float load = wheel.load > 0.01f ? wheel.load : 1.0f;
     weightedOmega += std::fabs(wheel.angularVelocity) * load;
+    slowestOmega = std::min(slowestOmega, std::fabs(wheel.angularVelocity));
     totalLoad += load;
     ++valid;
   }
 
+  s_state.validWheelCount = valid;
   s_state.wheelDataValid = valid >= 2 && totalLoad > 0.01f;
   if (!s_state.wheelDataValid) {
     s_state.absActive = false;
-    s_state.absLevel = 0.0f;
+    s_state.absLevel +=
+        (0.0f - s_state.absLevel) * Clamp01(dt * 10.0f);
     s_state.wheelSlip = 0.0f;
+    s_state.rawWheelSlip = 0.0f;
     return effectiveBrake;
   }
 
@@ -76,16 +81,29 @@ float UpdateABS(Vehicle vehicle, VehicleData &data, float brakeInput,
           (measuredRadius - s_state.rollingRadius) * 0.03f;
   }
 
-  const float wheelSpeed = omega * s_state.rollingRadius;
-  s_state.wheelSlip =
-      roadSpeed > 1.0f ? Clamp01((roadSpeed - wheelSpeed) / roadSpeed) : 0.0f;
+  const float slowestWheelSpeed = slowestOmega * s_state.rollingRadius;
+  s_state.rawWheelSlip =
+      roadSpeed > 1.0f
+          ? Clamp01((roadSpeed - slowestWheelSpeed) / roadSpeed)
+          : 0.0f;
+  const float slipAlpha = 1.0f - std::exp(-18.0f * dt);
+  s_state.wheelSlip +=
+      (s_state.rawWheelSlip - s_state.wheelSlip) * slipAlpha;
 
   const float target = std::clamp(Config::AbsSlipTarget, 0.05f, 0.60f);
-  if (s_state.absEnabled && effectiveBrake > 0.25f && roadSpeed > 3.0f &&
-      s_state.wheelSlip > target) {
-    s_state.absLevel =
-        Clamp01((s_state.wheelSlip - target) / std::max(0.10f, 0.50f - target));
-    s_state.absActive = true;
+  const bool interventionAllowed =
+      s_state.absEnabled && effectiveBrake > 0.20f && roadSpeed > 2.0f;
+  const float requestedRelease =
+      interventionAllowed && s_state.wheelSlip > target
+          ? Clamp01((s_state.wheelSlip - target) /
+                    std::max(0.10f, 0.50f - target))
+          : 0.0f;
+  const float releaseRate =
+      requestedRelease > s_state.absLevel ? 20.0f : 12.0f;
+  s_state.absLevel +=
+      (requestedRelease - s_state.absLevel) * Clamp01(dt * releaseRate);
+  s_state.absActive = interventionAllowed && s_state.absLevel > 0.01f;
+  if (s_state.absActive) {
     const float pressure =
         effectiveBrake *
         (1.0f - Clamp01(Config::AbsMaxRelease) * s_state.absLevel);
@@ -96,7 +114,6 @@ float UpdateABS(Vehicle vehicle, VehicleData &data, float brakeInput,
   }
 
   s_state.absActive = false;
-  s_state.absLevel = 0.0f;
   (void)vehicle;
   return effectiveBrake;
 }

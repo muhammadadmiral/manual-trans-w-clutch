@@ -745,8 +745,12 @@ void ScriptMain() {
           "WheelRPM=%.3f CutFix=%d MemPedal=%.3f "
           "SpeedKmH=%.1f SignedMps=%.2f Ratio=%.4f MaxVel=%.2f EstFlat=%.2f "
           "Handling=%d Load=%.3f TorqueReserve=%.3f Stall=%.3f "
+          "Accel=%.3f LowRec=%.3f "
           "Clash=%.3f Shock=%.3f Money=%d Engine=%d Actual=%d Start=%d "
-          "TCS=%d ABS=%d",
+          "TCSEn=%d TCSReady=%d TCSWheels=%d TCSDriven=%d "
+          "TCSSlip=%.3f TCSCut=%.3f TCS=%d "
+          "ABSEn=%d ABSReady=%d ABSWheels=%d ABSSlip=%.3f ABSLevel=%.3f ABS=%d "
+          "LCEn=%d LCArmed=%d LCCut=%d",
           transmissionMode, VehicleProfile::GetName(vehicleProfile),
           automaticMode ? AutomaticGearbox::GetSelectorName() : "M",
           manualGear, static_cast<unsigned>(data.GetGear()),
@@ -774,13 +778,29 @@ void ScriptMain() {
           EngineModel::GetState().handlingBacked ? 1 : 0,
           EngineModel::GetLoad(), EngineModel::GetTorqueReserve(),
           EngineModel::GetStallProgress(),
+          EngineModel::GetState().longitudinalAcceleration,
+          EngineModel::GetState().lowRpmRecovery,
           GearboxSystem::GetState().clashSeverity,
           GearboxSystem::GetState().shockRemaining,
           GearboxSystem::GetState().moneyShift ? 1 : 0,
           isEngineOn ? 1 : 0, actualEngineOn ? 1 : 0,
           engineStarting ? 1 : 0,
+          TractionControl::GetState().enabled ? 1 : 0,
+          TractionControl::GetState().wheelDataValid ? 1 : 0,
+          TractionControl::GetState().validWheelCount,
+          TractionControl::GetState().drivenWheelCount,
+          TractionControl::GetState().slipRatio,
+          TractionControl::GetState().cutLevel,
           TractionControl::IsTCSActive() ? 1 : 0,
-          BrakeSystem::IsABSActive() ? 1 : 0);
+          BrakeSystem::GetState().absEnabled ? 1 : 0,
+          BrakeSystem::GetState().wheelDataValid ? 1 : 0,
+          BrakeSystem::GetState().validWheelCount,
+          BrakeSystem::GetState().wheelSlip,
+          BrakeSystem::GetState().absLevel,
+          BrakeSystem::IsABSActive() ? 1 : 0,
+          LaunchControl::GetState().enabled ? 1 : 0,
+          LaunchControl::GetState().armed ? 1 : 0,
+          LaunchControl::GetState().limiting ? 1 : 0);
       s_lastStatusLog = GetTickCount();
     }
 

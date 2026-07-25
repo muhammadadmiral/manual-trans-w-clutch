@@ -62,7 +62,10 @@ tidak lagi menjadi faktor tunggal.
 
 ## ABS / TCS dan brake fade
 
-TCS dan ABS hanya mengintervensi bila minimal dua sample roda valid.
+TCS dan ABS hanya mengintervensi bila minimal dua sample roda valid. Angka
+`TCS=0` atau `ABS=0` di log berarti sistem sedang tidak memotong input, bukan
+fiturnya mati. Cek `TCSEn`/`ABSEn` untuk konfigurasi dan
+`TCSReady`/`ABSReady` untuk kesiapan telemetry roda.
 
 - `Slip Target`: slip yang masih diizinkan.
 - `Max Cut/Release`: batas intervensi throttle atau pressure.
@@ -86,4 +89,9 @@ TCS dan ABS hanya mengintervensi bila minimal dua sample roda valid.
 Baris `STATUS` di `manual-trans.log` dicatat setelah final drivetrain write dan
 memuat profile kendaraan, selector, logical/physical gear, clutch, RPM native,
 ratio, max velocity, status handling pointer, torque reserve, stall, clash,
-money shift, starter, TCS, dan ABS.
+money shift, starter, TCS, ABS, dan launch control. `Accel` adalah respons
+longitudinal terfilter dan `LowRec` adalah kompensasi torque native yang sedang
+dipakai ketika GTA menahan forced gear di low RPM. Untuk assist, suffix `En`
+berarti enabled, `Ready` berarti telemetry tersedia, dan nilai tanpa suffix
+berarti sedang mengintervensi. Launch control memang mati jika `LCEn=0`;
+aktifkan `LaunchControl=1` lewat menu atau bagian `[Engine]`.

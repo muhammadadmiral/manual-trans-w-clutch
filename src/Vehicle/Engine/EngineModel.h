@@ -20,11 +20,15 @@ struct State {
   float connectedRPMTarget = 0.2f;
   float estimatedFlatVelocity = 0.0f;
   float driveTorqueFactor = 1.0f;
+  float longitudinalAcceleration = 0.0f;
+  float lowRpmRecovery = 0.0f;
+  float previousDirectionalSpeed = 0.0f;
   bool freeRevActive = false;
   bool rpmOwned = false;
   bool nativeCutRecovered = false;
   bool redlineCut = false;
   bool handlingBacked = false;
+  bool speedSampleValid = false;
 };
 
 void Reset();

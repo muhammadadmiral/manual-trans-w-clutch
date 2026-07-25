@@ -183,10 +183,18 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
     maxGear = 1;
   s_state.currentGear = std::clamp(s_state.currentGear, 1, maxGear);
   const float speedCoupling = Clamp01(std::fabs(signedSpeedMps) / 7.0f);
+  const float roadRPM =
+      RoadRPM(vehicle, data, vehicleMaxGear, s_state.currentGear,
+              signedSpeedMps);
+  const bool sport = s_state.selector == Selector::Sport;
+  const float lowRpmUnlock =
+      throttle *
+      (1.0f - SmoothStep((roadRPM - 0.22f) / (sport ? 0.30f : 0.36f)));
+  const float unlockAmount = lowRpmUnlock * (sport ? 0.16f : 0.30f);
   const float converterCoupling =
       engineOn ? std::clamp(0.62f + speedCoupling * 0.38f +
-                               throttle * 0.10f,
-                           0.0f, 1.0f)
+                               throttle * 0.08f - unlockAmount,
+                           sport ? 0.58f : 0.48f, 1.0f)
                : 0.0f;
 
   const DWORD now = GetTickCount();
@@ -195,7 +203,6 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
 
   if (s_state.shiftPhase != ShiftPhase::Engaged) {
     const DWORD phaseElapsed = now - s_state.phaseStartedAt;
-    const bool sport = s_state.selector == Selector::Sport;
     const DWORD disengageMs = sport ? 55 : 80;
     const DWORD synchronizeMs = sport ? 70 : 105;
     const DWORD engageMs = sport ? 150 : 230;
@@ -250,7 +257,6 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
   if (elapsedSinceShift < delayMs)
     return s_state.currentGear;
 
-  const bool sport = s_state.selector == Selector::Sport;
   const float nativeRPM = data.GetRPM();
   const float rpm =
       RoadRPM(vehicle, data, vehicleMaxGear, s_state.currentGear,

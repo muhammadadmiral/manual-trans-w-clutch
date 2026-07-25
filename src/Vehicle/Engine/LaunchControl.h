@@ -5,7 +5,10 @@ class VehicleData;
 namespace LaunchControl {
 
 struct State {
+  bool enabled = false;
+  bool armed = false;
   bool active = false;
+  bool limiting = false;
   float targetRPM = 0.72f;
 };
 
