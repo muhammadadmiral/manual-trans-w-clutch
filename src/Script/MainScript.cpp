@@ -329,10 +329,16 @@ void ScriptMain() {
           VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
           LOG_INFO(Script, "Engine key -> OFF");
         } else {
-          engineStarting = true;
-          engineStartTick = GetTickCount64();
-          VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, TRUE, FALSE, TRUE);
-          LOG_INFO(Script, "Engine key -> STARTING");
+          if (vehicleProfile == VehicleProfile::Drivetrain::Electric) {
+            isEngineOn = true;
+            VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, TRUE, TRUE, TRUE);
+            LOG_INFO(Script, "EV power -> READY");
+          } else {
+            engineStarting = true;
+            engineStartTick = GetTickCount64();
+            VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, TRUE, FALSE, TRUE);
+            LOG_INFO(Script, "Engine key -> STARTING");
+          }
         }
       } else {
         Renderer::ShowNotification(
@@ -364,7 +370,7 @@ void ScriptMain() {
         LOG_WARN(Script, "Engine unavailable health=%.1f", engineHealth);
       } else {
         // Flag engine native kadang drop sesaat saat downshift ekstrem.
-        VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, TRUE, FALSE, TRUE);
+        VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, TRUE, TRUE, TRUE);
       }
     }
 
@@ -497,7 +503,7 @@ void ScriptMain() {
             transmissionMode == 0
                 ? "Transmission mod: ~c~OFF"
                 : (transmissionMode == 1
-                       ? "Transmission: ~b~AUTOMATIC P-R-N-D-S"
+                       ? "Transmission: ~b~AUTOMATIC P-R-N-D-S-L2-L1"
                        : "Transmission: ~g~MANUAL SEQUENTIAL"));
       }
       LOG_INFO(Gear, "Transmission mode=%d requested=%d profile=%s",
@@ -515,9 +521,8 @@ void ScriptMain() {
     const float vehicleSpeed = ENTITY::GET_ENTITY_SPEED(vehicle);
     const float speedKmH = vehicleSpeed * 3.6f;
     const float forwardSpeed = ENTITY::GET_ENTITY_SPEED_VECTOR(vehicle, TRUE).y;
-    // A digital clutch must disconnect on the first pressed frame. Attack
-    // still shapes release/travel, but can never leave residual drive while
-    // the key is physically held.
+    // Tombol clutch harus putus di frame pertama. Attack/release tetap kepakai
+    // buat travel setelah tombol dilepas.
     const bool automaticMode = transmissionMode == 1;
     const bool motorcycleAutoClutch =
         transmissionMode == 2 &&
@@ -662,7 +667,8 @@ void ScriptMain() {
           "Actuator=%.3f Throttle=%.3f Brake=%.3f RPM=%.3f "
           "SpeedKmH=%.1f SignedMps=%.2f Ratio=%.4f MaxVel=%.2f "
           "Handling=%d Load=%.3f TorqueReserve=%.3f Stall=%.3f "
-          "Clash=%.3f Shock=%.3f Money=%d Start=%d TCS=%d ABS=%d",
+          "Clash=%.3f Shock=%.3f Money=%d Engine=%d Actual=%d Start=%d "
+          "TCS=%d ABS=%d",
           transmissionMode, VehicleProfile::GetName(vehicleProfile),
           automaticMode ? AutomaticGearbox::GetSelectorName() : "M",
           manualGear, static_cast<unsigned>(data.GetGear()),
@@ -679,6 +685,7 @@ void ScriptMain() {
           GearboxSystem::GetState().clashSeverity,
           GearboxSystem::GetState().shockRemaining,
           GearboxSystem::GetState().moneyShift ? 1 : 0,
+          isEngineOn ? 1 : 0, actualEngineOn ? 1 : 0,
           engineStarting ? 1 : 0,
           TractionControl::IsTCSActive() ? 1 : 0,
           BrakeSystem::IsABSActive() ? 1 : 0);
