@@ -23,6 +23,7 @@
     <ClCompile Include="src\Script\MainScript.cpp" />
     <ClCompile Include="src\Core\ModLogger.cpp" />
     <ClCompile Include="src\Memory\AOBScanner.cpp" />
+    <ClCompile Include="src\Memory\CalibrationEngine.cpp" />
     <ClCompile Include="src\Memory\GameMemoryEngine.cpp" />
     <ClCompile Include="src\Memory\OffsetResolver.cpp" />
     <ClCompile Include="src\Vehicle\VehicleData.cpp" />
@@ -47,6 +48,7 @@
     <ClInclude Include="src\Core\InputHandler.h" />
     <ClInclude Include="src\Core\Renderer.h" />
     <ClInclude Include="src\Memory\AOBScanner.h" />
+    <ClInclude Include="src\Memory\CalibrationEngine.h" />
     <ClInclude Include="src\Memory\GameMemoryEngine.h" />
     <ClInclude Include="src\Memory\OffsetResolver.h" />
     <ClInclude Include="src\Vehicle\VehicleData.h" />

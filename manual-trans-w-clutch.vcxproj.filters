@@ -66,6 +66,9 @@
     <ClCompile Include="src\Memory\AOBScanner.cpp">
       <Filter>Source Files\Memory</Filter>
     </ClCompile>
+    <ClCompile Include="src\Memory\CalibrationEngine.cpp">
+      <Filter>Source Files\Memory</Filter>
+    </ClCompile>
     <ClCompile Include="src\Memory\GameMemoryEngine.cpp">
       <Filter>Source Files\Memory</Filter>
     </ClCompile>
@@ -120,6 +123,9 @@
       <Filter>Header Files\Core</Filter>
     </ClInclude>
     <ClInclude Include="src\Memory\AOBScanner.h">
+      <Filter>Header Files\Memory</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Memory\CalibrationEngine.h">
       <Filter>Header Files\Memory</Filter>
     </ClInclude>
     <ClInclude Include="src\Memory\GameMemoryEngine.h">

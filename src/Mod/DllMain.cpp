@@ -2,11 +2,13 @@
 // DllMain.cpp
 // Windows DLL entry point for the manual-trans-w-clutch ScriptHookV mod.
 //
-// Responsibilities:
+// Responsibilities (and ONLY these):
 //   - Initialize / shut down ModLogger
 //   - Register / unregister ScriptMain with ScriptHookV
+//   - Expose g_pluginModule so other TUs can find the .asi directory
 //
-// Nothing else belongs here. Keep this file minimal.
+// Everything else lives in src/Script/MainScript.cpp (game loop) or
+// src/Core, src/Memory, src/Vehicle (subsystems).
 // =============================================================================
 #define NOMINMAX
 #include <Windows.h>
@@ -15,8 +17,6 @@
 #include "../Core/ModLogger.h"
 #include "../Script/MainScript.h"
 
-// Exposed so other translation units (MainScript, VehicleData, Config, …)
-// can pass the HMODULE to APIs like GetModuleFileNameA.
 HMODULE g_pluginModule = nullptr;
 
 BOOL APIENTRY DllMain(HMODULE instance, DWORD reason, LPVOID) {
@@ -25,16 +25,13 @@ BOOL APIENTRY DllMain(HMODULE instance, DWORD reason, LPVOID) {
     case DLL_PROCESS_ATTACH:
         g_pluginModule = instance;
         DisableThreadLibraryCalls(instance);
-
-        // Initialize the logger first so every subsequent call can use it.
         ModLogger::Initialize(instance);
-        LOG_INFO(INIT, "DLL_PROCESS_ATTACH — registering script thread with ScriptHookV.");
-
+        LOG_INFO(Init, "DLL_PROCESS_ATTACH — registering ScriptMain with ScriptHookV");
         scriptRegister(instance, ScriptMain);
         break;
 
     case DLL_PROCESS_DETACH:
-        LOG_INFO(INIT, "DLL_PROCESS_DETACH — unregistering script and flushing logs.");
+        LOG_INFO(Init, "DLL_PROCESS_DETACH — unregistering script, flushing logs");
         scriptUnregister(instance);
         ModLogger::Shutdown();
         break;
@@ -42,6 +39,5 @@ BOOL APIENTRY DllMain(HMODULE instance, DWORD reason, LPVOID) {
     default:
         break;
     }
-
     return TRUE;
 }

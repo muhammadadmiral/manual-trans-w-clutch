@@ -1,12 +1,18 @@
 // =============================================================================
-// MainScript.cpp
-// ScriptHookV main game-loop script for manual-trans-w-clutch.
+// MainScript.cpp — ScriptHookV main game-loop script
+//
+// Entry point: ScriptMain() — registered in src/Mod/DllMain.cpp
 //
 // This file owns:
-//   - Vehicle validation helpers (anonymous namespace)
-//   - ScriptMain() — the per-frame update loop
+//   • Vehicle validation and change detection
+//   • Per-frame subsystem orchestration:
+//       InputHandler → ClutchSim → ParkingBrake → TCS/ABS →
+//       Turbo → GearLogic → PhysicsEngine → FuelSystem →
+//       Memory writes → HUD / Telemetry
+//   • Calibration HUD overlay
 //
-// It does NOT own DllMain() — that lives in src/Mod/DllMain.cpp.
+// Subsystem implementations live in src/Vehicle/ and src/Core/.
+// CalibrationEngine lives in src/Memory/CalibrationEngine.cpp.
 // =============================================================================
 #define NOMINMAX
 #include "MainScript.h"
@@ -36,245 +42,202 @@
 extern HMODULE g_pluginModule;
 
 // =============================================================================
-// Vehicle classification helpers
+// Vehicle validation helpers (anonymous — not part of the public API)
 // =============================================================================
 namespace {
 
-bool IsVehicleClassExcluded(int vehicleClass) {
-    for (const int excluded : Config::ExcludedVehicleClasses) {
-        if (excluded == vehicleClass) return true;
-    }
+bool IsModelExcluded(int vehicleClass) {
+    for (const int excl : Config::ExcludedVehicleClasses)
+        if (excl == vehicleClass) return true;
     return false;
 }
 
+// Returns true if the vehicle model should be controlled by this mod.
+// Slow path — checks many native predicates.
 bool ComputeIsValidVehicle(Vehicle vehicle) {
-    if (vehicle == 0 || !ENTITY::DOES_ENTITY_EXIST(vehicle)) return false;
-
+    if (!vehicle || !ENTITY::DOES_ENTITY_EXIST(vehicle)) return false;
     const Hash model = ENTITY::GET_ENTITY_MODEL(vehicle);
-
     if (VEHICLE::IS_THIS_MODEL_A_PLANE(model)   ||
         VEHICLE::IS_THIS_MODEL_A_HELI(model)    ||
         VEHICLE::IS_THIS_MODEL_A_BOAT(model)    ||
         VEHICLE::IS_THIS_MODEL_A_JETSKI(model)  ||
         VEHICLE::IS_THIS_MODEL_A_TRAIN(model)   ||
-        VEHICLE::IS_THIS_MODEL_A_BICYCLE(model)) {
-        return false;
-    }
-
+        VEHICLE::IS_THIS_MODEL_A_BICYCLE(model))  return false;
     if (!Config::AllowQuadbikes && VEHICLE::IS_THIS_MODEL_A_QUADBIKE(model))
         return false;
-
-    if (IsVehicleClassExcluded(VEHICLE::GET_VEHICLE_CLASS(vehicle)))
+    if (IsModelExcluded(VEHICLE::GET_VEHICLE_CLASS(vehicle)))
         return false;
-
     return true;
 }
 
-// Model-hash cache so we only call the expensive model checks once per model.
+// Cached per-model result so we don't call natives every frame.
 bool IsValidVehicle(Vehicle vehicle) {
-    if (vehicle == 0 || !ENTITY::DOES_ENTITY_EXIST(vehicle)) return false;
-
-    static std::unordered_map<Hash, bool> s_classCache;
+    if (!vehicle || !ENTITY::DOES_ENTITY_EXIST(vehicle)) return false;
+    static std::unordered_map<Hash, bool> s_cache;
     const Hash model = ENTITY::GET_ENTITY_MODEL(vehicle);
-    const auto it    = s_classCache.find(model);
-    if (it != s_classCache.end()) return it->second;
-
-    const bool valid = ComputeIsValidVehicle(vehicle);
-    if (valid)
-        s_classCache.emplace(model, true);
-    return valid;
+    const auto it    = s_cache.find(model);
+    if (it != s_cache.end()) return it->second;
+    const bool v = ComputeIsValidVehicle(vehicle);
+    if (v) s_cache.emplace(model, true);
+    return v;
 }
 
 bool IsPlayerDriving(Ped playerPed, Vehicle vehicle) {
     return VEHICLE::GET_PED_IN_VEHICLE_SEAT(vehicle, -1, 0) == playerPed;
 }
 
-// ── Calibration HUD helper ────────────────────────────────────────────────────
+// ── Calibration HUD ───────────────────────────────────────────────────────────
 void DrawCalibrationHUD(CalibrationState state, float smoothedThrottle) {
-    std::string calibMsg = "Calibration: ";
+    std::string msg = "Calibration: ";
     switch (state) {
         case CalibrationState::Failed:
-            calibMsg += "Failed. Check notification or Menu.";
-            break;
+            msg += "~r~FAILED~w~ — check manual-trans.log"; break;
         case CalibrationState::WaitingForEngineOff:
-            calibMsg += "Turn off engine (press " +
-                        std::string(1, static_cast<char>(Config::KeyEngine)) + ")";
-            break;
+            msg += "Turn engine OFF (press " + std::string(1, (char)Config::KeyEngine) + ")"; break;
         case CalibrationState::WaitingForEngineOn:
-            calibMsg += "Turn ON engine (press " +
-                        std::string(1, static_cast<char>(Config::KeyEngine)) + ") and idle";
-            break;
+            msg += "Turn engine ON and let it idle"; break;
         case CalibrationState::ScanningEngineOff:
-            calibMsg += "Waiting for RPM to settle (engine off)...";
-            break;
+            msg += "Waiting for RPM to reach 0…"; break;
         case CalibrationState::ScanningEngineOn:
-            calibMsg += "Sampling idle RPM...";
-            break;
+            msg += "Sampling idle RPM…"; break;
         case CalibrationState::WaitingForRev:
-            calibMsg += "Rev the engine (Hold W)";
-            break;
+            msg += "~g~Hold throttle (W) to rev engine"; break;
         case CalibrationState::ScanningRev:
-            calibMsg += "Sampling rev RPM...";
-            break;
+            msg += "Sampling rev RPM…"; break;
         case CalibrationState::Done:
-            calibMsg += "Success! Offsets saved.";
-            break;
+            msg += "~g~SUCCESS! Offsets saved."; break;
         default:
-            calibMsg += "Scanning... (" +
-                        std::to_string(VehicleData::GetCalibrationCandidateCount()) +
-                        " candidates left)";
+            msg += "Scanning… (" +
+                   std::to_string(VehicleData::GetCalibrationCandidateCount()) +
+                   " candidates)";
             break;
     }
+    Renderer::DrawTextOverlay(msg.c_str(), 0.5f, 0.10f, 0.60f);
 
-    Renderer::DrawTextOverlay(calibMsg.c_str(), 0.5f, 0.10f, 0.60f);
-
-    // Debug row: raw key state + smoothed throttle
-    char throttleDbg[128]{};
-    sprintf_s(throttleDbg,
-              "[debug] raw W: %s | smoothed throttle: %.2f | calib state: %d",
-              (GetAsyncKeyState(0x57) & 0x8000) ? "PRESSED" : "released",
+    char dbg[160]{};
+    sprintf_s(dbg,
+              "[debug] W=%s throttle=%.2f state=%d candidates=%zu",
+              (GetAsyncKeyState(0x57) & 0x8000) ? "DOWN" : "up",
               smoothedThrottle,
-              static_cast<int>(state));
-    Renderer::DrawTextOverlay(throttleDbg, 0.5f, 0.15f, 0.36f);
+              static_cast<int>(state),
+              VehicleData::GetCalibrationCandidateCount());
+    Renderer::DrawTextOverlay(dbg, 0.5f, 0.15f, 0.34f);
 }
 
 } // namespace
 
 // =============================================================================
-// ScriptMain — registered with ScriptHookV via scriptRegister()
+// ScriptMain — the ScriptHookV game-loop thread
 // =============================================================================
 void ScriptMain() {
-    LOG_INFO(SCRIPT, "ScriptMain started, waiting for player ped...");
+    LOG_INFO(Script, "ScriptMain started — waiting for player ped...");
 
-    // ── Phase 1: wait until the player ped is alive ───────────────────────────
+    // ── Phase 1: wait for the player to spawn ─────────────────────────────────
     while (true) {
         scriptWait(1000);
-        const Ped playerPed = PLAYER::PLAYER_PED_ID();
-        if (ENTITY::DOES_ENTITY_EXIST(playerPed) && !PED::IS_PED_INJURED(playerPed))
-            break;
+        const Ped p = PLAYER::PLAYER_PED_ID();
+        if (ENTITY::DOES_ENTITY_EXIST(p) && !PED::IS_PED_INJURED(p)) break;
     }
-    LOG_INFO(SCRIPT, "Player ped ready. Running VehicleData::Initialize...");
+    LOG_INFO(Script, "Player ped ready. Initializing VehicleData...");
 
-    // ── Phase 2: initialize memory offsets ───────────────────────────────────
+    // ── Phase 2: resolve CVehicle offsets ─────────────────────────────────────
     if (!VehicleData::Initialize(g_pluginModule)) {
-        const std::string buildVer = VehicleData::GetGameBuildVersion();
-        const std::string reason   = VehicleData::GetLastFailureReason();
-
-        LOG_FATAL(MEM, "VehicleData::Initialize failed! Build: %s | Reason: %s",
-                  buildVer.empty() ? "unknown" : buildVer.c_str(),
-                  reason.c_str());
-
-        char msg[256]{};
-        sprintf_s(msg, "Manual transmission disabled (build %s): %s",
-                  buildVer.empty() ? "unknown" : buildVer.c_str(),
-                  reason.c_str());
-        Renderer::ShowNotification(msg);
+        const std::string reason = VehicleData::GetLastFailureReason();
+        LOG_FATAL(Script, "VehicleData::Initialize returned false: %s", reason.c_str());
+        Renderer::ShowNotification(("~r~Manual trans disabled: " + reason).c_str());
         return;
     }
-    LOG_INFO(SCRIPT, "VehicleData::Initialize OK. Reading config...");
+    LOG_INFO(Script, "VehicleData::Initialize OK. Reading config...");
 
     Config::ReadConfig(g_pluginModule);
-
-    // Apply log verbosity from config
-    if (Config::DebugOverlay)
-        ModLogger::SetMinLevel(ModLogger::Level::DEBUG);
-    else
-        ModLogger::SetMinLevel(ModLogger::Level::INFO);
-
-    LOG_INFO(SCRIPT, "Config loaded. Debug logging: %s",
-             Config::DebugOverlay ? "VERBOSE" : "INFO");
+    ModLogger::SetMinLevel(Config::DebugOverlay ? ModLogger::Level::Verbose
+                                                : ModLogger::Level::Info);
+    LOG_INFO(Script, "Config loaded. Verbose logging: %s",
+             Config::DebugOverlay ? "ON" : "off");
 
     // ── Per-session state ─────────────────────────────────────────────────────
-    bool     notificationShown    = false;
-    Vehicle  activeVehicle        = 0;
-    bool     activeLayoutValidated = false;
-    bool     isEngineOn           = true;
-    int      grindWarningTimer    = 0;
-    int      manualGear           = 0;
-    int      activeSignal         = 0;
-    ULONGLONG s_vehicleEnterTime  = 0;
+    bool       notificationShown   = false;
+    Vehicle    activeVehicle        = 0;
+    bool       activeLayoutValid    = false;
+    bool       isEngineOn           = true;
+    int        grindWarningTimer    = 0;
+    int        manualGear           = 0;
+    int        activeSignal         = 0;
+    ULONGLONG  vehicleEnterTick     = 0;
 
-    // Calibration failure de-dupe
-    static CalibrationState s_lastCalibState = CalibrationState::None;
+    CalibrationState lastCalibState = CalibrationState::None;
 
     // ── Main loop ─────────────────────────────────────────────────────────────
     while (true) {
         scriptWait(0);
 
-        // Force-recalibrate requested from menu
+        // Force re-calibrate from menu
         if (Config::ForceRecalibrate) {
             Config::ForceRecalibrate = false;
-            LOG_INFO(CALIB, "ForceRecalibrate requested — resetting calibration state.");
+            LOG_INFO(Calib, "ForceRecalibrate flag set — resetting calibration");
             VehicleData::ResetCalibration();
-            s_lastCalibState = CalibrationState::None;
+            lastCalibState = CalibrationState::None;
         }
 
         Menu::Update();
-
         const Ped playerPed = PLAYER::PLAYER_PED_ID();
 
         // ── Not in a vehicle ──────────────────────────────────────────────────
         if (!PED::IS_PED_IN_ANY_VEHICLE(playerPed, FALSE)) {
-            if (activeVehicle != 0) {
-                LOG_INFO(SCRIPT, "Player exited vehicle %d. Resetting session state.", activeVehicle);
+            if (activeVehicle) {
+                LOG_INFO(Script, "Player exited vehicle %d — resetting session state", activeVehicle);
             }
-            activeVehicle = 0;
-            activeLayoutValidated = false;
-            activeSignal = 0;
+            activeVehicle     = 0;
+            activeLayoutValid = false;
+            activeSignal      = 0;
             InputHandler::ResetEdges();
             Menu::Draw();
             continue;
         }
 
         const Vehicle vehicle = PED::GET_VEHICLE_PED_IS_IN(playerPed, FALSE);
-
-        // ── Not a valid manual-trans vehicle ─────────────────────────────────
         if (!IsValidVehicle(vehicle) || !IsPlayerDriving(playerPed, vehicle)) {
-            activeVehicle = 0;
-            activeLayoutValidated = false;
-            activeSignal = 0;
+            activeVehicle     = 0;
+            activeLayoutValid = false;
+            activeSignal      = 0;
             InputHandler::ResetEdges();
             Menu::Draw();
             continue;
         }
 
-        // ── Show one-time "loaded" notification ───────────────────────────────
+        // ── One-time "mod active" notification ────────────────────────────────
         if (!notificationShown && VehicleData::IsInitialized()) {
             notificationShown = true;
-            const VehicleOffsets& offsets = VehicleData::GetResolvedOffsets();
-            const std::string     buildVer = VehicleData::GetGameBuildVersion();
-
-            char msg[256]{};
-            sprintf_s(msg,
-                      "Manual transmission: %s | build %s | G:%X N:%X R:%X C:%X",
+            const VehicleOffsets& off = VehicleData::GetResolvedOffsets();
+            const std::string     bv  = VehicleData::GetGameBuildVersion();
+            char notify[256]{};
+            sprintf_s(notify,
+                      "Manual trans: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
                       VehicleData::GetOffsetSourceName(),
-                      buildVer.empty() ? "unknown" : buildVer.c_str(),
-                      offsets.Gear, offsets.NextGear, offsets.RPM, offsets.Clutch);
-            Renderer::ShowNotification(msg);
-
-            LOG_INFO(INIT, "Mod active — source=%s build=%s G=0x%X N=0x%X RPM=0x%X CLT=0x%X",
+                      bv.empty() ? "?" : bv.c_str(),
+                      off.Gear, off.NextGear, off.RPM, off.Clutch);
+            Renderer::ShowNotification(notify);
+            LOG_INFO(Init,
+                     "Mod active — src=%s build=%s G=0x%X N=0x%X RPM=0x%X CLT=0x%X",
                      VehicleData::GetOffsetSourceName(),
-                     buildVer.empty() ? "unknown" : buildVer.c_str(),
-                     offsets.Gear, offsets.NextGear, offsets.RPM, offsets.Clutch);
+                     bv.empty() ? "?" : bv.c_str(),
+                     off.Gear, off.NextGear, off.RPM, off.Clutch);
         }
 
         const int maxGear = VEHICLE::_GET_VEHICLE_MAX_DRIVE_GEAR_COUNT(vehicle);
         VehicleData data(vehicle);
-        const bool actualEngineOn = VEHICLE::GET_IS_VEHICLE_ENGINE_RUNNING(vehicle) != 0;
+        const bool actualEngineOn = (VEHICLE::GET_IS_VEHICLE_ENGINE_RUNNING(vehicle) != 0);
 
         // ── Vehicle change ────────────────────────────────────────────────────
         if (vehicle != activeVehicle) {
-            LOG_INFO(SCRIPT, "Entered vehicle handle=%d maxGear=%d. Resetting subsystems.", vehicle, maxGear);
+            LOG_INFO(Script, "Entered vehicle handle=%d maxGear=%d", vehicle, maxGear);
+            activeVehicle     = vehicle;
+            activeLayoutValid = true;
 
-            activeVehicle = vehicle;
-            activeLayoutValidated = true;
-
+            isEngineOn = Config::RequireColdStart ? false : actualEngineOn;
             if (Config::RequireColdStart) {
                 VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
-                isEngineOn = false;
-                LOG_INFO(SCRIPT, "Cold start required — engine set OFF for vehicle %d.", vehicle);
-            } else {
-                isEngineOn = actualEngineOn;
+                LOG_INFO(Script, "Cold start required — engine forced OFF for vehicle %d", vehicle);
             }
 
             GearLogic::Reset(0);
@@ -288,133 +251,116 @@ void ScriptMain() {
             if (TelemetryLogger::IsLogging()) TelemetryLogger::StopSession();
             TelemetryLogger::StartSession(std::to_string(vehicle));
 
-            s_vehicleEnterTime = GetTickCount64();
-            activeSignal = 0;
+            vehicleEnterTick = GetTickCount64();
+            activeSignal     = 0;
         }
 
-        // ── Skip frames while vehicle physics initializes ─────────────────────
-        if (GetTickCount64() - s_vehicleEnterTime < 500) {
+        // Skip a short grace period while vehicle physics initializes
+        if (GetTickCount64() - vehicleEnterTick < 500) {
             Menu::Draw();
             continue;
         }
 
         InputHandler::Update();
 
-        // ── Engine on/off key ─────────────────────────────────────────────────
+        // ── Engine toggle key ─────────────────────────────────────────────────
         if (InputHandler::IsEngineJustPressed()) {
             isEngineOn = !isEngineOn;
-            LOG_INFO(SCRIPT, "Engine key pressed — new state: %s", isEngineOn ? "ON" : "OFF");
             VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, isEngineOn ? TRUE : FALSE, TRUE, TRUE);
+            LOG_INFO(Script, "Engine key → %s", isEngineOn ? "ON" : "OFF");
         } else if (!isEngineOn && actualEngineOn) {
-            // Game turned engine back on (e.g. AI restart). Correct it.
+            // Game AI turned it back on — force our state.
             VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
-            LOG_DEBUG(SCRIPT, "Engine state mismatch corrected: we=OFF game=ON → forcing OFF.");
+            LOG_DEBUG(Script, "Engine mismatch corrected: we=OFF game=ON → forcing OFF");
         } else if (isEngineOn && !actualEngineOn) {
-            // Engine died externally (fire / destroyed / fuel out).
+            // Died externally (fire / destroyed / fuel empty)
             isEngineOn = false;
-            LOG_WARN(SCRIPT, "Engine died externally (fire/destroyed/fuel). Reflecting state.");
+            LOG_WARN(Script, "Engine died externally (fire/destroyed). Reflecting state.");
         }
 
         // ── Turn signals ──────────────────────────────────────────────────────
-        {
-            constexpr int kIndicatorLeft  = 1;
-            constexpr int kIndicatorRight = 0;
-
-            if (InputHandler::IsSignalLeftJustPressed()) {
-                activeSignal = (activeSignal == 1) ? 0 : 1;
-                VEHICLE::SET_VEHICLE_INDICATOR_LIGHTS(vehicle, kIndicatorRight, FALSE);
-                VEHICLE::SET_VEHICLE_INDICATOR_LIGHTS(vehicle, kIndicatorLeft, activeSignal == 1);
-                LOG_DEBUG(SIGNAL, "Signal LEFT toggled — activeSignal=%d", activeSignal);
-            } else if (InputHandler::IsSignalRightJustPressed()) {
-                activeSignal = (activeSignal == 2) ? 0 : 2;
-                VEHICLE::SET_VEHICLE_INDICATOR_LIGHTS(vehicle, kIndicatorLeft, FALSE);
-                VEHICLE::SET_VEHICLE_INDICATOR_LIGHTS(vehicle, kIndicatorRight, activeSignal == 2);
-                LOG_DEBUG(SIGNAL, "Signal RIGHT toggled — activeSignal=%d", activeSignal);
-            }
+        if (InputHandler::IsSignalLeftJustPressed()) {
+            activeSignal = (activeSignal == 1) ? 0 : 1;
+            VEHICLE::SET_VEHICLE_INDICATOR_LIGHTS(vehicle, 0, FALSE);
+            VEHICLE::SET_VEHICLE_INDICATOR_LIGHTS(vehicle, 1, activeSignal == 1);
+            LOG_DEBUG(Sig, "Signal LEFT → %d", activeSignal);
+        } else if (InputHandler::IsSignalRightJustPressed()) {
+            activeSignal = (activeSignal == 2) ? 0 : 2;
+            VEHICLE::SET_VEHICLE_INDICATOR_LIGHTS(vehicle, 1, FALSE);
+            VEHICLE::SET_VEHICLE_INDICATOR_LIGHTS(vehicle, 0, activeSignal == 2);
+            LOG_DEBUG(Sig, "Signal RIGHT → %d", activeSignal);
         }
 
-        // ── Calibration path ──────────────────────────────────────────────────
+        // ── Calibration path (while not initialized) ──────────────────────────
         if (!VehicleData::IsInitialized()) {
-            const float smoothedThrottle = InputHandler::GetSmoothedThrottle();
-            const bool  isRevving        = smoothedThrottle > 0.5f;
+            const float smoothThrottle = InputHandler::GetSmoothedThrottle();
+            const bool  isRevving      = smoothThrottle > 0.5f;
 
             VehicleData::UpdateCalibration(g_pluginModule, vehicle, isEngineOn, isRevving);
 
             const CalibrationState state = VehicleData::GetCalibrationState();
 
-            // Log state transitions
-            if (state != s_lastCalibState) {
-                LOG_INFO(CALIB, "State transition: %d → %d | candidates=%zu",
-                         static_cast<int>(s_lastCalibState),
+            if (state != lastCalibState) {
+                LOG_INFO(Calib, "State %d → %d | candidates=%zu",
+                         static_cast<int>(lastCalibState),
                          static_cast<int>(state),
                          VehicleData::GetCalibrationCandidateCount());
-                s_lastCalibState = state;
+                lastCalibState = state;
             }
 
             if (VehicleData::IsInitialized()) {
-                const VehicleOffsets& offsets = VehicleData::GetResolvedOffsets();
-                LOG_INFO(CALIB, "Calibration SUCCESS — RPM=0x%X CLT=0x%X G=0x%X N=0x%X TG=0x%X",
-                         offsets.RPM, offsets.Clutch,
-                         offsets.Gear, offsets.NextGear, offsets.TopGear);
-
-                activeLayoutValidated = data.HasPlausibleLayout(maxGear > 0 ? maxGear : 6);
-                Renderer::ShowNotification("Calibration complete! Manual transmission active.");
+                // Just succeeded!
+                const VehicleOffsets& off = VehicleData::GetResolvedOffsets();
+                LOG_INFO(Calib, "Calibration done — RPM=0x%X CLT=0x%X G=0x%X N=0x%X TG=0x%X",
+                         off.RPM, off.Clutch, off.Gear, off.NextGear, off.TopGear);
+                activeLayoutValid = data.HasPlausibleLayout(maxGear > 0 ? maxGear : 6);
+                Renderer::ShowNotification("~g~Calibration complete! Manual transmission active.");
             } else {
-                // Show failure notification once per failure event
                 if (state == CalibrationState::Failed &&
-                    s_lastCalibState != CalibrationState::Failed) {
-                    const std::string reason = VehicleData::GetLastFailureReason();
-                    LOG_ERROR(CALIB, "Calibration FAILED: %s", reason.c_str());
-                    std::string failMsg = "~r~Calibration Failed:~w~\n" + reason;
-                    Renderer::ShowNotification(failMsg.c_str());
+                    lastCalibState == CalibrationState::Failed) {
+                    const std::string& reason = VehicleData::GetLastFailureReason();
+                    LOG_ERROR(Calib, "Calibration FAILED: %s", reason.c_str());
+                    Renderer::ShowNotification(("~r~Calibration Failed:~w~ " + reason).c_str());
                 }
-
-                DrawCalibrationHUD(state, smoothedThrottle);
-
-                // Extended debug: show candidate count every second
-                LOG_DEBUG_T(CALIB, 1000,
-                            "Calibration in progress — state=%d candidates=%zu isRevving=%d throttle=%.2f",
+                DrawCalibrationHUD(state, smoothThrottle);
+                LOG_DEBUG_T(Calib, 1000,
+                            "Calib in progress: state=%d candidates=%zu throttle=%.2f revving=%d",
                             static_cast<int>(state),
                             VehicleData::GetCalibrationCandidateCount(),
-                            static_cast<int>(isRevving),
-                            smoothedThrottle);
+                            smoothThrottle,
+                            static_cast<int>(isRevving));
             }
-
             Menu::Draw();
             continue;
         }
 
         // ── Layout validation ─────────────────────────────────────────────────
-        if (!activeLayoutValidated || !data.IsValid()) {
-            LOG_WARN_T(MEM, 2000,
-                       "Layout not validated or VehicleData invalid — skipping frame. "
-                       "validated=%d dataValid=%d",
-                       static_cast<int>(activeLayoutValidated),
+        if (!activeLayoutValid || !data.IsValid()) {
+            LOG_WARN_T(Memory, 2000,
+                       "Layout invalid — skipping frame (valid=%d dataValid=%d)",
+                       static_cast<int>(activeLayoutValid),
                        static_cast<int>(data.IsValid()));
             Menu::Draw();
             continue;
         }
 
-        // Continuous sanity check — calibration-derived offsets can drift.
+        // Continuous mid-session sanity check (calibration offsets can drift)
         if (!data.HasPlausibleLayout(maxGear > 0 ? maxGear : 6)) {
-            activeLayoutValidated = false;
-            LOG_ERROR(MEM,
-                      "Plausibility check FAILED mid-session! "
-                      "gear=%u nextGear=%u rpm=%.4f clutch=%.4f maxGear=%d. "
-                      "Disabling mod for this vehicle.",
-                      static_cast<unsigned>(data.GetGear()),
-                      static_cast<unsigned>(data.GetNextGear()),
+            activeLayoutValid = false;
+            LOG_ERROR(Memory,
+                      "Mid-session plausibility FAILED: G=%u N=%u RPM=%.4f CLT=%.4f maxGear=%d "
+                      "Disabling for this vehicle.",
+                      data.GetGear(), data.GetNextGear(),
                       data.GetRPM(), data.GetClutch(), maxGear);
             Renderer::ShowNotification(
-                "Manual transmission: memory layout looks wrong, disabling for "
-                "this vehicle. Try recalibrating.");
+                "Manual trans: memory layout invalid — disabling. Try recalibrating.");
             Menu::Draw();
             continue;
         }
 
-        // Deluxo hover-mode skip
+        // Deluxo hover-mode: skip manual trans logic when hovering
         if (data.GetHoverTransformRatioLerp() > 0.0f) {
-            LOG_DEBUG_T(SCRIPT, 3000, "Deluxo hover mode active — skipping manual trans logic.");
+            LOG_DEBUG_T(Script, 3000, "Deluxo hover active — skipping");
             Menu::Draw();
             continue;
         }
@@ -427,56 +373,46 @@ void ScriptMain() {
         const float throttle     = InputHandler::GetSmoothedThrottle();
         const float rpm          = data.GetRPM();
 
-        // Debug dump every 500 ms to avoid log spam
-        LOG_DEBUG_T(INPUT, 500,
-                    "throttle=%.3f brake=%.3f clutch=%.3f steer=%.3f "
-                    "rpm=%.4f speed=%.1fkm/h gear=%d",
+        LOG_DEBUG_T(Input, 500,
+                    "throttle=%.3f brake=%.3f clutch=%.3f steer=%.3f rpm=%.4f spd=%.1fkm/h gear=%d",
                     throttle,
                     InputHandler::GetSmoothedBrake(),
                     clutch,
                     InputHandler::GetSmoothedSteer(),
                     rpm, speedKmH, manualGear);
 
-        // ── Clutch simulation ─────────────────────────────────────────────────
+        // ── Subsystem updates ─────────────────────────────────────────────────
         float simulatedClutch = PhysicsEngine::UpdateClutch(clutch, throttle, rpm, isEngineOn);
-
-        // ── Parking brake ─────────────────────────────────────────────────────
         const bool parkingBrakeOn = ParkingBrake::Update(
             vehicle, data, speedKmH, throttle, manualGear, isEngineOn);
 
-        // ── TCS & ABS ─────────────────────────────────────────────────────────
         float tcsThrottle = throttle;
         float absBrake    = InputHandler::GetSmoothedBrake();
-        TractionControl::Update(vehicle, data, speedKmH, rpm, manualGear,
-                                tcsThrottle, absBrake);
+        TractionControl::Update(vehicle, data, speedKmH, rpm, manualGear, tcsThrottle, absBrake);
 
         if (TractionControl::IsTCSActive())
-            LOG_DEBUG_T(PHYSICS, 500, "TCS active — throttle limited to %.3f", tcsThrottle);
+            LOG_DEBUG_T(Physics, 500, "TCS active — throttle limited to %.3f", tcsThrottle);
         if (TractionControl::IsABSActive())
-            LOG_DEBUG_T(PHYSICS, 500, "ABS active — brake limited to %.3f", absBrake);
+            LOG_DEBUG_T(Physics, 500, "ABS active — brake limited to %.3f", absBrake);
 
-        // ── Turbo ─────────────────────────────────────────────────────────────
-        float turboMultiplier = TurboSystem::Update(vehicle, data, rpm, tcsThrottle, isEngineOn);
-        if (turboMultiplier > 1.05f) {
-            VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, turboMultiplier);
-            LOG_DEBUG_T(TURBO, 1000, "Boost active — multiplier=%.3f pressure=%.3f",
-                        turboMultiplier, TurboSystem::GetBoostPressure());
+        float turboMul = TurboSystem::Update(vehicle, data, rpm, tcsThrottle, isEngineOn);
+        if (turboMul > 1.05f) {
+            VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, turboMul);
+            LOG_DEBUG_T(Turbo, 1000, "Boost active: mul=%.3f press=%.3f",
+                        turboMul, TurboSystem::GetBoostPressure());
         }
 
-        // ── Apply native controls ─────────────────────────────────────────────
+        // Apply native controls
         InputHandler::ApplyGameControls(manualGear, simulatedClutch, rpm, maxGear, forwardSpeed);
         if (tcsThrottle < throttle)
             PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, tcsThrottle);
         if (absBrake < InputHandler::GetSmoothedBrake()) {
-            if (forwardSpeed > 0.1f)
-                PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, absBrake);
-            else
-                PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 76, absBrake);
+            PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, forwardSpeed > 0.1f ? 72 : 76, absBrake);
         }
 
         const bool wasEngineOn = isEngineOn;
 
-        // ── Gear logic ────────────────────────────────────────────────────────
+        // Gear logic
         manualGear = GearLogic::Update(
             vehicle, data, maxGear,
             InputHandler::IsShiftUpJustPressed(),
@@ -485,12 +421,12 @@ void ScriptMain() {
             isEngineOn, grindWarningTimer);
 
         if (wasEngineOn && !isEngineOn) {
-            LOG_WARN(GEAR, "Engine stalled — gear=%d speed=%.1fkm/h clutch=%.3f",
+            LOG_WARN(Gear, "Engine stalled — gear=%d spd=%.1fkm/h clutch=%.3f",
                      manualGear, speedKmH, simulatedClutch);
-            Renderer::ShowNotification("Engine Stalled! (Depress clutch or shift to Neutral N)");
+            Renderer::ShowNotification("Engine Stalled! (Press clutch or shift to N)");
         }
 
-        // ── Post-gear physics ─────────────────────────────────────────────────
+        // Physics post-gear
         const bool physicsStall = PhysicsEngine::UpdatePostGear(
             vehicle, data, manualGear, maxGear,
             simulatedClutch, throttle, speedKmH,
@@ -499,25 +435,25 @@ void ScriptMain() {
         if (physicsStall && isEngineOn) {
             isEngineOn = false;
             VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
-            LOG_WARN(PHYSICS, "Physics stall — clutch bite-point stall triggered. "
-                              "gear=%d speed=%.1fkm/h clutchHeat=%.3f",
+            LOG_WARN(Physics,
+                     "Clutch bite-point stall: gear=%d spd=%.1fkm/h heat=%.3f",
                      manualGear, speedKmH, PhysicsEngine::GetClutchHeat());
             Renderer::ShowNotification("Engine Stalled! (Clutch bite-point)");
         }
 
-        // ── Fuel system ───────────────────────────────────────────────────────
+        // Fuel
         const bool fuelStall = FuelSystem::Update(
             vehicle, data, throttle, rpm, isEngineOn, speedKmH);
 
         if (fuelStall && isEngineOn) {
             isEngineOn = false;
             VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
-            LOG_ERROR(FUEL, "Fuel stall! Fuel=%.3f OilTemp=%.3f",
+            LOG_ERROR(Fuel, "Fuel stall! fuel=%.3f oilTemp=%.3f",
                       FuelSystem::GetFuelLevel(), FuelSystem::GetOilTemperature());
-            Renderer::ShowNotification("~r~OUT OF FUEL! Engine died.");
+            Renderer::ShowNotification("~r~OUT OF FUEL! Engine stopped.");
         }
 
-        // ── Apply memory writes ───────────────────────────────────────────────
+        // Memory writes + lights
         GearLogic::ApplyToMemory(vehicle, data, manualGear, simulatedClutch);
         LightsLogic::Update(vehicle, data, manualGear,
                             InputHandler::GetSmoothedBrake(), throttle);
@@ -528,7 +464,7 @@ void ScriptMain() {
         if (grindWarningTimer > 0) {
             --grindWarningTimer;
             Renderer::DrawGrindWarning();
-            LOG_WARN_T(GEAR, 2000, "Gear grind! gear=%d clutch=%.3f rpm=%.4f",
+            LOG_WARN_T(Gear, 2000, "Gear grind: gear=%d clutch=%.3f rpm=%.4f",
                        manualGear, simulatedClutch, rpm);
         }
 
@@ -552,9 +488,9 @@ void ScriptMain() {
 
             Renderer::DrawTextOverlay(
                 (std::string("TCS: ") +
-                 (TractionControl::IsTCSActive() ? "~y~ACTIVE" : "~g~OK") +
+                 (TractionControl::IsTCSActive() ? "~y~ON" : "~g~OK") +
                  " | ABS: " +
-                 (TractionControl::IsABSActive() ? "~y~ACTIVE" : "~g~OK") +
+                 (TractionControl::IsABSActive() ? "~y~ON" : "~g~OK") +
                  (TurboSystem::HasTurbo()
                       ? (" | BOOST: " +
                          std::to_string(TurboSystem::GetBoostPressure()).substr(0, 4))
@@ -564,7 +500,7 @@ void ScriptMain() {
                 Config::OverlayPosY + Config::OverlayBarHeight * 5.0f, 0.35f);
         }
 
-        // ── Telemetry ─────────────────────────────────────────────────────────
+        // Telemetry
         TelemetryLogger::LogFrame(
             vehicle, data, speedKmH, rpm, tcsThrottle, absBrake,
             simulatedClutch, manualGear, InputHandler::GetSmoothedSteer(),
