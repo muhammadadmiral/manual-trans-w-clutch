@@ -34,6 +34,7 @@
 #include "CalibrationEngine.h"
 #include "AOBScanner.h"
 #include "../Core/ModLogger.h"
+#include "../Vehicle/VehicleData.h"
 
 #define NOMINMAX
 #include <Windows.h>
@@ -87,17 +88,33 @@ static bool IsRatiosPlausible(uintptr_t ptr) {
     // Must be a valid user-space address and readable
     if (ptr < 0x10000 || ptr > 0x7FFFFFFFFFFull)
         return false;
+    
+    // Float arrays must be at least 4-byte aligned. 
+    if ((ptr & 3) != 0)
+        return false;
+
     if (!AOBScanner::IsReadable(ptr, 16))
         return false;
 
     const float* r = reinterpret_cast<const float*>(ptr);
-    for (int g = 0; g < 2; ++g) {
-        if (!std::isfinite(r[g])) return false;
-        // Reverse gear ratios are negative (e.g. -3.3), forward positive.
-        // Zero (or near-zero) is rejected — not a real gear ratio.
-        if (r[g] > -0.05f && r[g] < 0.05f) return false;
-        if (r[g] < -25.0f || r[g] > 25.0f) return false;
+    
+    // In GTA V, r[0] is Reverse, r[1] is First Gear, r[2] is Second Gear.
+    // We check r[1] and r[2] to avoid issues with Reverse being 0.0f or undefined.
+    for (int g = 1; g <= 2; ++g) {
+        uint32_t u;
+        std::memcpy(&u, &r[g], 4);
+        uint32_t exp = (u >> 23) & 0xFF;
+        if (exp == 0xFF) return false; // Reject NaN, Inf
+        if (exp == 0) return false;    // Reject Denormal and exact 0.0f
+
+        float val = r[g];
+        // Forward gear ratios must be strictly positive (usually 1.0 to 5.0)
+        if (val < 0.1f || val > 15.0f) return false;
     }
+    
+    // Verify that First gear ratio is > Second gear ratio (basic mechanics)
+    if (r[1] <= r[2]) return false;
+
     return true;
 }
 
@@ -122,14 +139,6 @@ static bool IsGearClusterValid(uintptr_t vehicleBase, uint32_t base,
 
 // ============================================================================
 // SearchGearLayout
-//
-// Finds the byte offsets within the CVehicle struct for:
-//   NextGear  (uint8)
-//   Gear      (uint8)
-//   TopGear   (uint8)
-//   GearRatios pointer (uintptr_t)  — may be 0 if not found (Pass 2 only)
-//
-// Returns false if neither pass found a plausible layout.
 // ============================================================================
 struct GearCluster {
     uint32_t nextGearOff = 0;
@@ -140,25 +149,14 @@ struct GearCluster {
 
 static bool SearchGearLayout(uintptr_t vehicleBase,
                              uint32_t  rpmOffset,
+                             uint8_t   realMaxGear,
                              GearCluster& out)
 {
     const uint32_t scanLo = CalibrationEngine::kScanStart;
     const uint32_t scanHi = CalibrationEngine::kScanEnd;
 
     // ── Pass 1: GearRatios-pointer-based search ───────────────────────────
-    //
-    // Step through the entire scan window in 4-byte increments.
-    // At each position, read 8 bytes as a uintptr_t and check if it could
-    // be a pointer to the gear-ratios float array.
-    // For every such pointer, try a set of byte-cluster offsets relative to
-    // the pointer location (not just the classic -8) to accommodate the
-    // extended struct layout in GTA V Enhanced.
     LOG_DEBUG(Calib, "  [SearchGear P1] Scanning 0x%X-0x%X for GearRatios ptr", scanLo, scanHi);
-
-    static const int kDeltasP1[] = {
-        -8, -10, -12, -6, -4, -16, -20, -24,  // before the pointer
-         0,   2,   4,   6,   8,  10,  12,  16  // at/after the pointer
-    };
 
     for (uint32_t ptrOff = scanLo; ptrOff + 8 <= scanHi; ptrOff += 4) {
         if (!AOBScanner::IsReadable(vehicleBase + ptrOff, 8))
@@ -170,8 +168,9 @@ static bool SearchGearLayout(uintptr_t vehicleBase,
         if (!IsRatiosPlausible(ptr))
             continue;
 
-        // This looks like a GearRatios pointer.  Try all cluster-position deltas.
-        for (int delta : kDeltasP1) {
+        // This looks like a GearRatios pointer! Try a wide range of cluster-position deltas.
+        // We search from -256 to +256 around the pointer to find the Gear fields.
+        for (int delta = -256; delta <= 256; delta += 2) {
             const int32_t tryBase32 = static_cast<int32_t>(ptrOff) + delta;
             if (tryBase32 < static_cast<int32_t>(scanLo)) continue;
             const uint32_t tryBase = static_cast<uint32_t>(tryBase32);
@@ -179,6 +178,9 @@ static bool SearchGearLayout(uintptr_t vehicleBase,
 
             uint8_t ng, g, tg;
             if (IsGearClusterValid(vehicleBase, tryBase, ng, g, tg)) {
+                // Strict check: only accept if TopGear matches the game's actual maxGear
+                if (tg != realMaxGear) continue;
+
                 out.nextGearOff = tryBase;
                 out.gearOff     = tryBase + 2;
                 out.topGearOff  = tryBase + 6;
@@ -193,19 +195,41 @@ static bool SearchGearLayout(uintptr_t vehicleBase,
         }
     }
 
-    // ── Pass 2: Direct gear-byte pattern scan ─────────────────────────────
-    //
-    // If no GearRatios pointer was found (e.g. Enhanced GTA V stores ratios
-    // differently, or the struct layout changed), scan directly for the
-    // characteristic uint8 cluster with tighter constraints to reduce false
-    // positives:
-    //   • TopGear in [2, 10]          — most GTA V cars
-    //   • Byte at cluster+1 == 0      — alignment padding byte in known struct
-    //   • |gearOffset - rpmOffset| ≤ 0x800  — gear and RPM are nearby in struct
-    LOG_DEBUG(Calib,
-        "  [SearchGear P2] No ptr found. Direct scan 0x%X-0x%X rpmHint=0x%X",
-        scanLo, scanHi, rpmOffset);
+    // ── Pass 2: Fallback heuristic scan ───────────────────────────────────────
+    // If the exact pointers weren't found, we scan for a byte cluster that
+    // looks like NextGear, Gear, TopGear.
+    LOG_DEBUG(Calib, "  [SearchGear P2] No ptr found. Direct scan 0x%X-0x%X rpmHint=0x%X", scanLo, scanHi, rpmOffset);
 
+    // Known distances from RPM to NextGear for various GTA V builds:
+    // Build 2802+: RPM 0x8C8, NextGear 0x7A0 (dist = 0x128)
+    // Build 1180+: RPM 0x808, NextGear 0x7E0 (dist = 0x28)
+    // Build 877+:  RPM 0x808, NextGear 0x7D0 (dist = 0x38)
+    static const uint32_t kKnownDistances[] = { 0x128, 0x28, 0x38 };
+
+    // Try known structural distances FIRST before doing a blind scan!
+    for (uint32_t dist : kKnownDistances) {
+        if (rpmOffset < dist) continue;
+        uint32_t tryNextGear = rpmOffset - dist;
+        
+        if (tryNextGear >= scanLo && tryNextGear + 8 <= scanHi) {
+            uint8_t ng, g, tg;
+            if (IsGearClusterValid(vehicleBase, tryNextGear, ng, g, tg)) {
+                // If it looks structurally valid at a known distance, we lock it in immediately.
+                // We do NOT strictly check topGear == realMaxGear here because the game often
+                // overrides max gear for reverse or highway cruising.
+                out.nextGearOff = tryNextGear;
+                out.gearOff     = tryNextGear + 2;
+                out.topGearOff  = tryNextGear + 6;
+                out.ratiosOff   = 0;
+                
+                LOG_INFO(Calib, "  [P2 KNOWN DIST HIT] Cluster@0x%X matches known offset distance 0x%X from RPM! N=%u G=%u Top=%u", 
+                         tryNextGear, dist, ng, g, tg);
+                return true;
+            }
+        }
+    }
+
+    // If known distances failed, do a conservative blind scan.
     for (uint32_t gOff = scanLo; gOff + 8 <= scanHi; gOff += 2) {
         if (!AOBScanner::IsReadable(vehicleBase + gOff, 8))
             continue;
@@ -218,21 +242,36 @@ static bool SearchGearLayout(uintptr_t vehicleBase,
 
         if (gear > 1)                    continue; // 0=neutral, 1=first gear
         if (nextGear > 2)                continue;
-        if (topGear < 2 || topGear > 10) continue; // tighter than Pass 1
+        // RELAXED FILTER: TopGear just needs to be close to realMaxGear.
+        // Strict match causes false positives if the game adds a hidden 6th gear!
+        if (topGear < realMaxGear || topGear > realMaxGear + 2) continue; 
         if (pad1 != 0)                   continue; // strong alignment filter
 
-        // Proximity: gear cluster must be within 0x800 bytes of RPM candidate
-        const uint32_t dist = gOff > rpmOffset ? gOff - rpmOffset
-                                                : rpmOffset - gOff;
-        if (dist > 0x800) continue;
+        // Proximity: gear cluster must be within 0x200 bytes of RPM candidate (stricter than before)
+        const uint32_t dist = gOff > rpmOffset ? gOff - rpmOffset : rpmOffset - gOff;
+        if (dist > 0x200) continue;
 
         out.nextGearOff = gOff;
         out.gearOff     = gOff + 2;
         out.topGearOff  = gOff + 6;
         out.ratiosOff   = 0; // unknown — GetGearRatio() returns 0 gracefully
+        
         LOG_DEBUG(Calib,
-            "  [P2 HIT] Cluster@0x%X N=%u G=%u Top=%u dist=0x%X",
+            "  [P2 BLIND HIT] Cluster@0x%X N=%u G=%u Top=%u dist=0x%X",
             gOff, nextGear, gear, topGear, dist);
+            
+        // TEMPORARY DIAGNOSTIC: Dump memory to log to find the true gear offset
+        LOG_INFO(Calib, "  --- BEGIN MEMORY DUMP (0x780 - 0x8D0) ---");
+        for (uint32_t dOff = 0x780; dOff < 0x8D0; dOff += 16) {
+            if (AOBScanner::IsReadable(vehicleBase + dOff, 16)) {
+                const uint8_t* p = reinterpret_cast<const uint8_t*>(vehicleBase + dOff);
+                LOG_INFO(Calib, "  0x%03X: %02X %02X %02X %02X %02X %02X %02X %02X  %02X %02X %02X %02X %02X %02X %02X %02X",
+                         dOff, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7],
+                         p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15]);
+            }
+        }
+        LOG_INFO(Calib, "  --- END MEMORY DUMP ---");
+            
         return true;
     }
 
@@ -245,12 +284,12 @@ static bool SearchGearLayout(uintptr_t vehicleBase,
 // This wrapper has ONLY POD locals (GearCluster = 4x uint32_t, no destructor),
 // so __try is valid here.  Never call LOG_ inside this function — std::string
 // internally used by ModLogger would violate the same rule.
-static bool SafeCallSearchGearLayout(uintptr_t vehicleBase, uint32_t rpmOffset,
+static bool SafeCallSearchGearLayout(uintptr_t vehicleBase, uint32_t rpmOffset, uint8_t realMaxGear,
                                      GearCluster* pOut)
 {
     bool result = false;
     __try {
-        result = SearchGearLayout(vehicleBase, rpmOffset, *pOut);
+        result = SearchGearLayout(vehicleBase, rpmOffset, realMaxGear, *pOut);
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         OutputDebugStringA("[CalibrationEngine] SEH exception in SearchGearLayout\n");
         return false;
@@ -280,7 +319,7 @@ void Reset() {
 }
 
 // ---------------------------------------------------------------------------
-bool Update(int vehicleHandle, bool isEngineOn, bool isRevving,
+bool Update(int vehicleHandle, bool isEngineOn, bool isRevving, uint8_t maxGear,
             VehicleOffsets& outOffsets)
 {
     if (s_state == CalibrationState::None ||
@@ -484,13 +523,15 @@ bool Update(int vehicleHandle, bool isEngineOn, bool isRevving,
             LOG_DEBUG(Calib, "  Testing RPM=0x%X CLT=0x%X", rpmOff, rpmOff + 12);
 
             GearCluster cluster{};
-            bool found = SafeCallSearchGearLayout(vehicleBase, rpmOff, &cluster);
+            bool found = SafeCallSearchGearLayout(vehicleBase, rpmOff, maxGear, &cluster);
             if (!found) {
                 LOG_DEBUG(Calib, "  RPM=0x%X: no layout found (SEH or search failed)", rpmOff);
                 continue;
             }
 
-            VehicleOffsets cand{};
+            // Initialize from existing resolved offsets so we don't zero out fields
+            // that weren't scanned here (like LightsBroken or DriveForce).
+            VehicleOffsets cand = VehicleData::GetResolvedOffsets();
             cand.RPM       = rpmOff;
             cand.Clutch    = rpmOff + 12;
             cand.Gear      = cluster.gearOff;

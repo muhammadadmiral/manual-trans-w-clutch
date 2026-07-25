@@ -48,51 +48,59 @@ void DrawBar(float x, float y, float width, float height, float fraction, int r,
 }
 
 void DrawGearHUD(int manualGear, int maxGear, int activeSignal, bool isEngineOn) {
-    // Gear Badge Container (Bottom Right Overlay, above minimap if desired, we'll put it on bottom right)
+    // Positioning - Bottom right corner, sleek and minimalist
     const float badgeX = 0.88f;
     const float badgeY = 0.85f;
-    const float badgeW = 0.06f;
-    const float badgeH = 0.09f;
+    const float badgeW = 0.055f;
+    const float badgeH = 0.085f;
 
-    // Draw main background (dark gradient look via multiple rects or solid)
-    GRAPHICS::DRAW_RECT(badgeX, badgeY, badgeW, badgeH, 12, 14, 18, 220, 0);
+    // Dark sleek backdrop
+    GRAPHICS::DRAW_RECT(badgeX, badgeY, badgeW, badgeH, 15, 15, 18, 220, 0);
+    // Subtle top border/accent
+    GRAPHICS::DRAW_RECT(badgeX, badgeY - (badgeH / 2.0f) + 0.002f, badgeW, 0.004f, 60, 200, 255, 255, 0);
+
+    // Label "GEAR" (clean font)
+    DrawTextOverlay("GEAR", badgeX, badgeY - 0.038f, 0.25f, 150, 150, 150, 255, 0, false, true);
 
     // Determine Label and Color
     char gearStr[8]{};
     int r = 255, g = 255, b = 255;
     if (!isEngineOn) {
         strcpy_s(gearStr, "OFF");
-        r = 150; g = 150; b = 150;
+        r = 120; g = 120; b = 120;
     } else if (manualGear == -1) {
         strcpy_s(gearStr, "R");
         r = 255; g = 60; b = 60; // Red Reverse
     } else if (manualGear == 0) {
         strcpy_s(gearStr, "N");
-        r = 255; g = 180; b = 40; // Gold Neutral
+        r = 255; g = 180; b = 40; // Orange Neutral
     } else {
         sprintf_s(gearStr, "%d", manualGear);
-        r = 40; g = 200; b = 255; // Cyan Gears
+        // Cyan for normal, Green for cruising gears, Yellow for max gear
+        if (manualGear <= 3) { r = 60; g = 200; b = 255; }
+        else if (manualGear < maxGear) { r = 100; g = 255; b = 100; }
+        else { r = 255; g = 220; b = 50; }
     }
 
-    // Draw Big Gear Text (Font 4 is Pricedown, Font 2 is Chalet London, Font 7 is Chalet Comprime)
-    // Font 2 looks very clean for HUD elements
-    DrawTextOverlay(gearStr, badgeX, badgeY - 0.045f, 1.2f, r, g, b, 255, 2, true, true);
+    // Draw Big Gear Text (Font 2 is Chalet London, very clean, much better than 0 or 4)
+    DrawTextOverlay(gearStr, badgeX, badgeY - 0.025f, 1.0f, r, g, b, 255, 2, false, true);
 
-    // Turn Signals
-    // activeSignal: 0=off, 1=left, 2=right, 3=hazard
+    // Turn Signals at the bottom
     const ULONGLONG tick = GetTickCount64();
-    const bool blink = (tick % 800) < 400;
+    const bool blink = (tick % 700) < 350; // slightly faster sleek blink
 
-    int lR = 40, lG = 40, lB = 40, lA = 100;
-    int rR = 40, rG = 40, rB = 40, rA = 100;
+    int lR = 50, lG = 50, lB = 50, lA = 120;
+    int rR = 50, rG = 50, rB = 50, rA = 120;
 
     if (blink) {
         if (activeSignal == 1 || activeSignal == 3) { lR = 60; lG = 255; lB = 60; lA = 255; }
         if (activeSignal == 2 || activeSignal == 3) { rR = 60; rG = 255; rB = 60; rA = 255; }
     }
 
-    DrawTextOverlay("<", badgeX - 0.02f, badgeY - 0.045f, 0.8f, lR, lG, lB, lA, 0, true, true);
-    DrawTextOverlay(">", badgeX + 0.02f, badgeY - 0.045f, 0.8f, rR, rG, rB, rA, 0, true, true);
+    // Left indicator
+    DrawTextOverlay("~u~<", badgeX - 0.018f, badgeY + 0.015f, 0.45f, lR, lG, lB, lA, 0, false, true);
+    // Right indicator
+    DrawTextOverlay("~u~>", badgeX + 0.018f, badgeY + 0.015f, 0.45f, rR, rG, rB, rA, 0, false, true);
 }
 
 void DrawGrindWarning() {

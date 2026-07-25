@@ -57,7 +57,8 @@ public:
     static void UpdateCalibration(HMODULE pluginModule,
                                   int     vehicleHandle,
                                   bool    isEngineOn,
-                                  bool    isRevving);
+                                  bool    isRevving,
+                                  uint8_t maxGear);
 
     static void ResetCalibration();
 

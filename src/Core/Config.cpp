@@ -40,23 +40,23 @@ bool ForceRecalibrate = false;
 //   Brake:    attack medium-fast (0.07), release medium (0.18)
 //   Clutch:   attack very fast (0.045), release fast (0.06) — snappy
 //   Steer:    attack fast (0.055), release moderate (0.10) — responsive
-float ThrottleAttack  = 0.08f;
-float ThrottleRelease = 0.28f;
-float BrakeAttack     = 0.07f;
-float BrakeRelease    = 0.18f;
-float ClutchAttack    = 0.045f;
-float ClutchRelease   = 0.06f;
+float ThrottleAttack  = 0.40f;
+float ThrottleRelease = 0.60f;
+float BrakeAttack     = 0.30f;
+float BrakeRelease    = 0.50f;
+float ClutchAttack    = 0.20f;
+float ClutchRelease   = 0.35f;
 
 // Steering
-float SteerAttack      = 0.055f;
-float SteerRelease     = 0.10f;
-float SteerExpo        = 0.35f;
+float SteerAttack      = 0.15f;
+float SteerRelease     = 0.30f;
+float SteerExpo        = 0.50f;
 float SteerDeadzonePct = 0.05f;
 
 // Output expo curves (0=linear, 1=full cubic)
-float ThrottleExpo = 0.25f;
-float BrakeExpo    = 0.20f;
-float ClutchExpo   = 0.10f;
+float ThrottleExpo = 0.45f;
+float BrakeExpo    = 0.35f;
+float ClutchExpo   = 0.25f;
 
 // ── Excluded vehicle classes ──────────────────────────────────────────────────
 std::vector<int> ExcludedVehicleClasses;

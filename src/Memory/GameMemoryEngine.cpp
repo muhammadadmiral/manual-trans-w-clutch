@@ -153,7 +153,7 @@ uint8_t CVehicle::GetLightsVisuallyBroken() const {
 }
 
 void CVehicle::SetGear(uint8_t gear) {
-  if (!IsValid())
+  if (!IsValid() || m_offsets->Gear == 0)
     return;
   __try {
     *reinterpret_cast<uint8_t *>(m_address + m_offsets->Gear) = gear;
@@ -162,7 +162,7 @@ void CVehicle::SetGear(uint8_t gear) {
 }
 
 void CVehicle::SetNextGear(uint8_t gear) {
-  if (!IsValid())
+  if (!IsValid() || m_offsets->NextGear == 0)
     return;
   __try {
     *reinterpret_cast<uint8_t *>(m_address + m_offsets->NextGear) = gear;
@@ -171,7 +171,7 @@ void CVehicle::SetNextGear(uint8_t gear) {
 }
 
 void CVehicle::SetClutch(float clutch) {
-  if (!IsValid())
+  if (!IsValid() || m_offsets->Clutch == 0)
     return;
   __try {
     *reinterpret_cast<float *>(m_address + m_offsets->Clutch) = clutch;
@@ -180,7 +180,7 @@ void CVehicle::SetClutch(float clutch) {
 }
 
 void CVehicle::SetRPM(float rpm) {
-  if (!IsValid())
+  if (!IsValid() || m_offsets->RPM == 0)
     return;
   __try {
     *reinterpret_cast<float *>(m_address + m_offsets->RPM) = rpm;
@@ -189,7 +189,7 @@ void CVehicle::SetRPM(float rpm) {
 }
 
 void CVehicle::SetLightsBroken(uint8_t state) {
-  if (!IsValid())
+  if (!IsValid() || m_offsets->LightsBroken == 0)
     return;
   __try {
     *reinterpret_cast<uint8_t *>(m_address + m_offsets->LightsBroken) = state;
@@ -198,7 +198,7 @@ void CVehicle::SetLightsBroken(uint8_t state) {
 }
 
 void CVehicle::SetLightsVisuallyBroken(uint8_t state) {
-  if (!IsValid())
+  if (!IsValid() || m_offsets->LightsVisuallyBroken == 0)
     return;
   __try {
     *reinterpret_cast<uint8_t *>(m_address + m_offsets->LightsVisuallyBroken) =

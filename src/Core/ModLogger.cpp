@@ -65,25 +65,32 @@ std::string Timestamp() {
     return buf;
 }
 
-void WriteEntry(Level level, Category category, const char* message) {
+static const char* ExtractFilename(const char* path) {
+    const char* slash = strrchr(path, '\\');
+    if (!slash) slash = strrchr(path, '/');
+    return slash ? slash + 1 : path;
+}
+
+void WriteEntry(Level level, Category category, const char* file, int line, const char* func, const char* message) {
     const std::string ts  = Timestamp();
     const char* lv        = LevelToStr(level);
     const char* cat       = CategoryToStr(category);
+    const char* shortFile = ExtractFilename(file);
 
-    char line[1024]{};
-    sprintf_s(line, "[%s] [%s] [%s] %s\n", ts.c_str(), lv, cat, message);
+    char lineStr[1024]{};
+    sprintf_s(lineStr, "[%s] [%-7s] [%-7s] [%s:%d (%s)] %s\n", 
+              ts.c_str(), lv, cat, shortFile, line, func, message);
 
     std::lock_guard<std::mutex> lk(s_mutex);
 
     if (s_file) {
-        fputs(line, s_file);
-        // Flush immediately on WARNING+ so logs survive crashes.
-        if (level >= Level::Warning)
-            fflush(s_file);
+        fputs(lineStr, s_file);
+        // Flush immediately on every log so logs survive crashes.
+        fflush(s_file);
     }
 
     // Also send to DebugView / attached debugger.
-    OutputDebugStringA(line);
+    OutputDebugStringA(lineStr);
 }
 
 } // anonymous namespace
@@ -131,13 +138,13 @@ void Initialize(HMODULE pluginModule) {
         return;
     }
 
-    WriteEntry(Level::Info, Category::Init,
+    WriteEntry(Level::Info, Category::Init, "ModLogger.cpp", 0, "Initialize",
                "========== manual-trans-w-clutch session start ==========");
 }
 
 void Shutdown() {
     if (!s_file) return;
-    WriteEntry(Level::Info, Category::Init,
+    WriteEntry(Level::Info, Category::Init, "ModLogger.cpp", 0, "Shutdown",
                "========== manual-trans-w-clutch session end   ==========");
     fclose(s_file);
     s_file = nullptr;
@@ -146,7 +153,7 @@ void Shutdown() {
 void SetMinLevel(Level level) { s_minLevel = level; }
 Level GetMinLevel()            { return s_minLevel; }
 
-void Log(Level level, Category category, const char* fmt, ...) {
+void Log(Level level, Category category, const char* file, int line, const char* func, const char* fmt, ...) {
     if (level < s_minLevel) return;
 
     char message[1024]{};
@@ -155,10 +162,10 @@ void Log(Level level, Category category, const char* fmt, ...) {
     vsnprintf_s(message, sizeof(message), _TRUNCATE, fmt, args);
     va_end(args);
 
-    WriteEntry(level, category, message);
+    WriteEntry(level, category, file, line, func, message);
 }
 
-void LogThrottled(Level level, Category category, int cooldownMs,
+void LogThrottled(Level level, Category category, const char* file, int line, const char* func, int cooldownMs,
                   const char* fmt, ...) {
     if (level < s_minLevel) return;
 
@@ -178,7 +185,7 @@ void LogThrottled(Level level, Category category, int cooldownMs,
     vsnprintf_s(message, sizeof(message), _TRUNCATE, fmt, args);
     va_end(args);
 
-    WriteEntry(level, category, message);
+    WriteEntry(level, category, file, line, func, message);
 }
 
 } // namespace ModLogger

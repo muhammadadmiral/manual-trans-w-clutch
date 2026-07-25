@@ -297,11 +297,11 @@ bool VehicleData::Initialize(HMODULE pluginModule) {
 // Calibration delegation
 // =============================================================================
 void VehicleData::UpdateCalibration(HMODULE pluginModule, int vehicleHandle,
-                                    bool isEngineOn, bool isRevving) {
+                                    bool isEngineOn, bool isRevving, uint8_t maxGear) {
     if (initialized) return;
 
     VehicleOffsets offsets{};
-    if (CalibrationEngine::Update(vehicleHandle, isEngineOn, isRevving, offsets)) {
+    if (CalibrationEngine::Update(vehicleHandle, isEngineOn, isRevving, maxGear, offsets)) {
         resolvedOffsets = offsets;
         offsetSource    = VehicleOffsetSource::Calibration;
         initialized     = true;

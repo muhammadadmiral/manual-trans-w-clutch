@@ -71,6 +71,7 @@ void Reset();
 bool Update(int  vehicleHandle,
             bool isEngineOn,
             bool isRevving,
+            uint8_t maxGear,
             VehicleOffsets& outOffsets);
 
 } // namespace CalibrationEngine

@@ -62,11 +62,11 @@ void Initialize(HMODULE pluginModule);
 void Shutdown();
 
 // Core log function — prefer the macros below.
-void Log(Level level, Category category, const char* fmt, ...);
+void Log(Level level, Category category, const char* file, int line, const char* func, const char* fmt, ...);
 
 // Rate-limited: only emits at most once per cooldownMs milliseconds per
 // unique call site (keyed on the fmt pointer — stable for string literals).
-void LogThrottled(Level level, Category category, int cooldownMs,
+void LogThrottled(Level level, Category category, const char* file, int line, const char* func, int cooldownMs,
                   const char* fmt, ...);
 
 void  SetMinLevel(Level level);
@@ -77,13 +77,13 @@ Level GetMinLevel();
 // ── Convenience macros ────────────────────────────────────────────────────────
 // 'cat' must be an unquoted Category member in PascalCase (e.g. Init, Calib).
 // The macro pastes it as   ModLogger::Category::<cat>.
-#define LOG_DEBUG(cat,  ...) ModLogger::Log(ModLogger::Level::Verbose, ModLogger::Category::cat, __VA_ARGS__)
-#define LOG_VERBOSE(cat,...) ModLogger::Log(ModLogger::Level::Verbose, ModLogger::Category::cat, __VA_ARGS__)
-#define LOG_INFO(cat,   ...) ModLogger::Log(ModLogger::Level::Info,    ModLogger::Category::cat, __VA_ARGS__)
-#define LOG_WARN(cat,   ...) ModLogger::Log(ModLogger::Level::Warning, ModLogger::Category::cat, __VA_ARGS__)
-#define LOG_ERROR(cat,  ...) ModLogger::Log(ModLogger::Level::Err,     ModLogger::Category::cat, __VA_ARGS__)
-#define LOG_FATAL(cat,  ...) ModLogger::Log(ModLogger::Level::Fatal,   ModLogger::Category::cat, __VA_ARGS__)
+#define LOG_DEBUG(cat,  ...) ModLogger::Log(ModLogger::Level::Verbose, ModLogger::Category::cat, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOG_VERBOSE(cat,...) ModLogger::Log(ModLogger::Level::Verbose, ModLogger::Category::cat, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOG_INFO(cat,   ...) ModLogger::Log(ModLogger::Level::Info,    ModLogger::Category::cat, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOG_WARN(cat,   ...) ModLogger::Log(ModLogger::Level::Warning, ModLogger::Category::cat, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOG_ERROR(cat,  ...) ModLogger::Log(ModLogger::Level::Err,     ModLogger::Category::cat, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOG_FATAL(cat,  ...) ModLogger::Log(ModLogger::Level::Fatal,   ModLogger::Category::cat, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
 
 // Rate-limited variants
-#define LOG_DEBUG_T(cat, ms, ...) ModLogger::LogThrottled(ModLogger::Level::Verbose, ModLogger::Category::cat, ms, __VA_ARGS__)
-#define LOG_WARN_T(cat,  ms, ...) ModLogger::LogThrottled(ModLogger::Level::Warning, ModLogger::Category::cat, ms, __VA_ARGS__)
+#define LOG_DEBUG_T(cat, ms, ...) ModLogger::LogThrottled(ModLogger::Level::Verbose, ModLogger::Category::cat, __FILE__, __LINE__, __FUNCTION__, ms, __VA_ARGS__)
+#define LOG_WARN_T(cat,  ms, ...) ModLogger::LogThrottled(ModLogger::Level::Warning, ModLogger::Category::cat, __FILE__, __LINE__, __FUNCTION__, ms, __VA_ARGS__)
