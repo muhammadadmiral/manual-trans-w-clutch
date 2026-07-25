@@ -148,7 +148,7 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
     targetGear = s_state.currentGear - 1;
     s_state.kickdown = true;
   } else if (rpm > upThreshold && s_state.currentGear < maxGear &&
-             throttle > 0.04f) {
+             throttle > 0.04f && std::fabs(signedSpeedMps) > 2.0f) {
     targetGear = s_state.currentGear + 1;
   } else if ((rpm < downThreshold || (brake > 0.35f && rpm < upThreshold)) &&
              s_state.currentGear > 1 &&

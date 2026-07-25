@@ -41,6 +41,14 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
   const bool canShift =
       (currentTime - s_lastShiftTime) > 80; // permit quick multi-gear selection
 
+  if (canShift && (isUp || isDown) && GearboxSystem::IsSeized()) {
+    PlayGearGrindSound(vehicle);
+    grindWarningTimer = 60;
+    s_lastShiftTime = currentTime;
+    LOG_ERROR(Gear, "Gearbox seized: shift rejected");
+    return s_manualGear;
+  }
+
   if (canShift) {
     if (isUp && s_manualGear < maxGear) {
       const int fromGear = s_manualGear;
