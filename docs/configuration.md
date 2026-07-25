@@ -25,8 +25,9 @@ Motor non-scooter tetap sequential dan memakai auto-clutch.
 - `Auto Start Needs Brake`: menambah syarat brake pada starter automatic.
 - `Launch Control` dan `Launch RPM`: limiter launch manual atau automatic.
 
-`ConnectedRPMSync` tetap dibaca dari INI lama untuk kompatibilitas, tetapi tidak
-lagi menulis RPM.
+`ConnectedRPMSync` tetap dibaca dari INI lama untuk kompatibilitas. Sinkronisasi
+baru memakai inertia, rasio aktual, road speed, dan coupling sehingga nilainya
+tidak lagi menjadi faktor tunggal.
 
 ## Clutch
 
@@ -42,6 +43,8 @@ lagi menulis RPM.
 - `Shift Delay`: dwell minimum untuk mencegah hunting.
 - `D/S Upshift RPM` dan `D/S Downshift RPM`: dasar shift map; throttle
   menggeser threshold secara dinamis.
+- Baseline D adalah `0.50/0.22`, supaya throttle ringan cepat memilih gear
+  tinggi dan bertahan di RPM rendah. Baseline S `0.84/0.34`.
 - `Kickdown Pedal`: bukaan throttle minimum untuk downshift paksa yang masih
   aman terhadap over-rev.
 - `S Torque Boost`: nama legacy untuk agresivitas sport pedal map; tidak

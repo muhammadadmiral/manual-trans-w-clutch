@@ -5,10 +5,10 @@ bukan alamat absolut.
 
 | Field | Object | Resolver / relasi | Akses |
 |---|---|---|---|
-| Current RPM | `CVehicle` | pola/kalibrasi engine | read; write hanya saat driveline open |
+| Current RPM | `CVehicle` | pola/kalibrasi engine | read/write saat mode aktif |
 | Clutch actuator | `CVehicle` | displacement RPM `+0xC` | read/write |
-| Engine throttle | `CVehicle` | displacement RPM `+0x10` | read; write hanya saat driveline open |
-| Throttle pedal | `CVehicle` | kelompok steering input `+0x10` | opsional read |
+| Engine throttle | `CVehicle` | displacement RPM `+0x10` | read/write saat mode aktif |
+| Throttle pedal | `CVehicle` | kelompok steering input `+0x10` | opsional read/write |
 | Gear / NextGear | `CVehicle` | pola transmission | read/write |
 | Gear ratios | `CVehicle` | inline `NextGear + 0xC`, atau pointer build lama | read |
 | Handling pointer | `CVehicle` | pola handling | read |
@@ -35,6 +35,11 @@ Field baru harus punya signature, relasi struct yang konsisten, range check, dan
 jalur no-op ketika resolver gagal.
 
 Runtime menulis clutch dengan semantik signed GTA: `1` terhubung, nilai negatif
-hard-open. Setter RPM/engine-throttle hanya aktif pada netral atau saat pedal
-clutch membuka driveline. Ini diperlukan karena engine GTA tidak free-rev
-konsisten di gear 2+; setter tidak pernah dipakai untuk mengubah kecepatan roda.
+hard-open. Empat code signature Enhanced menonaktifkan auto-shift/clutch-low-RPM
+dan throttle-lift native. Resolver wajib menemukan masing-masing tepat satu
+kali. Patch dipasang sekaligus, menyimpan byte asli, rollback bila satu write
+gagal, dan direstore ketika mode Off/keluar kendaraan/unload.
+
+RPM saat clutch tersambung dihitung dari road speed, runtime flat velocity, dan
+rasio kendaraan aktif. RPM ini bukan pengganti kecepatan: wheel angular
+velocity dan vehicle velocity tidak pernah ditulis.

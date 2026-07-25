@@ -4,10 +4,10 @@
 
 Logical gear netral memakai gear 1 sebagai carrier fisik dan actuator clutch
 negatif sebagai hard-open. GTA tidak free-rev konsisten pada clutch terputus,
-terutama di gear 2+, jadi `EngineModel` memegang RPM hanya selama driveline
-terbuka. Target free-rev memakai input throttle GTA, RPM GTA saat ownership
-dimulai, frame time, serta drive inertia/karakter akselerasi kendaraan. Roda dan
-vehicle speed tidak pernah ditulis.
+terutama di gear 2+, jadi `EngineModel` memegang RPM mesin selama mode aktif.
+Saat terbuka target berasal dari throttle dan inertia. Saat terhubung target
+berasal dari road speed dikali rasio gear; slip clutch atau torque converter
+hanya memberi selisih sementara. Roda dan vehicle speed tidak pernah ditulis.
 
 ## Clutch
 
@@ -69,6 +69,9 @@ kalah oleh beban, kendaraan boleh rollback dan mesin dapat stall.
 - Netral ke gear 2 atau upshift di RPM rendah tidak mematikan throttle. Rasio
   gear hanya menurunkan torque reserve sehingga mobil terasa berat atau stall
   bila torsi benar-benar tidak cukup.
+- Native auto-shift, auto-clutch low-RPM, dan throttle-lift Enhanced dipatch
+  fail-closed. Karena itu logical gear 2-akhir tidak lagi ditolak hanya karena
+  berada di bawah band RPM bawaan GTA.
 
 ## Automatic P-R-N-D-S-L2-L1
 
@@ -78,7 +81,8 @@ ke arah sebaliknya.
 - P membuka driveline dan mengunci parking brake.
 - R memakai W sebagai throttle mundur dan S sebagai rem.
 - N membuka driveline dan tetap mengizinkan free-rev.
-- D melakukan upshift lebih awal dan downshift lebih rendah.
+- D memakai baseline up/down `0.50/0.22`; throttle ringan cepat masuk gear
+  tinggi lalu RPM naik lambat mengikuti road speed.
 - S menahan RPM, lebih responsif melakukan kickdown, mempertahankan gear rendah
   saat braking, dan memakai mapping pedal lebih agresif. Peak power tetap dari
   handling GTA.

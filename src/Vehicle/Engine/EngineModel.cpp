@@ -1,6 +1,7 @@
 #include "EngineModel.h"
 #include "../VehicleData.h"
 #include "../../Core/Config.h"
+#include "../../Memory/GearboxPatches.h"
 #include "../../../sdk/inc/natives.h"
 #include <algorithm>
 #include <cmath>
@@ -179,14 +180,21 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
         std::clamp(0.72f + nativeAcceleration * 1.10f, 0.65f, 1.60f);
   }
 
-  const bool open = gear == 0 || clutchDisengagement > 0.35f;
-  s_state.freeRevActive = engineOn && open;
+  const bool nativeOverride = GearboxPatches::IsApplied();
+  const bool open =
+      gear == 0 ||
+      (automaticMode ? clutchEngagement < 0.08f
+                     : clutchDisengagement > 0.35f);
+  s_state.freeRevActive =
+      engineOn && open && (!automaticMode || gear == 0);
+  s_state.nativeCutRecovered = false;
 
   s_state.estimatedFlatVelocity =
       ResolveFlatVelocity(vehicle, data, maxGear);
   s_state.wheelRPM =
       ResolveWheelRPM(vehicle, data, gear, maxGear, speedMps,
                       s_state.idleRPM);
+  s_state.connectedRPMTarget = s_state.wheelRPM;
   s_state.expectedRPM = open ? rpm : std::min(1.0f, s_state.wheelRPM);
 
   if (!engineOn) {
@@ -210,6 +218,7 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
         gear == 0 ? 0.0f : Clamp01(clutchEngagement * clutchEngagement * 0.65f);
     const float target =
         freeTarget + (s_state.wheelRPM - freeTarget) * clutchDrag;
+    s_state.connectedRPMTarget = target;
     const float inertiaScale = std::clamp(s_state.inertia, 0.30f, 3.0f);
     const float response =
         target >= s_state.controlledRPM
@@ -226,6 +235,54 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
 
     data.SetRPM(s_state.controlledRPM);
     data.SetThrottle(pedal);
+    data.SetThrottlePedal(pedal);
+    s_state.expectedRPM = s_state.controlledRPM;
+  } else if (nativeOverride && gear > 0) {
+    if (!s_state.rpmOwned) {
+      s_state.controlledRPM =
+          std::clamp(std::max(rpm, s_state.idleRPM), s_state.idleRPM, 1.0f);
+      s_state.rpmOwned = true;
+    }
+
+    const float pedal = Clamp01(throttle);
+    const float freeTarget =
+        s_state.idleRPM +
+        std::pow(pedal, 0.62f) * (1.0f - s_state.idleRPM);
+    float target = s_state.wheelRPM;
+
+    if (automaticMode) {
+      // Converter D boleh slip sedikit, tapi RPM utamanya tetap ikut rasio
+      // dan kecepatan jalan. Hasilnya upshift menurunkan RPM, bukan rebound.
+      const float converterSlip = 1.0f - Clamp01(clutchEngagement);
+      target += converterSlip *
+                (0.035f + std::pow(pedal, 0.70f) * 0.20f);
+    } else if (clutchEngagement < 0.995f) {
+      const float discSlip =
+          std::pow(1.0f - Clamp01(clutchEngagement), 1.35f);
+      target += (freeTarget - target) * discSlip;
+    }
+
+    target = std::clamp(target, s_state.idleRPM, 1.08f);
+    s_state.connectedRPMTarget = target;
+
+    const float inertiaScale = std::clamp(s_state.inertia, 0.30f, 3.0f);
+    const float response =
+        automaticMode ? 7.0f / std::sqrt(inertiaScale)
+                      : 11.0f / std::sqrt(inertiaScale);
+    const float alpha = 1.0f - std::exp(-response * dt);
+    s_state.controlledRPM +=
+        (target - s_state.controlledRPM) * Clamp01(alpha);
+    s_state.controlledRPM =
+        std::clamp(s_state.controlledRPM, s_state.idleRPM, 1.08f);
+
+    const float nativeThrottle = data.GetThrottle();
+    s_state.nativeCutRecovered =
+        (pedal > 0.10f && nativeThrottle < pedal * 0.25f) ||
+        (s_state.wheelRPM > s_state.idleRPM + 0.06f &&
+         rpm + 0.08f < s_state.wheelRPM);
+    data.SetRPM(s_state.controlledRPM);
+    data.SetThrottle(pedal);
+    data.SetThrottlePedal(pedal);
     s_state.expectedRPM = s_state.controlledRPM;
   } else {
     s_state.rpmOwned = false;

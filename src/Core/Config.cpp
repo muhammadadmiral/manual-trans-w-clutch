@@ -69,10 +69,10 @@ float NoLiftShiftPenalty = 0.35f;
 float ConnectedRPMSync = 0.25f;
 bool AutomaticBrakeInterlock = true;
 float AutomaticShiftDelay = 0.35f;
-float AutomaticDUpRPM = 0.68f;
-float AutomaticDDownRPM = 0.28f;
-float AutomaticSUpRPM = 0.90f;
-float AutomaticSDownRPM = 0.42f;
+float AutomaticDUpRPM = 0.50f;
+float AutomaticDDownRPM = 0.22f;
+float AutomaticSUpRPM = 0.84f;
+float AutomaticSDownRPM = 0.34f;
 float AutomaticKickdownThrottle = 0.72f;
 float AutomaticSTorqueBoost = 0.10f;
 bool BrakeThrottleOverride = true;
@@ -176,6 +176,8 @@ void WriteFloat(const char* section, const char* key, float value, const char* i
 void ReadConfig(HMODULE module) {
     char ini[MAX_PATH]{};
     if (!BuildIniPath(module, ini)) return;
+    const int drivetrainSchema =
+        GetPrivateProfileIntA("Internal", "DrivetrainSchema", 0, ini);
 
     TransmissionMode = std::clamp(
         static_cast<int>(
@@ -222,10 +224,20 @@ void ReadConfig(HMODULE module) {
         GetPrivateProfileIntA("Automatic", "BrakeInterlock", 1, ini) != 0;
     AutomaticShiftDelay =
         ReadFloat("Automatic", "ShiftDelay", 0.35f, ini);
-    AutomaticDUpRPM = ReadFloat("Automatic", "DUpRPM", 0.68f, ini);
-    AutomaticDDownRPM = ReadFloat("Automatic", "DDownRPM", 0.28f, ini);
-    AutomaticSUpRPM = ReadFloat("Automatic", "SUpRPM", 0.90f, ini);
-    AutomaticSDownRPM = ReadFloat("Automatic", "SDownRPM", 0.42f, ini);
+    AutomaticDUpRPM = ReadFloat("Automatic", "DUpRPM", 0.50f, ini);
+    AutomaticDDownRPM = ReadFloat("Automatic", "DDownRPM", 0.22f, ini);
+    AutomaticSUpRPM = ReadFloat("Automatic", "SUpRPM", 0.84f, ini);
+    AutomaticSDownRPM = ReadFloat("Automatic", "SDownRPM", 0.34f, ini);
+    if (drivetrainSchema < 5 &&
+        std::fabs(AutomaticDUpRPM - 0.68f) < 0.001f &&
+        std::fabs(AutomaticDDownRPM - 0.28f) < 0.001f &&
+        std::fabs(AutomaticSUpRPM - 0.90f) < 0.001f &&
+        std::fabs(AutomaticSDownRPM - 0.42f) < 0.001f) {
+        AutomaticDUpRPM = 0.50f;
+        AutomaticDDownRPM = 0.22f;
+        AutomaticSUpRPM = 0.84f;
+        AutomaticSDownRPM = 0.34f;
+    }
     AutomaticKickdownThrottle =
         ReadFloat("Automatic", "KickdownThrottle", 0.72f, ini);
     AutomaticSTorqueBoost =
@@ -312,8 +324,11 @@ void ReadConfig(HMODULE module) {
     }
 
     // Auto-create if the file doesn't exist yet
-    if (GetFileAttributesA(ini) == INVALID_FILE_ATTRIBUTES)
+    if (GetFileAttributesA(ini) == INVALID_FILE_ATTRIBUTES ||
+        drivetrainSchema < 5) {
         SaveConfig(module);
+        WriteInt("Internal", "DrivetrainSchema", 5, ini);
+    }
 }
 
 void SaveConfig(HMODULE module) {

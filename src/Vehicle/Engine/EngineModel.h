@@ -17,9 +17,11 @@ struct State {
   float previousRPM = 0.2f;
   float controlledRPM = 0.2f;
   float wheelRPM = 0.2f;
+  float connectedRPMTarget = 0.2f;
   float estimatedFlatVelocity = 0.0f;
   bool freeRevActive = false;
   bool rpmOwned = false;
+  bool nativeCutRecovered = false;
   bool handlingBacked = false;
 };
 

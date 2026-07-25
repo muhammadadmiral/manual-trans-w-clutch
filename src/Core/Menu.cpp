@@ -272,7 +272,7 @@ void Menu::Initialize() {
       0.01f, 0.10f, 1.20f));
   automatic.items.push_back(MenuItem(
       "D Upshift RPM", MenuItem::Float, &Config::AutomaticDUpRPM,
-      0.01f, 0.40f, 0.95f));
+      0.01f, 0.35f, 0.80f));
   automatic.items.push_back(MenuItem(
       "D Downshift RPM", MenuItem::Float, &Config::AutomaticDDownRPM,
       0.01f, 0.10f, 0.70f));
