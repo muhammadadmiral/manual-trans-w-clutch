@@ -131,6 +131,28 @@ float CVehicle::GetThrottlePedal() const {
   }
 }
 
+float CVehicle::GetTransmissionDriveForce() const {
+  if (!IsValid() || m_offsets->TransmissionDriveForce == 0)
+    return 0.0f;
+  __try {
+    return *reinterpret_cast<float *>(
+        m_address + m_offsets->TransmissionDriveForce);
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return 0.0f;
+  }
+}
+
+float CVehicle::GetTransmissionDriveMaxFlatVel() const {
+  if (!IsValid() || m_offsets->TransmissionDriveMaxFlatVel == 0)
+    return 0.0f;
+  __try {
+    return *reinterpret_cast<float *>(
+        m_address + m_offsets->TransmissionDriveMaxFlatVel);
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return 0.0f;
+  }
+}
+
 uint8_t CVehicle::GetWheelCount() const {
   if (!IsValid() || m_offsets->WheelCount == 0)
     return 0;

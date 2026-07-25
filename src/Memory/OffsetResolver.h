@@ -19,6 +19,8 @@ struct VehicleOffsets {
   uint32_t DriveInertia = 0;
   uint32_t DriveMaxFlatVel = 0;
   uint32_t DriveForce = 0;
+  uint32_t TransmissionDriveMaxFlatVel = 0;
+  uint32_t TransmissionDriveForce = 0;
   uint32_t WheelsPtr = 0;
   uint32_t WheelCount = 0;
   uint32_t WheelAngularVelocity = 0;

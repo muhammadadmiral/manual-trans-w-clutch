@@ -14,7 +14,9 @@ bukan alamat absolut.
 | Handling pointer | `CVehicle` | pola handling | read |
 | Drive inertia | `CHandlingData` | `0x54` | read |
 | Initial drive force | `CHandlingData` | `0x60` | read |
-| Drive max flat velocity | `CHandlingData` | `0x64` | read |
+| Initial drive max velocity | `CHandlingData` | `0x64` | fallback read |
+| Runtime drive force | `CTransmission` dalam `CVehicle` | `NextGear - 0x68` | read |
+| Runtime drive max flat velocity | `CTransmission` dalam `CVehicle` | `NextGear - 0x60` | read |
 | Wheel array / count | `CVehicle` | pola wheel count | read |
 | Angular velocity | `CWheel` | pola suspension group `+0xC` | read |
 | Load / brake / power | `CWheel` | kelompok steering-angle wheel | read |

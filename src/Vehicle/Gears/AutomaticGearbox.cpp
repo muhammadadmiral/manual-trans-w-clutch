@@ -207,6 +207,8 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
   const float upshiftMinSpeed =
       estimatedTopSpeed * static_cast<float>(s_state.currentGear) *
       (sport ? 0.060f : 0.050f);
+  const bool nativeLimiterPressure =
+      throttle > 0.70f && nativeRPM > 0.78f && rpm > 0.62f;
 
   int targetGear = s_state.currentGear;
   if (kickdownRequest &&
@@ -214,7 +216,8 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
                       s_state.currentGear - 1, signedSpeedMps)) {
     targetGear = s_state.currentGear - 1;
     s_state.kickdown = true;
-  } else if (rpm > upThreshold && s_state.currentGear < maxGear &&
+  } else if ((rpm > upThreshold || nativeLimiterPressure) &&
+             s_state.currentGear < maxGear &&
              throttle > 0.04f &&
              std::fabs(signedSpeedMps) >= upshiftMinSpeed) {
     targetGear = s_state.currentGear + 1;
@@ -254,7 +257,7 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
 
 void ApplyToMemory(Vehicle vehicle, VehicleData &data, int activeGear) {
   const float openClutch =
-      ENTITY::GET_ENTITY_SPEED(vehicle) < 1.0f ? -1.0f : -0.35f;
+      ENTITY::GET_ENTITY_SPEED(vehicle) < 1.0f ? -5.0f : -0.5f;
   if (s_state.selector == Selector::Park) {
     data.SetGear(1);
     data.SetNextGear(1);

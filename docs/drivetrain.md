@@ -36,8 +36,9 @@ clutch secara fisik pada satu profil yang sama.
 
 ## Load dan stall
 
-Kecepatan minimum drivetrain memakai idle RPM, `fDriveMaxFlatVel`, dan rasio
-gear bila pointer handling valid. Bila pointer optional tidak tersedia, model
+Kecepatan minimum drivetrain memakai idle RPM, runtime
+`CTransmission::fDriveMaxFlatVel`, dan rasio gear kendaraan aktif. Nilai
+handling `0x64` hanya fallback; bila pointer optional tidak tersedia, model
 memakai `GET_VEHICLE_ESTIMATED_MAX_SPEED` dan
 `GET_VEHICLE_ACCELERATION`, sehingga fallback tetap beda per kendaraan.
 Stall progress hanya naik bila:

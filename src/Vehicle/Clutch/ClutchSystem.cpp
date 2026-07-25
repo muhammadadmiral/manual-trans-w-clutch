@@ -95,7 +95,7 @@ void ApplyToVehicle(VehicleData &data, int gear, float speedMps) {
 
   if (gear == 0 || drivelineOpen) {
     s_state.nativeActuator =
-        std::fabs(speedMps) < 1.0f ? -1.0f : -0.35f;
+        std::fabs(speedMps) < 1.0f ? -5.0f : -0.5f;
   } else {
     s_state.nativeActuator = s_state.engagement;
   }
@@ -109,7 +109,7 @@ float GetNativeActuator() { return s_state.nativeActuator; }
 float GetDumpSeverity() { return s_state.dumpSeverity; }
 bool IsDumpActive() { return s_state.dumpRemaining > 0.0f; }
 bool IsDrivelineOpen(int gear) {
-  return gear == 0 || s_state.disengagement > 0.40f;
+  return gear == 0 || s_state.disengagement > 0.35f;
 }
 const State &GetState() { return s_state; }
 

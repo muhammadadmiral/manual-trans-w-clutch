@@ -151,6 +151,7 @@ bool VehicleData::AreOffsetsSane(const VehicleOffsets& v) {
                                                 : v.NextGear - v.Gear;
     if (gDist == 0 || gDist > 0x20) return false;
     if (v.Clutch != v.RPM + 0xC) return false;
+    if (v.Throttle != 0 && v.Throttle != v.RPM + 0x10) return false;
 
     if ((v.RPM & 3) != 0) return false;
     if (v.Clutch != 0 &&
@@ -195,6 +196,10 @@ bool VehicleData::LoadOffsetsFromIni(HMODULE pluginModule, VehicleOffsets& resul
         out.HandlingPtr           = ReadHexOffset(iniPath, section, "HandlingPtr");
         out.DriveInertia          = ReadHexOffset(iniPath, section, "DriveInertia");
         out.DriveMaxFlatVel       = ReadHexOffset(iniPath, section, "DriveMaxFlatVel");
+        out.TransmissionDriveMaxFlatVel =
+            ReadHexOffset(iniPath, section, "TransmissionDriveMaxFlatVel");
+        out.TransmissionDriveForce =
+            ReadHexOffset(iniPath, section, "TransmissionDriveForce");
         out.WheelsPtr             = ReadHexOffset(iniPath, section, "WheelsPtr");
         out.WheelCount            = ReadHexOffset(iniPath, section, "WheelCount");
         out.WheelAngularVelocity  = ReadHexOffset(iniPath, section, "WheelAngularVelocity");
@@ -204,6 +209,7 @@ bool VehicleData::LoadOffsetsFromIni(HMODULE pluginModule, VehicleOffsets& resul
         out.TopGear               = ReadHexOffset(iniPath, section, "TopGear");
         out.DriveForce            = ReadHexOffset(iniPath, section, "DriveForce");
         out.FuelLevel             = ReadHexOffset(iniPath, section, "FuelLevel");
+        out.OilLevel              = ReadHexOffset(iniPath, section, "OilLevel");
         out.LightsBroken          = ReadHexOffset(iniPath, section, "LightsBroken");
         out.LightsVisuallyBroken  = ReadHexOffset(iniPath, section, "LightsVisuallyBroken");
         out.HoverTransformRatioLerp = ReadHexOffset(iniPath, section, "HoverTransformRatioLerp");
@@ -284,6 +290,10 @@ void VehicleData::SaveOffsetsToIni(HMODULE pluginModule,
         write(section, "HandlingPtr",             offsets.HandlingPtr);
         write(section, "DriveInertia",            offsets.DriveInertia);
         write(section, "DriveMaxFlatVel",         offsets.DriveMaxFlatVel);
+        write(section, "TransmissionDriveMaxFlatVel",
+              offsets.TransmissionDriveMaxFlatVel);
+        write(section, "TransmissionDriveForce",
+              offsets.TransmissionDriveForce);
         write(section, "WheelsPtr",               offsets.WheelsPtr);
         write(section, "WheelCount",              offsets.WheelCount);
         write(section, "WheelAngularVelocity",    offsets.WheelAngularVelocity);
@@ -293,6 +303,7 @@ void VehicleData::SaveOffsetsToIni(HMODULE pluginModule,
         write(section, "TopGear",                offsets.TopGear);
         write(section, "DriveForce",             offsets.DriveForce);
         write(section, "FuelLevel",              offsets.FuelLevel);
+        write(section, "OilLevel",               offsets.OilLevel);
         write(section, "LightsBroken",           offsets.LightsBroken);
         write(section, "LightsVisuallyBroken",   offsets.LightsVisuallyBroken);
         write(section, "HoverTransformRatioLerp",offsets.HoverTransformRatioLerp);
@@ -325,8 +336,19 @@ bool VehicleData::Initialize(HMODULE pluginModule) {
         resolvedOffsets = candidate;
         offsetSource    = VehicleOffsetSource::PatternScan;
         initialized     = true;
-        LOG_INFO(Init, "AOB scan OK — G=0x%X N=0x%X RPM=0x%X CLT=0x%X",
-                 candidate.Gear, candidate.NextGear, candidate.RPM, candidate.Clutch);
+        LOG_INFO(
+            Init,
+            "AOB scan OK: G=0x%X N=0x%X RPM=0x%X CLT=0x%X THR=0x%X "
+            "PED=0x%X HP=0x%X INERTIA=0x%X FORCE=0x%X MAXVEL=0x%X "
+            "TFORCE=0x%X TMAX=0x%X WHEELS=0x%X COUNT=0x%X",
+            candidate.Gear, candidate.NextGear, candidate.RPM,
+            candidate.Clutch, candidate.Throttle,
+            candidate.ThrottlePedal, candidate.HandlingPtr,
+            candidate.DriveInertia, candidate.DriveForce,
+            candidate.DriveMaxFlatVel,
+            candidate.TransmissionDriveForce,
+            candidate.TransmissionDriveMaxFlatVel,
+            candidate.WheelsPtr, candidate.WheelCount);
         SaveOffsetsToIni(pluginModule, candidate);
         return true;
     }
@@ -470,6 +492,10 @@ float   VehicleData::GetHoverTransformRatioLerp() const { return m_vehicle.GetHo
 
 float VehicleData::GetDriveForce() const {
     if (!m_isValid) return 0.0f;
+    const float runtimeValue = m_vehicle.GetTransmissionDriveForce();
+    if (std::isfinite(runtimeValue) && runtimeValue > 0.001f &&
+        runtimeValue < 10.0f)
+        return runtimeValue;
     auto h = m_vehicle.GetHandlingData();
     return h.IsValid() ? h.GetDriveForce() : 0.0f;
 }
@@ -482,6 +508,10 @@ float VehicleData::GetDriveInertia() const {
 
 float VehicleData::GetDriveMaxFlatVel() const {
     if (!m_isValid) return 0.0f;
+    const float runtimeValue = m_vehicle.GetTransmissionDriveMaxFlatVel();
+    if (std::isfinite(runtimeValue) && runtimeValue > 1.0f &&
+        runtimeValue < 1000.0f)
+        return runtimeValue;
     auto h = m_vehicle.GetHandlingData();
     return h.IsValid() ? h.GetDriveMaxFlatVel() : 0.0f;
 }

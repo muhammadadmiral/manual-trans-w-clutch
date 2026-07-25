@@ -45,7 +45,8 @@ ditulis. Native power multiplier hanya memberi karakter torsi S dan kembali
 ## Aturan fail-open
 
 - Resolver field inti gagal: transmisi tidak diaktifkan.
-- Handling pointer gagal: flat velocity diturunkan dari estimated top speed dan
-  rasio top gear, sedangkan inertia memakai karakter acceleration native.
+- Runtime `CTransmission` tidak masuk rentang masuk akal: flat velocity jatuh
+  ke handling, lalu ke estimated top speed dan rasio top gear. Inertia tetap
+  memakai handling atau karakter acceleration native.
 - Telemetry roda gagal: TCS dan ABS tidak memotong input.
 - Write opsional selalu no-op bila offset nol.
