@@ -6,7 +6,7 @@
 #include <cstring>
 
 bool VehicleOffsets::IsCompleteCore() const {
-  return Gear != 0 && NextGear != 0 && Clutch != 0 && RPM != 0;
+  return Gear != 0 && NextGear != 0 && RPM != 0;
 }
 
 static bool TryReadU32(uintptr_t address, uint32_t &value) {
@@ -32,23 +32,18 @@ bool OffsetResolver::ScanPatterns(VehicleOffsets &outOffsets,
   VehicleOffsets offsets{};
   uintptr_t addr = 0;
 
-  // 1. Core Engine (RPM / Clutch / engine-sound throttle).
-  // These three floats are members of CVehicle. The relationship is stable:
-  // fClutch = fCurrentRPM + 0xC and fThrottle = fCurrentRPM + 0x10.
+  // RPM aman dibaca. Offset di sebelahnya jangan langsung dianggap clutch
+  // atau throttle; layout Enhanced sudah beda dan salah tulis di sini fatal.
   addr = AOBScanner::FindUnique(
       "76 03 0F 28 F0 F3 44 0F 10 93 ? ? ? ?");
   if (addr != 0 && TryReadU32(addr + 10, offsets.RPM)) {
-    offsets.Clutch = offsets.RPM + 0xC;
-    offsets.Throttle = offsets.RPM + 0x10;
   } else {
     // Older fallback retained for builds whose surrounding code changed.
     addr = AOBScanner::FindUnique("F6 83 ? ? ? ? 07 75 ? 44 0F");
     if (addr == 0 || !TryReadU32(addr - 42, offsets.RPM)) {
-      outFailureReason = "Could not resolve the RPM/clutch pattern.";
+      outFailureReason = "Could not resolve the RPM pattern.";
       return false;
     }
-    offsets.Clutch = offsets.RPM + 0xC;
-    offsets.Throttle = offsets.RPM + 0x10;
   }
 
   // 2. Core Transmission (Gear / NextGear / TopGear / GearRatios)
@@ -63,7 +58,8 @@ bool OffsetResolver::ScanPatterns(VehicleOffsets &outOffsets,
       offsets.NextGear = baseGearOffset;
       offsets.Gear = baseGearOffset + 2;
       offsets.TopGear = baseGearOffset + 6;
-      offsets.GearRatios = baseGearOffset + 8;
+      offsets.GearRatios = baseGearOffset + 0xC;
+      offsets.GearRatiosInline = 1;
     } else {
       outFailureReason = "Failed to read Gear RIP displacement.";
       return false;
@@ -124,11 +120,6 @@ bool OffsetResolver::ScanPatterns(VehicleOffsets &outOffsets,
 }
 
 void OffsetResolver::EnrichOptionalOffsets(VehicleOffsets &offsets) {
-  if (offsets.RPM != 0) {
-    offsets.Clutch = offsets.RPM + 0xC;
-    offsets.Throttle = offsets.RPM + 0x10;
-  }
-
   // CVehicle::m_handlingData. The handling fields below are offsets inside
   // CHandlingData, not displacements from CVehicle.
   uintptr_t addr = AOBScanner::FindUnique(

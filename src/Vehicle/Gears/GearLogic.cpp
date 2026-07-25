@@ -97,10 +97,9 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
 
 void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
                    int maxGear, float clutch, float throttle, float speedKmH) {
-  // Saat pedal benar-benar mentok, physical gear dibuat netral. Logical gear
-  // tetap tersimpan di s_manualGear dan langsung masuk lagi di bite point.
-  // Ini jadi hard disconnect kalau GTA menimpa fClutch di akhir frame.
-  if (manualGear == 0 || clutch >= 0.995f) {
+  // Logical gear tetap tersimpan saat pedal membuka drivetrain. Physical gear
+  // baru masuk lagi dekat bite point supaya throttle bebas menaikkan RPM.
+  if (manualGear == 0 || clutch >= 0.88f) {
     data.SetGear(0xFF);
     data.SetNextGear(0xFF);
   } else if (manualGear == -1) {

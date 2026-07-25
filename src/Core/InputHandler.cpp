@@ -88,6 +88,7 @@ static float s_smoothedBrake    = 0.0f;
 static float s_smoothedClutch   = 0.0f;
 static float s_smoothedSteer    = 0.0f;
 static float s_driveCoupling    = 0.0f;
+static float s_reverseInjectedBrakeAxis = 0.0f;
 
 // ── Raw state ─────────────────────────────────────────────────────────────────
 static bool  s_throttleDown  = false;
@@ -98,7 +99,7 @@ static float s_rawSteerTarget = 0.0f;
 // =============================================================================
 // Update — called every ScriptHookV frame
 // =============================================================================
-void Update() {
+void Update(int selectedGear) {
     // ── Delta time ────────────────────────────────────────────────────────────
     const ULONGLONG now = GetTickCount64();
     const float dtSec = (s_lastTick == 0)
@@ -142,8 +143,14 @@ void Update() {
     // ── Brake: S or DOWN ──────────────────────────────────────────────────────
     const bool keyboardBrake = keyDown(0x53) || keyDown(VK_DOWN);
     const float nativeBrake = Clamp01(PAD::GET_CONTROL_NORMAL(0, 72));
-    s_brakeDown = nativeBrake > 0.001f || keyboardBrake;
-    s_smoothedBrake = keyboardBrake ? 1.0f : nativeBrake;
+    const bool reverseInjectionEcho =
+        selectedGear < 0 && keyboardThrottle && !keyboardBrake &&
+        s_reverseInjectedBrakeAxis > 0.01f &&
+        std::fabs(nativeBrake - s_reverseInjectedBrakeAxis) < 0.12f;
+    const float physicalBrake = reverseInjectionEcho ? 0.0f : nativeBrake;
+    s_brakeDown = physicalBrake > 0.001f || keyboardBrake;
+    s_smoothedBrake = keyboardBrake ? 1.0f : physicalBrake;
+    s_reverseInjectedBrakeAxis = 0.0f;
 
     // ── Clutch ────────────────────────────────────────────────────────────────
     s_clutchDown = keyDown(Config::KeyClutch);
@@ -192,6 +199,7 @@ void ApplyGameControls(Vehicle vehicle, int manualGear, float clutch,
             // W dibaca dari control 71, tapi drivetrain reverse GTA bergerak
             // lewat control 72. Jangan disable target sebelum reinjection.
             PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, finalThrottle);
+            s_reverseInjectedBrakeAxis = finalThrottle;
         }
     } else {
         if (std::fabs(finalThrottle - s_smoothedThrottle) > 0.005f) {
@@ -217,6 +225,7 @@ void ResetEdges() {
     s_lastTick = 0;
     s_smoothedThrottle = s_smoothedBrake = s_smoothedClutch = 0.0f;
     s_smoothedSteer = s_rawSteerTarget = s_driveCoupling = 0.0f;
+    s_reverseInjectedBrakeAxis = 0.0f;
 }
 
 // =============================================================================

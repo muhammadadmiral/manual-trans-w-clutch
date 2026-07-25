@@ -21,6 +21,7 @@ struct State {
   Selector selector = Selector::Park;
   int currentGear = 1;
   DWORD lastShiftTime = 0;
+  int lastShiftDirection = 0;
   float coupling = 0.0f;
   bool kickdown = false;
   bool selectorRejected = false;

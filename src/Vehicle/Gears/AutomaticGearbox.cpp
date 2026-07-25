@@ -130,7 +130,8 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
   const DWORD now = GetTickCount();
   const DWORD delayMs = static_cast<DWORD>(
       std::clamp(Config::AutomaticShiftDelay, 0.10f, 1.20f) * 1000.0f);
-  if (now - s_state.lastShiftTime < delayMs)
+  const DWORD elapsedSinceShift = now - s_state.lastShiftTime;
+  if (elapsedSinceShift < delayMs)
     return s_state.currentGear;
 
   const bool sport = s_state.selector == Selector::Sport;
@@ -148,6 +149,13 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
   const bool kickdownRequest =
       throttle >= std::clamp(Config::AutomaticKickdownThrottle, 0.40f, 0.98f) &&
       rpm < (sport ? 0.82f : 0.72f) && s_state.currentGear > 1;
+  const float estimatedTopSpeed =
+      (std::max)(8.0f, VEHICLE::GET_VEHICLE_ESTIMATED_MAX_SPEED(vehicle));
+  const float upshiftMinSpeed =
+      estimatedTopSpeed *
+      (static_cast<float>(s_state.currentGear) /
+       static_cast<float>((std::max)(1, maxGear))) *
+      (sport ? 0.76f : 0.68f);
 
   int targetGear = s_state.currentGear;
   if (kickdownRequest &&
@@ -155,7 +163,8 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
     targetGear = s_state.currentGear - 1;
     s_state.kickdown = true;
   } else if (rpm > upThreshold && s_state.currentGear < maxGear &&
-             throttle > 0.04f && std::fabs(signedSpeedMps) > 2.0f) {
+             throttle > 0.04f &&
+             std::fabs(signedSpeedMps) >= upshiftMinSpeed) {
     targetGear = s_state.currentGear + 1;
   } else if ((rpm < downThreshold || (brake > 0.35f && rpm < upThreshold)) &&
              s_state.currentGear > 1 &&
@@ -165,9 +174,19 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
   }
 
   if (targetGear != s_state.currentGear) {
+    const int direction = targetGear > s_state.currentGear ? 1 : -1;
+    const DWORD reversalHoldMs =
+        (std::max<DWORD>)(900, delayMs * 3);
+    if (s_state.lastShiftDirection != 0 &&
+        direction != s_state.lastShiftDirection &&
+        elapsedSinceShift < reversalHoldMs) {
+      return s_state.currentGear;
+    }
+
     const int previous = s_state.currentGear;
     s_state.currentGear = targetGear;
     s_state.lastShiftTime = now;
+    s_state.lastShiftDirection = direction;
     GearboxSystem::NotifyAutomaticShift(data, previous, targetGear, sport);
     LOG_INFO(Gear, "Automatic %s shift: %d -> %d rpm=%.3f throttle=%.3f",
              sport ? "S" : "D", previous, targetGear, rpm, throttle);
@@ -181,7 +200,6 @@ void ApplyToMemory(Vehicle vehicle, VehicleData &data, int activeGear) {
   if (s_state.selector == Selector::Park) {
     data.SetGear(0xFF);
     data.SetNextGear(0xFF);
-    data.SetClutch(0.0f);
     VEHICLE::SET_VEHICLE_HANDBRAKE(vehicle, TRUE);
     PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 76, 1.0f);
     return;
@@ -190,16 +208,13 @@ void ApplyToMemory(Vehicle vehicle, VehicleData &data, int activeGear) {
   if (activeGear == 0) {
     data.SetGear(0xFF);
     data.SetNextGear(0xFF);
-    data.SetClutch(0.0f);
   } else if (activeGear < 0) {
     data.SetGear(0);
     data.SetNextGear(0);
-    data.SetClutch(s_state.coupling);
   } else {
     const uint8_t gear = static_cast<uint8_t>(activeGear);
     data.SetGear(gear);
     data.SetNextGear(gear);
-    data.SetClutch(s_state.coupling);
   }
 }
 

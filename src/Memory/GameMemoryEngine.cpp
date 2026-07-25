@@ -88,7 +88,10 @@ float CVehicle::GetGearRatio(uint8_t gearIndex) const {
     return 0.0f;
   __try {
     const uintptr_t ratios =
-        *reinterpret_cast<uintptr_t *>(m_address + m_offsets->GearRatios);
+        m_offsets->GearRatiosInline != 0
+            ? m_address + m_offsets->GearRatios
+            : *reinterpret_cast<uintptr_t *>(m_address +
+                                             m_offsets->GearRatios);
     if (!AOBScanner::IsReadable(ratios + gearIndex * sizeof(float),
                                 sizeof(float)))
       return 0.0f;
@@ -99,7 +102,7 @@ float CVehicle::GetGearRatio(uint8_t gearIndex) const {
 }
 
 float CVehicle::GetClutch() const {
-  if (!IsValid())
+  if (!IsValid() || m_offsets->Clutch == 0)
     return 0.0f;
   __try {
     return *reinterpret_cast<float *>(m_address + m_offsets->Clutch);

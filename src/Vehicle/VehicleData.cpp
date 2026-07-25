@@ -143,7 +143,7 @@ bool VehicleData::AreOffsetsSane(const VehicleOffsets& v) {
     if (!v.IsCompleteCore()) return false;
 
     constexpr uint32_t kMin = 0x100, kMax = 0x8000;
-    const uint32_t fields[] = {v.Gear, v.NextGear, v.Clutch, v.RPM};
+    const uint32_t fields[] = {v.Gear, v.NextGear, v.RPM};
     for (uint32_t f : fields)
         if (f < kMin || f >= kMax) return false;
 
@@ -151,11 +151,14 @@ bool VehicleData::AreOffsetsSane(const VehicleOffsets& v) {
                                                 : v.NextGear - v.Gear;
     if (gDist == 0 || gDist > 0x20) return false;
 
-    const uint32_t cDist = v.Clutch > v.RPM ? v.Clutch - v.RPM
-                                              : v.RPM - v.Clutch;
-    if (cDist == 0 || cDist > 0x40) return false;
-
-    if ((v.RPM & 3) || (v.Clutch & 3)) return false;
+    if ((v.RPM & 3) != 0) return false;
+    if (v.Clutch != 0 &&
+        (v.Clutch < kMin || v.Clutch >= kMax || (v.Clutch & 3) != 0))
+        return false;
+    if (v.GearRatios != 0 &&
+        (v.GearRatios < kMin || v.GearRatios >= kMax ||
+         (v.GearRatios & 3) != 0))
+        return false;
     return true;
 }
 
@@ -204,17 +207,28 @@ bool VehicleData::LoadOffsetsFromIni(HMODULE pluginModule, VehicleOffsets& resul
         out.LightsVisuallyBroken  = ReadHexOffset(iniPath, section, "LightsVisuallyBroken");
         out.HoverTransformRatioLerp = ReadHexOffset(iniPath, section, "HoverTransformRatioLerp");
         out.GearRatios            = ReadHexOffset(iniPath, section, "GearRatios");
+        out.GearRatiosInline      = ReadHexOffset(iniPath, section, "GearRatiosInline");
         
         // Backwards compatibility for old INIs that didn't save TopGear
         if (out.TopGear == 0 && out.NextGear != 0) {
             out.TopGear = out.NextGear + 2;
         }
 
-        if (out.RPM != 0 && out.Clutch != out.RPM + 0xC) {
+        if (out.Clutch != 0 || out.Throttle != 0) {
             LOG_WARN(Memory,
-                     "Correcting stale clutch offset 0x%X -> 0x%X "
-                     "(RPM+0xC)",
-                     out.Clutch, out.RPM + 0xC);
+                     "Unsafe legacy actuator offsets ignored: CLT=0x%X THR=0x%X",
+                     out.Clutch, out.Throttle);
+            out.Clutch = 0;
+            out.Throttle = 0;
+        }
+        if (out.GearRatios == 0 && out.NextGear != 0 &&
+            out.Gear == out.NextGear + 2 &&
+            out.TopGear == out.NextGear + 6) {
+            out.GearRatios = out.NextGear + 0xC;
+            out.GearRatiosInline = 1;
+            LOG_INFO(Memory,
+                     "Migrated inline gear ratios to 0x%X from gear cluster",
+                     out.GearRatios);
         }
         OffsetResolver::EnrichOptionalOffsets(out);
     };
@@ -277,6 +291,7 @@ void VehicleData::SaveOffsetsToIni(HMODULE pluginModule,
         write(section, "LightsVisuallyBroken",   offsets.LightsVisuallyBroken);
         write(section, "HoverTransformRatioLerp",offsets.HoverTransformRatioLerp);
         write(section, "GearRatios",             offsets.GearRatios);
+        write(section, "GearRatiosInline",       offsets.GearRatiosInline);
     };
 
     writeAll("Offsets");
@@ -406,15 +421,17 @@ bool VehicleData::HasPlausibleLayout(int maxGear) const {
 
     const uint8_t gear     = GetGear();
     const uint8_t nextGear = GetNextGear();
-    const float   clutch   = GetClutch();
     const float   rpm      = GetRPM();
+    const bool clutchOk =
+        resolvedOffsets.Clutch == 0 ||
+        (std::isfinite(GetClutch()) && GetClutch() >= -0.25f &&
+         GetClutch() <= 2.0f);
 
     // 0xFF == invalid / neutral on some vehicles
     const bool gearOk     = gear     <= static_cast<uint8_t>(maxGear + 1) || gear     == 0xFF;
     const bool nextGearOk = nextGear <= static_cast<uint8_t>(maxGear + 1) || nextGear == 0xFF;
 
-    return gearOk && nextGearOk &&
-           std::isfinite(clutch) && clutch >= -0.25f && clutch <= 2.0f &&
+    return gearOk && nextGearOk && clutchOk &&
            std::isfinite(rpm)    && rpm    >= -0.25f && rpm    <= 2.5f;
 }
 
@@ -485,7 +502,9 @@ bool VehicleData::SetTopGear(uint8_t gear) {
     return true;
 }
 bool VehicleData::SetClutch(float clutch) {
-    if (!m_isValid || !std::isfinite(clutch)) return false;
+    if (!m_isValid || resolvedOffsets.Clutch == 0 ||
+        !std::isfinite(clutch))
+        return false;
     m_vehicle.SetClutch(clutch);
     return true;
 }

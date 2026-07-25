@@ -10,6 +10,7 @@ struct VehicleOffsets {
   uint32_t NextGear = 0;
   uint32_t TopGear = 0;
   uint32_t GearRatios = 0;
+  uint32_t GearRatiosInline = 0;
   uint32_t Clutch = 0;
   uint32_t RPM = 0;
   uint32_t Throttle = 0;
@@ -39,7 +40,7 @@ class OffsetResolver {
 public:
   // Scans the GTA V process memory to find and resolve all known CVehicle
   // offsets. Returns true if at least the core transmission offsets (Gear,
-  // NextGear, Clutch, RPM) were found.
+  // NextGear, RPM) were found.
   static bool ScanPatterns(VehicleOffsets &outOffsets,
                            std::string &outFailureReason);
 

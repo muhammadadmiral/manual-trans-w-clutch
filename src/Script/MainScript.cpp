@@ -199,6 +199,8 @@ void ScriptMain() {
     // ── Not in a vehicle ──────────────────────────────────────────────────
     if (!PED::IS_PED_IN_ANY_VEHICLE(playerPed, FALSE)) {
       if (activeVehicle) {
+        if (ENTITY::DOES_ENTITY_EXIST(activeVehicle))
+          VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(activeVehicle, 1.0f);
         LOG_INFO(Script, "Player exited vehicle %d — resetting session state",
                  activeVehicle);
       }
@@ -212,6 +214,8 @@ void ScriptMain() {
 
     const Vehicle vehicle = PED::GET_VEHICLE_PED_IS_IN(playerPed, FALSE);
     if (!IsValidVehicle(vehicle) || !IsPlayerDriving(playerPed, vehicle)) {
+      if (activeVehicle && ENTITY::DOES_ENTITY_EXIST(activeVehicle))
+        VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(activeVehicle, 1.0f);
       activeVehicle = 0;
       activeLayoutValid = false;
       activeSignal = 0;
@@ -248,6 +252,8 @@ void ScriptMain() {
 
     // ── Vehicle change ────────────────────────────────────────────────────
     if (vehicle != activeVehicle) {
+      if (activeVehicle && ENTITY::DOES_ENTITY_EXIST(activeVehicle))
+        VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(activeVehicle, 1.0f);
       LOG_INFO(Script, "Entered vehicle handle=%d maxGear=%d", vehicle,
                maxGear);
       activeVehicle = vehicle;
@@ -297,7 +303,7 @@ void ScriptMain() {
       continue;
     }
 
-    InputHandler::Update();
+    InputHandler::Update(manualGear);
 
     // ── Engine toggle key ─────────────────────────────────────────────────
     if (InputHandler::IsEngineJustPressed()) {
@@ -489,7 +495,7 @@ void ScriptMain() {
       PedalModel::Reset();
       manualGear = 0;
       automaticClutchUntil = 0;
-      data.SetClutch(1.0f);
+      VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, 1.0f);
       activeTransmissionMode = transmissionMode;
 
       if (electricVehicle && requestedMode == 2) {
@@ -512,7 +518,7 @@ void ScriptMain() {
     }
 
     if (transmissionMode == 0) {
-      data.SetClutch(1.0f);
+      VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, 1.0f);
       Menu::Draw();
       continue;
     }
@@ -603,6 +609,20 @@ void ScriptMain() {
                                     driveThrottle, absBrake, maxGear,
                                     forwardSpeed);
 
+    const float clutchEngagement =
+        automaticMode ? AutomaticGearbox::GetCoupling()
+                      : ClutchSystem::GetEngagement();
+    float torqueCoupling =
+        manualGear == 0 ? 0.0f : std::clamp(clutchEngagement, 0.0f, 1.0f);
+    if (!automaticMode && InputHandler::IsClutchDown())
+      torqueCoupling = 0.0f;
+    if (automaticMode && AutomaticGearbox::IsSport()) {
+      torqueCoupling *=
+          1.0f + std::clamp(Config::AutomaticSTorqueBoost, 0.0f, 0.50f);
+    }
+    VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(
+        vehicle, std::clamp(torqueCoupling, 0.0f, 1.50f));
+
     if (automaticMode) {
       AutomaticGearbox::ApplyToMemory(vehicle, data, manualGear);
     } else {
@@ -610,9 +630,6 @@ void ScriptMain() {
                                simulatedClutch, throttle, speedKmH);
       ClutchSystem::ApplyToVehicle(data, manualGear, forwardSpeed);
     }
-    const float clutchEngagement =
-        automaticMode ? AutomaticGearbox::GetCoupling()
-                      : ClutchSystem::GetEngagement();
     const bool engineStall = EngineModel::Update(
         vehicle, data, manualGear, maxGear, simulatedClutch,
         clutchEngagement, throttle, absBrake, forwardSpeed, isEngineOn,
