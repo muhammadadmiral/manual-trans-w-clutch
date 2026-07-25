@@ -19,9 +19,16 @@ Sprint drivetrain aktif. Fokus saat ini:
 - dump clutch, bog, dan stall memakai RPM, rasio/handling yang tervalidasi,
   lalu fallback data native per kendaraan bila optional pointer tidak tersedia;
 - shift manual tanpa clutch tetap masuk, tetapi menghasilkan clash, torque cut,
-  shock, wear, dan risiko over-rev saat salah downshift;
+  shock, synchronizer wear/resistance, dan risiko over-rev + skid pulse saat
+  salah downshift;
+- clutch punya kapasitas torsi, overload slip, heat fade, serta judder di bite
+  point; idle creep menyerah pada tanjakan bila torsinya tidak cukup;
+- free-rev punya rev-hang berbasis inertia, pengereman darurat tanpa clutch bisa
+  stall, dan overrun memakai fuel cut;
 - automatic D melakukan shift santai, sedangkan S menahan RPM, lebih cepat
-  kickdown, dan memakai sport pedal map tanpa cheat-power global;
+  kickdown, memberi downshift blip, dan memakai sport pedal map;
+- automatic memodelkan TCC lockup, kickdown delay, temperatur ATF/limp mode,
+  neutral-drop damage, DSG ignition cut, brake-boost stall, dan safety-neutral;
 - L2/L1 membatasi gear tertinggi; LShift maju di gate selector dan LCtrl kembali;
 - Faggio/Faggio2/Faggio3/Pizza Boy diprofilkan sebagai scooter CVT gas-rem,
   motor lain sequential dengan auto-clutch, dan EV dikunci ke automatic;
@@ -69,7 +76,7 @@ dijelaskan di [docs/configuration.md](docs/configuration.md).
    memuat ScriptHookV.
 
 Sesudah mengganti ASI, cek awal `manual-trans.log`. Build sprint ini wajib
-mencetak `Runtime=driveline-r15-safe` dan path file yang benar-benar dimuat. Kalau
+mencetak `Runtime=driveline-r16-crashfix` dan path file yang benar-benar dimuat. Kalau
 baris itu tidak ada, GTA masih memakai salinan ASI lama.
 
 Artefak yang sudah diverifikasi pada sprint ini:
@@ -102,6 +109,9 @@ LugStallRPM=1500
 LugStallDelay=2.20
 WaterStallDelay=2.50
 RolloverStallDelay=7.00
+RevHangDuration=0.50
+HardBrakeStall=1
+FuelCutoffEngineBrake=1
 
 [Automatic]
 DUpRPM=0.50
@@ -110,6 +120,11 @@ SUpRPM=0.84
 SDownRPM=0.34
 SportTorqueBoost=0.10
 DKeyboardThrottle=0.62
+KickdownDelay=0.65
+TCC=1
+FluidOverheat=1
+NeutralDropDamage=1
+BrakeBoostStall=1
 ```
 
 `Mode=0` melepas kontrol drivetrain ke GTA, `Mode=1` mengaktifkan automatic
@@ -129,6 +144,7 @@ terverifikasi. TCS/ABS otomatis tidak mengintervensi bila `CWheel` tidak
 ter-resolve. Cluster engine memakai `Clutch=RPM+0xC` dan
 `EngineThrottle=RPM+0x10`; field throttle ini bukan pedal input. Saat mode
 transmisi aktif, RPM dan engine-throttle dapat ditulis untuk menjaga
-sinkronisasi poros setelah auto-shift native dinonaktifkan. Lima code patch
-wajib resolve unik; satu kegagalan membatalkan semuanya. Byte asli direstore
+sinkronisasi poros setelah auto-shift native dinonaktifkan. Dua code patch
+kritikal wajib resolve unik; satu kegagalan membatalkan takeover. Dua patch
+opsional boleh fail-open. Byte asli direstore
 saat mod Off, keluar kendaraan, atau unload.

@@ -12,14 +12,40 @@ static float Clamp01(float value) {
   return std::clamp(value, 0.0f, 1.0f);
 }
 
+static float Follow(float current, float target, float attack, float release,
+                    float dt) {
+  const float tau = target > current ? attack : release;
+  const float alpha =
+      tau > 0.001f ? 1.0f - std::exp(-dt / tau) : 1.0f;
+  return current + (target - current) * Clamp01(alpha);
+}
+
 void Reset() { s_state = State{}; }
 
 void Update(float rawThrottle, float rawBrake, float clutchDisengagement,
             int gear, float signedSpeedMps, bool automaticMode,
             bool engineOn) {
   const float dt = std::clamp(MISC::GET_FRAME_TIME(), 0.001f, 0.05f);
-  s_state.throttle = engineOn ? Clamp01(rawThrottle) : 0.0f;
-  s_state.brake = Clamp01(rawBrake);
+  const float throttleTarget = engineOn ? Clamp01(rawThrottle) : 0.0f;
+  const float brakeTarget = Clamp01(rawBrake);
+  s_state.automaticActuator = automaticMode;
+  if (automaticMode) {
+    s_state.actuatorThrottle =
+        Follow(s_state.actuatorThrottle, throttleTarget,
+               std::clamp(Config::AutomaticThrottleAttack, 0.01f, 1.50f),
+               std::clamp(Config::AutomaticThrottleRelease, 0.01f, 1.50f),
+               dt);
+    s_state.actuatorBrake =
+        Follow(s_state.actuatorBrake, brakeTarget,
+               std::clamp(Config::AutomaticBrakeAttack, 0.01f, 1.50f),
+               std::clamp(Config::AutomaticBrakeRelease, 0.01f, 1.50f),
+               dt);
+  } else {
+    s_state.actuatorThrottle = throttleTarget;
+    s_state.actuatorBrake = brakeTarget;
+  }
+  s_state.throttle = Clamp01(s_state.actuatorThrottle);
+  s_state.brake = Clamp01(s_state.actuatorBrake);
   s_state.heelToeWindow =
       !automaticMode && clutchDisengagement > 0.35f && gear != 0;
 

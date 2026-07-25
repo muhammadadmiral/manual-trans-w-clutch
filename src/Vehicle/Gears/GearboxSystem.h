@@ -1,4 +1,6 @@
 #pragma once
+#include <array>
+#include <cstdint>
 
 class VehicleData;
 using Vehicle = int;
@@ -26,6 +28,12 @@ struct State {
   bool powerShift = false;
   bool synchroShift = false;
   float moneyShiftSeverity = 0.0f;
+  float wheelLockRemaining = 0.0f;
+  float wheelLockBrake = 0.0f;
+  float selectedSynchroWear = 0.0f;
+  uint32_t resistanceDelayMs = 0;
+  bool shiftRejected = false;
+  std::array<float, 9> synchroWear{};
   int lastFromGear = 0;
   int lastToGear = 0;
 };
@@ -39,10 +47,13 @@ void NotifyShift(Vehicle vehicle, VehicleData &data, int fromGear, int toGear,
 void NotifyAutomaticShift(VehicleData &data, int fromGear, int toGear,
                           bool sportMode);
 void NotifyRevMatch(float currentRPM, float targetRPM);
+uint32_t GetShiftResistanceMs(VehicleData &data, int fromGear, int toGear,
+                              float clutchDisengagement, float throttle);
 
 float GetHealth();
 bool IsSeized();
 bool ConsumeStallRequest();
+float GetWheelLockBrake();
 const State &GetState();
 
 } // namespace GearboxSystem

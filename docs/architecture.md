@@ -41,6 +41,12 @@ Saat netral atau clutch-open, `EngineModel` melanjutkan RPM mesin bebas memakai
 inertia. Recovery low-RPM hanya memakai power multiplier native; tidak menulis
 runtime drive-force, roda, atau entity speed.
 
+Money-shift wheel-lock memakai pulse engine-brake/pressure pendek karena field
+`CWheel` build Enhanced ini belum tervalidasi untuk write per roda. Efeknya
+belum driven-wheel-exact. Hill rollback tidak menulis velocity: idle-creep
+dibatalkan ketika grade load melebihi kapasitas bite, lalu rigid-body GTA yang
+menangani gravitasi.
+
 ## Aturan fail-open
 
 - Resolver field inti gagal: transmisi tidak diaktifkan.

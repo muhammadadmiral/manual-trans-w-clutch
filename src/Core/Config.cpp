@@ -56,6 +56,8 @@ float LugStallRPM = 1500.0f;
 float LugStallDelay = 2.20f;
 float WaterStallDelay = 2.50f;
 float RolloverStallDelay = 7.00f;
+float RevHangDuration = 0.50f;
+bool HardBrakeStall = true;
 bool StarterInterlock = true;
 bool AutomaticStartRequiresBrake = true;
 
@@ -65,11 +67,16 @@ float ClutchHeatRate = 0.08f;
 float ClutchCoolRate = 0.035f;
 float ClutchFadeStart = 0.85f;
 float ClutchFadeStrength = 0.45f;
+float MaxClutchTorque = 1.00f;
+bool ClutchJudder = true;
 
 bool GearClash = true;
 float GearGrindDamage = 0.04f;
 float ShiftShockStrength = 0.65f;
 float NoLiftShiftPenalty = 0.35f;
+bool SynchronizerWear = true;
+bool ShiftResistance = true;
+bool FuelCutoffEngineBrake = true;
 float ConnectedRPMSync = 0.25f;
 bool AutomaticBrakeInterlock = true;
 float AutomaticShiftDelay = 0.35f;
@@ -80,6 +87,15 @@ float AutomaticSDownRPM = 0.34f;
 float AutomaticKickdownThrottle = 0.72f;
 float AutomaticSTorqueBoost = 0.10f;
 float AutomaticDKeyboardThrottle = 0.62f;
+float AutomaticKickdownDelay = 0.65f;
+bool AutomaticTCC = true;
+bool AutomaticFluidOverheat = true;
+bool AutomaticNeutralDropDamage = true;
+bool AutomaticBrakeBoostStall = true;
+float AutomaticThrottleAttack = 0.18f;
+float AutomaticThrottleRelease = 0.32f;
+float AutomaticBrakeAttack = 0.10f;
+float AutomaticBrakeRelease = 0.20f;
 bool BrakeThrottleOverride = true;
 float BrakeOverrideDelay = 0.20f;
 float BrakeOverrideCut = 0.85f;
@@ -225,6 +241,10 @@ void ReadConfig(HMODULE module) {
         ReadFloat("Engine", "WaterStallDelay", 2.50f, ini);
     RolloverStallDelay =
         ReadFloat("Engine", "RolloverStallDelay", 7.00f, ini);
+    RevHangDuration =
+        ReadFloat("Engine", "RevHangDuration", 0.50f, ini);
+    HardBrakeStall =
+        GetPrivateProfileIntA("Engine", "HardBrakeStall", 1, ini) != 0;
     StarterInterlock =
         GetPrivateProfileIntA("Engine", "StarterInterlock", 1, ini) != 0;
     AutomaticStartRequiresBrake =
@@ -257,6 +277,24 @@ void ReadConfig(HMODULE module) {
         ReadFloat("Automatic", "SportTorqueBoost", 0.10f, ini);
     AutomaticDKeyboardThrottle =
         ReadFloat("Automatic", "DKeyboardThrottle", 0.62f, ini);
+    AutomaticKickdownDelay =
+        ReadFloat("Automatic", "KickdownDelay", 0.65f, ini);
+    AutomaticTCC =
+        GetPrivateProfileIntA("Automatic", "TCC", 1, ini) != 0;
+    AutomaticFluidOverheat =
+        GetPrivateProfileIntA("Automatic", "FluidOverheat", 1, ini) != 0;
+    AutomaticNeutralDropDamage =
+        GetPrivateProfileIntA("Automatic", "NeutralDropDamage", 1, ini) != 0;
+    AutomaticBrakeBoostStall =
+        GetPrivateProfileIntA("Automatic", "BrakeBoostStall", 1, ini) != 0;
+    AutomaticThrottleAttack =
+        ReadFloat("Automatic", "ThrottleAttack", 0.18f, ini);
+    AutomaticThrottleRelease =
+        ReadFloat("Automatic", "ThrottleRelease", 0.32f, ini);
+    AutomaticBrakeAttack =
+        ReadFloat("Automatic", "BrakeAttack", 0.10f, ini);
+    AutomaticBrakeRelease =
+        ReadFloat("Automatic", "BrakeRelease", 0.20f, ini);
 
     BrakeThrottleOverride =
         GetPrivateProfileIntA("Pedals", "BrakeThrottleOverride", 1, ini) != 0;
@@ -293,6 +331,12 @@ void ReadConfig(HMODULE module) {
         ReadFloat("Gearbox", "ShiftShockStrength", 0.65f, ini);
     NoLiftShiftPenalty =
         ReadFloat("Gearbox", "NoLiftShiftPenalty", 0.35f, ini);
+    SynchronizerWear =
+        GetPrivateProfileIntA("Gearbox", "SynchronizerWear", 1, ini) != 0;
+    ShiftResistance =
+        GetPrivateProfileIntA("Gearbox", "ShiftResistance", 1, ini) != 0;
+    FuelCutoffEngineBrake =
+        GetPrivateProfileIntA("Engine", "FuelCutoffEngineBrake", 1, ini) != 0;
 
     ClutchBiteStart = ReadFloat("Clutch", "BiteStart", 0.18f, ini);
     ClutchBiteEnd = ReadFloat("Clutch", "BiteEnd", 0.43f, ini);
@@ -301,6 +345,10 @@ void ReadConfig(HMODULE module) {
     ClutchFadeStart = ReadFloat("Clutch", "FadeStart", 0.85f, ini);
     ClutchFadeStrength =
         ReadFloat("Clutch", "FadeStrength", 0.45f, ini);
+    MaxClutchTorque =
+        ReadFloat("Clutch", "MaxClutchTorque", 1.00f, ini);
+    ClutchJudder =
+        GetPrivateProfileIntA("Clutch", "Judder", 1, ini) != 0;
 
     // Analog smoothing τ (seconds)
     ThrottleAttack   = ReadFloat("Analog", "ThrottleAttack",   0.08f,  ini);
@@ -340,9 +388,9 @@ void ReadConfig(HMODULE module) {
 
     // Auto-create if the file doesn't exist yet
     if (GetFileAttributesA(ini) == INVALID_FILE_ATTRIBUTES ||
-        drivetrainSchema < 5) {
+        drivetrainSchema < 6) {
         SaveConfig(module);
-        WriteInt("Internal", "DrivetrainSchema", 5, ini);
+        WriteInt("Internal", "DrivetrainSchema", 6, ini);
     }
 }
 
@@ -379,6 +427,10 @@ void SaveConfig(HMODULE module) {
     WriteFloat("Engine", "LugStallDelay", LugStallDelay, ini);
     WriteFloat("Engine", "WaterStallDelay", WaterStallDelay, ini);
     WriteFloat("Engine", "RolloverStallDelay", RolloverStallDelay, ini);
+    WriteFloat("Engine", "RevHangDuration", RevHangDuration, ini);
+    WriteInt("Engine", "HardBrakeStall", HardBrakeStall ? 1 : 0, ini);
+    WriteInt("Engine", "FuelCutoffEngineBrake",
+             FuelCutoffEngineBrake ? 1 : 0, ini);
     WriteInt("Engine", "StarterInterlock", StarterInterlock ? 1 : 0, ini);
     WriteInt("Engine", "AutomaticStartRequiresBrake",
              AutomaticStartRequiresBrake ? 1 : 0, ini);
@@ -397,6 +449,18 @@ void SaveConfig(HMODULE module) {
                AutomaticSTorqueBoost, ini);
     WriteFloat("Automatic", "DKeyboardThrottle",
                AutomaticDKeyboardThrottle, ini);
+    WriteFloat("Automatic", "KickdownDelay", AutomaticKickdownDelay, ini);
+    WriteInt("Automatic", "TCC", AutomaticTCC ? 1 : 0, ini);
+    WriteInt("Automatic", "FluidOverheat",
+             AutomaticFluidOverheat ? 1 : 0, ini);
+    WriteInt("Automatic", "NeutralDropDamage",
+             AutomaticNeutralDropDamage ? 1 : 0, ini);
+    WriteInt("Automatic", "BrakeBoostStall",
+             AutomaticBrakeBoostStall ? 1 : 0, ini);
+    WriteFloat("Automatic", "ThrottleAttack", AutomaticThrottleAttack, ini);
+    WriteFloat("Automatic", "ThrottleRelease", AutomaticThrottleRelease, ini);
+    WriteFloat("Automatic", "BrakeAttack", AutomaticBrakeAttack, ini);
+    WriteFloat("Automatic", "BrakeRelease", AutomaticBrakeRelease, ini);
 
     WriteInt("Pedals", "BrakeThrottleOverride",
              BrakeThrottleOverride ? 1 : 0, ini);
@@ -426,6 +490,9 @@ void SaveConfig(HMODULE module) {
     WriteFloat("Gearbox", "GrindDamage", GearGrindDamage, ini);
     WriteFloat("Gearbox", "ShiftShockStrength", ShiftShockStrength, ini);
     WriteFloat("Gearbox", "NoLiftShiftPenalty", NoLiftShiftPenalty, ini);
+    WriteInt("Gearbox", "SynchronizerWear",
+             SynchronizerWear ? 1 : 0, ini);
+    WriteInt("Gearbox", "ShiftResistance", ShiftResistance ? 1 : 0, ini);
 
     WriteFloat("Clutch", "BiteStart", ClutchBiteStart, ini);
     WriteFloat("Clutch", "BiteEnd", ClutchBiteEnd, ini);
@@ -433,6 +500,8 @@ void SaveConfig(HMODULE module) {
     WriteFloat("Clutch", "CoolRate", ClutchCoolRate, ini);
     WriteFloat("Clutch", "FadeStart", ClutchFadeStart, ini);
     WriteFloat("Clutch", "FadeStrength", ClutchFadeStrength, ini);
+    WriteFloat("Clutch", "MaxClutchTorque", MaxClutchTorque, ini);
+    WriteInt("Clutch", "Judder", ClutchJudder ? 1 : 0, ini);
 
     WriteFloat("Analog", "ThrottleAttack",   ThrottleAttack,  ini);
     WriteFloat("Analog", "ThrottleRelease",  ThrottleRelease, ini);

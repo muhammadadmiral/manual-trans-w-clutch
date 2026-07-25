@@ -214,9 +214,18 @@ static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
       ResolveTorqueCurve(s_state.estimatedEngineRPM, rpmRange);
 
   s_state.creepThrottle = 0.0f;
+  const float pitchLoad =
+      Clamp01(std::max(0.0f, ENTITY::GET_ENTITY_PITCH(vehicle)) / 18.0f);
+  const float idleHoldCapacity =
+      Clamp01(Config::IdleTorqueFraction) * engagement *
+      (std::abs(gear) == 1 ? 1.65f : 0.75f);
+  s_state.hillRollback =
+      std::abs(gear) == 1 && brake < 0.05f &&
+      pitchLoad > idleHoldCapacity + Clamp01(throttle) * 0.45f;
   if (Config::IdleCreep && std::abs(gear) == 1 && throttle < 0.02f &&
       brake < 0.05f &&
-      engagement > 0.50f && speedGap > 0.01f) {
+      engagement > 0.50f && speedGap > 0.01f &&
+      !s_state.hillRollback) {
     s_state.creepThrottle =
         Clamp01(Config::IdleCreepThrottle) * speedGap * engagement;
     const int driveControl = gear < 0 ? 72 : 71;
@@ -257,8 +266,7 @@ static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
   const float gearWeight =
       Clamp01(static_cast<float>((std::max)(0, std::abs(gear) - 1)) /
               gearSpan);
-  const float uphillLoad =
-      Clamp01(std::max(0.0f, ENTITY::GET_ENTITY_PITCH(vehicle)) / 18.0f);
+  const float uphillLoad = pitchLoad;
   const float launchDemand =
       speedGap * (0.55f + gearWeight * 0.20f);
   const float lugDemand =
@@ -306,6 +314,24 @@ static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
 
   if (s_state.stallProgress >= 1.0f) {
     s_state.stallProgress = 0.0f;
+    return true;
+  }
+
+  const bool hardBraking =
+      Config::HardBrakeStall && !automaticMode && engineOn && gear != 0 &&
+      engagement > 0.75f && brake > 0.88f &&
+      s_state.longitudinalAcceleration < -4.5f &&
+      (std::fabs(speedMps) < 3.5f ||
+       s_state.estimatedEngineRPM < lugThreshold * 0.85f);
+  if (hardBraking) {
+    s_state.hardBrakeStallProgress += dt / 0.22f;
+  } else {
+    s_state.hardBrakeStallProgress =
+        std::max(0.0f, s_state.hardBrakeStallProgress - dt * 4.0f);
+  }
+  s_state.hardBrakeStall = s_state.hardBrakeStallProgress >= 1.0f;
+  if (s_state.hardBrakeStall) {
+    s_state.hardBrakeStallProgress = 0.0f;
     return true;
   }
   return false;
@@ -456,9 +482,17 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
     // gear 2+. Di fase terbuka saja kita lanjutkan state RPM mesin memakai
     // inertia kendaraan; kecepatan roda tidak pernah ditulis.
     const float pedal = Clamp01(throttle);
-    const float freeTarget =
+    float freeTarget =
         s_state.idleRPM +
         std::pow(pedal, 0.62f) * (1.0f - s_state.idleRPM);
+    if (s_state.previousThrottle > 0.15f && pedal < 0.02f)
+      s_state.revHangRemaining =
+          std::clamp(Config::RevHangDuration, 0.0f, 2.0f);
+    if (s_state.revHangRemaining > 0.0f && pedal < 0.02f) {
+      s_state.revHangRemaining =
+          std::max(0.0f, s_state.revHangRemaining - dt);
+      freeTarget = std::max(freeTarget, s_state.controlledRPM);
+    }
     const float clutchDrag =
         gear == 0 ? 0.0f : Clamp01(clutchEngagement * clutchEngagement * 0.65f);
     const float target =
@@ -535,6 +569,7 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
     s_state.controlledRPM = rpm;
   }
   s_state.previousRPM = rpm;
+  s_state.previousThrottle = Clamp01(throttle);
 
   const float ratio =
       gear > 0 ? std::fabs(data.GetGearRatio(static_cast<uint8_t>(gear)))

@@ -171,6 +171,13 @@ void Menu::Initialize() {
   engine.items.push_back(MenuItem("Rollover Stall", MenuItem::Float,
                                   &Config::RolloverStallDelay,
                                   0.25f, 1.00f, 20.00f));
+  engine.items.push_back(MenuItem("Rev Hang", MenuItem::Float,
+                                  &Config::RevHangDuration,
+                                  0.05f, 0.00f, 2.00f));
+  engine.items.push_back(MenuItem("Hard Brake Stall", MenuItem::Bool,
+                                  &Config::HardBrakeStall));
+  engine.items.push_back(MenuItem("Fuel Cut Engine Brake", MenuItem::Bool,
+                                  &Config::FuelCutoffEngineBrake));
   engine.items.push_back(MenuItem(
       "Starter Interlock", MenuItem::Bool, &Config::StarterInterlock));
   engine.items.push_back(MenuItem(
@@ -212,6 +219,11 @@ void Menu::Initialize() {
   clutchMenu.items.push_back(MenuItem("Fade Strength", MenuItem::Float,
                                       &Config::ClutchFadeStrength,
                                       0.01f, 0.00f, 1.00f));
+  clutchMenu.items.push_back(MenuItem("Max Clutch Torque", MenuItem::Float,
+                                      &Config::MaxClutchTorque,
+                                      0.05f, 0.30f, 2.00f));
+  clutchMenu.items.push_back(MenuItem("Hot Clutch Judder", MenuItem::Bool,
+                                      &Config::ClutchJudder));
   clutchMenu.items.push_back(MenuItem("Dump Rate", MenuItem::Float,
                                       &Config::ClutchDumpRate,
                                       0.25f, 1.00f, 30.00f));
@@ -267,6 +279,10 @@ void Menu::Initialize() {
   gearbox.items.push_back(MenuItem("No-lift Penalty", MenuItem::Float,
                                    &Config::NoLiftShiftPenalty,
                                    0.01f, 0.00f, 1.00f));
+  gearbox.items.push_back(MenuItem("Synchronizer Wear", MenuItem::Bool,
+                                   &Config::SynchronizerWear));
+  gearbox.items.push_back(MenuItem("Shift Resistance", MenuItem::Bool,
+                                   &Config::ShiftResistance));
   gearbox.items.push_back(MenuItem("Reverse Lockout km/h", MenuItem::Float,
                                    &Config::ReverseLockoutSpeedKmH,
                                    0.50f, 0.00f, 30.00f));
@@ -304,6 +320,32 @@ void Menu::Initialize() {
       "D Keyboard Pedal", MenuItem::Float,
       &Config::AutomaticDKeyboardThrottle,
       0.01f, 0.30f, 0.90f));
+  automatic.items.push_back(MenuItem(
+      "Kickdown Delay", MenuItem::Float, &Config::AutomaticKickdownDelay,
+      0.05f, 0.20f, 1.50f));
+  automatic.items.push_back(MenuItem(
+      "Torque Converter Lock", MenuItem::Bool, &Config::AutomaticTCC));
+  automatic.items.push_back(MenuItem(
+      "Fluid Overheat / Limp", MenuItem::Bool,
+      &Config::AutomaticFluidOverheat));
+  automatic.items.push_back(MenuItem(
+      "Neutral Drop Damage", MenuItem::Bool,
+      &Config::AutomaticNeutralDropDamage));
+  automatic.items.push_back(MenuItem(
+      "Brake Boost Stall", MenuItem::Bool,
+      &Config::AutomaticBrakeBoostStall));
+  automatic.items.push_back(MenuItem(
+      "Throttle Attack", MenuItem::Float, &Config::AutomaticThrottleAttack,
+      0.01f, 0.01f, 1.50f));
+  automatic.items.push_back(MenuItem(
+      "Throttle Release", MenuItem::Float, &Config::AutomaticThrottleRelease,
+      0.01f, 0.01f, 1.50f));
+  automatic.items.push_back(MenuItem(
+      "Brake Attack", MenuItem::Float, &Config::AutomaticBrakeAttack,
+      0.01f, 0.01f, 1.50f));
+  automatic.items.push_back(MenuItem(
+      "Brake Release", MenuItem::Float, &Config::AutomaticBrakeRelease,
+      0.01f, 0.01f, 1.50f));
   automatic.items.push_back(MenuItem(
       "Brake Overrides Gas", MenuItem::Bool,
       &Config::BrakeThrottleOverride));

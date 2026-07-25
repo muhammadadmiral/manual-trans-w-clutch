@@ -29,6 +29,11 @@ Motor non-scooter tetap sequential dan memakai auto-clutch.
 - `Water Stall Delay`: waktu hydrolock ketika mesin pembakaran terendam.
 - `Rollover Stall`: waktu oil-starvation saat kendaraan terbalik. Motor memakai
   cutoff lebih cepat; EV dikecualikan dari dua simulasi mesin pembakaran ini.
+- `Rev Hang`: lama RPM free-rev tertahan setelah throttle ditutup.
+- `Hard Brake Stall`: stall saat pengereman darurat menjelang berhenti tanpa
+  memutus clutch. Jika telemetry ABS roda belum valid, fallback memakai brake,
+  deselerasi longitudinal, RPM, dan kecepatan.
+- `Fuel Cut Engine Brake`: konsumsi nol pada overrun dan tambahan drag ringan.
 - `Starter Interlock`: manual wajib netral/clutch; automatic wajib P/N.
 - `Auto Start Needs Brake`: menambah syarat brake pada starter automatic.
 - `Launch Control` dan `Launch RPM`: limiter launch manual atau automatic.
@@ -42,6 +47,9 @@ tidak lagi menjadi faktor tunggal.
 - `Pedal Attack/Release/Expo`: respons binding digital.
 - `Bite Start/End`: rentang travel yang mengubah torque capacity.
 - `Heat/Cool Rate`, `Fade Start/Strength`: temperatur dan slip clutch.
+- `Max Clutch Torque`: kapasitas normalized disc; torsi di atas kapasitas
+  membuat disc selip walau pedal dilepas.
+- `Hot Clutch Judder`: micro-oscillation coupling pada bite point panas.
 - `Dump Rate`: kecepatan release minimum yang dianggap clutch dump.
 - `Dump Shock`: intensitas feedback dump.
 
@@ -55,6 +63,14 @@ tidak lagi menjadi faktor tunggal.
   tinggi dan bertahan di RPM rendah. Baseline S `0.84/0.34`.
 - `Kickdown Pedal`: bukaan throttle minimum untuk downshift paksa yang masih
   aman terhadap over-rev.
+- `Kickdown Delay`: reaksi hydraulic/TCU sebelum turun sampai dua gear.
+- `Torque Converter Lock`: TCC solid di gear 3+ saat cruise.
+- `Fluid Overheat / Limp`: ATF panas membatasi transmisi ke gear 3.
+- `Neutral Drop Damage`: N ke D/S pada RPM tinggi memberi shock dan damage.
+- `Brake Boost Stall`: gas+rem penuh terlalu lama memanaskan converter dan
+  akhirnya mematikan mesin.
+- `Throttle/Brake Attack/Release`: actuator khusus automatic; penting untuk
+  mengubah input keyboard 0/1 menjadi permintaan torsi dan pressure bertahap.
 - `S Torque Boost`: nama legacy untuk agresivitas sport pedal map; tidak
   menambah peak power atau memakai cheat-power native.
 - `D Keyboard Pedal`: batas intent throttle tombol W di selector D. Keyboard
@@ -68,6 +84,10 @@ tidak lagi menjadi faktor tunggal.
 - `Grind Damage`: wear shift tanpa clutch.
 - `Shift Shock`: torque cut/getaran ketika RPM input-output tidak sinkron.
 - `No-lift Penalty`: tambahan clash bila shift sambil gas tetap dibuka.
+- `Synchronizer Wear`: grind menambah wear gear tujuan dan tidak pulih sendiri
+  selama sesi drivetrain.
+- `Shift Resistance`: synchronizer aus menambah delay; mismatch berat dapat
+  menolak shift.
 - `Reverse Lockout km/h`: kecepatan maksimum untuk memasukkan reverse.
 - `Over-rev Damage`: kerusakan money shift.
 
@@ -114,6 +134,11 @@ berarti enabled, `Ready` berarti telemetry tersedia, dan nilai tanpa suffix
 berarti sedang mengintervensi. Launch control memang mati jika `LCEn=0`;
 aktifkan `LaunchControl=1` lewat menu atau bagian `[Engine]`.
 
+`ClutchDemand/ClutchCap/OSlip/Judder`, `SyncWear/ResistMs/ShiftReject`,
+`WheelLock`, `HillRollback`, dan `FuelCut` melacak edge case manual. Automatic
+menambah `TCC`, `ATF`, `Limp`, `KDPending`, `NeutralDrop`, `BrakeBoost`,
+`AutoTM`, dan `IgnCut`.
+
 `Condition` berasal dari engine health. Nilai upgrade dibaca langsung dari mod
 kendaraan, bukan INI. `LowRec` dan `PowerMul` adalah satu-satunya jalur
-recovery low-RPM pada r15-safe; tidak ada write runtime drive-force.
+recovery low-RPM pada r16-crashfix; tidak ada write runtime drive-force.

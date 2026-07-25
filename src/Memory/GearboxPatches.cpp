@@ -42,7 +42,7 @@ std::array<Patch, 4> s_patches{{
      2, 13, true, PatchKind::Nop},
     {"shift-down + clutch",
      "75 0D 66 41 FF 4D ? 41 C7 45 54 CD CC CC 3D 66 41 C7 45 04 06 00",
-     0, 2, true, PatchKind::Nop},
+     2, 13, true, PatchKind::Nop},
     {"clutch low RPM", "C7 43 ? CD CC CC 3D 66", 0, 7, false,
      PatchKind::LowRpmRedirect},
     {"throttle lift", "89 4F 58 F3 44 0F 11", 0, 3, false,

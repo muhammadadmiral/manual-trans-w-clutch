@@ -5,6 +5,8 @@
 #include "../../../sdk/inc/natives.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <limits>
 
 namespace GearboxSystem {
 
@@ -18,6 +20,17 @@ void Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
             float clutchDisengagement, float throttle, bool engineOn) {
   const float dt = std::clamp(MISC::GET_FRAME_TIME(), 0.001f, 0.05f);
   const float rpm = data.GetRPM();
+  if (s_state.wheelLockRemaining > 0.0f) {
+    s_state.wheelLockRemaining =
+        std::max(0.0f, s_state.wheelLockRemaining - dt);
+    const float envelope =
+        std::clamp(s_state.wheelLockRemaining / 0.22f, 0.0f, 1.0f);
+    s_state.wheelLockBrake =
+        std::clamp(0.35f + s_state.moneyShiftSeverity * 0.55f,
+                   0.0f, 0.92f) * envelope;
+  } else {
+    s_state.wheelLockBrake = 0.0f;
+  }
   if (s_state.shiftAssistCutRemaining > 0.0f) {
     s_state.shiftAssistCutRemaining =
         std::max(0.0f, s_state.shiftAssistCutRemaining - dt);
@@ -120,6 +133,8 @@ void NotifyShift(Vehicle vehicle, VehicleData &data, int fromGear, int toGear,
                     std::max(0.0f, Config::OverRevShiftDamage) *
                         (0.5f + overSpeed) *
                         VehicleUpgrades::GetState().durabilityMultiplier);
+      s_state.wheelLockRemaining =
+          0.08f + std::clamp(s_state.moneyShiftSeverity, 0.0f, 1.0f) * 0.14f;
     }
   }
   if (fromGear != 0 && toGear != 0 &&
@@ -186,6 +201,18 @@ void NotifyShift(Vehicle vehicle, VehicleData &data, int fromGear, int toGear,
                       (0.5f + s_state.clashSeverity) *
                       s_state.penaltyMultiplier);
   }
+  const size_t wearIndex =
+      static_cast<size_t>(std::clamp(std::abs(toGear), 0, 8));
+  if (Config::SynchronizerWear && wearIndex > 0 &&
+      s_state.clashSeverity > 0.02f) {
+    const float wearGain =
+        std::max(0.0f, Config::GearGrindDamage) *
+        (0.20f + s_state.clashSeverity * 0.80f) *
+        s_state.penaltyMultiplier;
+    s_state.synchroWear[wearIndex] =
+        std::clamp(s_state.synchroWear[wearIndex] + wearGain, 0.0f, 1.0f);
+  }
+  s_state.selectedSynchroWear = s_state.synchroWear[wearIndex];
   (void)vehicle;
 }
 
@@ -219,6 +246,42 @@ void NotifyRevMatch(float currentRPM, float targetRPM) {
   s_state.revMatched = std::fabs(currentRPM - targetRPM) < 0.15f;
 }
 
+uint32_t GetShiftResistanceMs(VehicleData &data, int fromGear, int toGear,
+                              float clutchDisengagement, float throttle) {
+  s_state.shiftRejected = false;
+  s_state.resistanceDelayMs = 0;
+  const size_t wearIndex =
+      static_cast<size_t>(std::clamp(std::abs(toGear), 0, 8));
+  s_state.selectedSynchroWear = s_state.synchroWear[wearIndex];
+  if (!Config::ShiftResistance || !Config::SynchronizerWear ||
+      wearIndex == 0 || s_state.selectedSynchroWear < 0.08f)
+    return 0;
+
+  const uint8_t fromIndex =
+      fromGear < 0 ? 0 : static_cast<uint8_t>(fromGear);
+  const uint8_t toIndex =
+      toGear < 0 ? 0 : static_cast<uint8_t>(toGear);
+  const float fromRatio = std::fabs(data.GetGearRatio(fromIndex));
+  const float toRatio = std::fabs(data.GetGearRatio(toIndex));
+  const float rpm = data.GetRPM();
+  const float target =
+      fromGear != 0 && toGear != 0 && fromRatio > 0.01f && toRatio > 0.01f
+          ? rpm * toRatio / fromRatio
+          : rpm;
+  const float mismatch = std::fabs(target - rpm);
+  const bool clutchless = clutchDisengagement < 0.35f;
+  const float abuse =
+      mismatch + (clutchless ? 0.30f : 0.0f) + throttle * 0.12f;
+  if (s_state.selectedSynchroWear > 0.72f && abuse > 0.35f) {
+    s_state.shiftRejected = true;
+    return (std::numeric_limits<uint32_t>::max)();
+  }
+  s_state.resistanceDelayMs = static_cast<uint32_t>(
+      40.0f + s_state.selectedSynchroWear * 420.0f +
+      abuse * s_state.selectedSynchroWear * 380.0f);
+  return s_state.resistanceDelayMs;
+}
+
 float GetHealth() { return s_state.health; }
 bool IsSeized() { return s_state.health <= 0.0f; }
 bool ConsumeStallRequest() {
@@ -226,6 +289,7 @@ bool ConsumeStallRequest() {
   s_state.stallRequest = false;
   return requested;
 }
+float GetWheelLockBrake() { return s_state.wheelLockBrake; }
 const State &GetState() { return s_state; }
 
 } // namespace GearboxSystem
