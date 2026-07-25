@@ -24,7 +24,7 @@ void Reset() {
 }
 
 void Update(Vehicle vehicle, VehicleData &data, float speedKmH, float rpm,
-            int gear, float &finalThrottle, float &finalBrake) {
+            int gear, float clutch, float &finalThrottle, float &finalBrake) {
             
   // ── 1. Calculate Wheel Slip (Simulated) ──────────────────────────────────
   // GTA V doesn't expose raw wheel speed easily to scripts without heavy memory 
@@ -41,7 +41,9 @@ void Update(Vehicle vehicle, VehicleData &data, float speedKmH, float rpm,
   float slip = theoreticalSpeed - speedKmH;
   
   // ── 2. Traction Control System (TCS) ─────────────────────────────────────
-  if (s_state.tcsEnabled && gear > 0 && finalThrottle > 0.1f) {
+  // If clutch is open (pedal pressed > 0.5f), power isn't going to wheels, so no TCS.
+  // Also disable TCS at very low speeds (< 15 km/h) to allow launching and rev-matching without throttle cut!
+  if (s_state.tcsEnabled && gear > 0 && finalThrottle > 0.1f && clutch < 0.5f && speedKmH > 15.0f) {
     // If wheels are spinning much faster than we are moving
     if (slip > 15.0f) { 
       // Calculate how much we need to cut throttle

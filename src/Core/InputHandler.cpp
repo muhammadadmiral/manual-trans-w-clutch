@@ -185,9 +185,8 @@ void Update() {
 
     // ── Clutch ────────────────────────────────────────────────────────────────
     s_clutchDown = keyDown(Config::KeyClutch);
-    // Invert logic: when key is pressed (foot on pedal), clutch is 0.0 (open).
-    // When key is released, clutch is 1.0 (engaged/direct drive).
-    const float clutchTarget = s_clutchDown ? 0.0f : 1.0f;
+    // Natural logic: pressed = 1.0 (clutch pedal down), released = 0.0
+    const float clutchTarget = s_clutchDown ? 1.0f : 0.0f;
     s_smoothedClutch = ExpSmooth(
         clutchTarget, s_smoothedClutch,
         Config::ClutchAttack,

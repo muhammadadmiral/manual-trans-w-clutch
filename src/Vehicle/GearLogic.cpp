@@ -129,12 +129,12 @@ void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
   } else if (manualGear == -1) {
     data.SetGear(0);
     data.SetNextGear(0);
-    data.SetClutch(1.0f - clutch); // 0.0f is fully engaged in GTA V
+    data.SetClutch(clutch); 
   } else {
     const uint8_t targetGear = static_cast<uint8_t>(manualGear);
     data.SetGear(targetGear);
     data.SetNextGear(targetGear);
-    data.SetClutch(1.0f - clutch);
+    data.SetClutch(clutch);
   }
 }
 

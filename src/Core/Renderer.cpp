@@ -114,11 +114,7 @@ void DrawGrindWarning() {
 
 void DrawDebugOverlay(int manualGear, unsigned gameGear, unsigned nextGear,
                       float rpm, float clutch, const char *srcName) {
-    char debugText[256]{};
-    sprintf_s(debugText,
-              "ModGear: %d | game: %u -> %u | RPM: %.3f | Clutch: %.2f | Src: %s",
-              manualGear, gameGear, nextGear, rpm, clutch, srcName);
-    DrawTextOverlay(debugText, 0.02f, 0.95f, 0.38f, 255, 255, 255, 255, 0, true, false);
+    // Disabled debug overlay per user request
 }
 
 void DrawPedalsOverlay(float rpm, float clutch, float throttle, float brake) {

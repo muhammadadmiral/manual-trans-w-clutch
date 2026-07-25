@@ -428,14 +428,20 @@ void ScriptMain() {
 
     float tcsThrottle = throttle;
     float absBrake = InputHandler::GetSmoothedBrake();
-    TractionControl::Update(vehicle, data, speedKmH, rpm, manualGear,
+    TractionControl::Update(vehicle, data, speedKmH, rpm, manualGear, simulatedClutch,
                             tcsThrottle, absBrake);
 
     if (TractionControl::IsTCSActive())
-      LOG_DEBUG_T(Physics, 500, "TCS active — throttle limited to %.3f",
-                  tcsThrottle);
+      LOG_VERBOSE(Physics, "TCS active — throttle limited to %.3f", tcsThrottle);
     if (TractionControl::IsABSActive())
-      LOG_DEBUG_T(Physics, 500, "ABS active — brake limited to %.3f", absBrake);
+      LOG_VERBOSE(Physics, "ABS active — brake limited to %.3f", absBrake);
+
+    static DWORD s_lastStatusLog = 0;
+    if (GetTickCount() - s_lastStatusLog > 1000) {
+      LOG_INFO(Gear, "STATUS: Gear=%d SimClutch=%.3f MemClutch=%.3f Throttle=%.3f RPM=%.3f Speed=%.1f",
+               manualGear, simulatedClutch, data.GetClutch(), tcsThrottle, rpm, speedKmH);
+      s_lastStatusLog = GetTickCount();
+    }
 
     float turboMul =
         TurboSystem::Update(vehicle, data, rpm, tcsThrottle, isEngineOn);
@@ -502,7 +508,7 @@ void ScriptMain() {
                         InputHandler::GetSmoothedBrake(), throttle);
 
     // ── HUD ───────────────────────────────────────────────────────────────
-    // Renderer::DrawGearHUD(manualGear, maxGear, activeSignal, isEngineOn);
+    Renderer::DrawGearHUD(manualGear, maxGear, activeSignal, isEngineOn);
 
     if (grindWarningTimer > 0) {
       --grindWarningTimer;

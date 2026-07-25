@@ -27,7 +27,7 @@ void Reset();
 
 // Call before ApplyGameControls. Modifies finalThrottle and finalBrake in-place.
 void Update(Vehicle vehicle, VehicleData &data, float speedKmH, float rpm,
-            int gear, float &finalThrottle, float &finalBrake);
+            int gear, float clutch, float &finalThrottle, float &finalBrake);
 
 void ToggleTCS();
 void ToggleABS();
