@@ -658,7 +658,8 @@ void ScriptMain() {
         vehicle, powerMultiplier);
 
     if (automaticMode) {
-      AutomaticGearbox::ApplyToMemory(vehicle, data, manualGear);
+      AutomaticGearbox::ApplyToMemory(vehicle, data, manualGear,
+                                      driveThrottle);
     } else {
       GearLogic::ApplyToMemory(vehicle, data, manualGear, maxGear,
                                simulatedClutch, throttle, speedKmH);
@@ -700,7 +701,8 @@ void ScriptMain() {
     LightsLogic::Update(vehicle, data, manualGear,
                         InputHandler::GetSmoothedBrake(), throttle);
     if (automaticMode) {
-      AutomaticGearbox::ApplyToMemory(vehicle, data, manualGear);
+      AutomaticGearbox::ApplyToMemory(vehicle, data, manualGear,
+                                      driveThrottle);
     } else {
       GearLogic::ApplyToMemory(vehicle, data, manualGear, maxGear,
                                simulatedClutch, throttle, speedKmH);
@@ -716,7 +718,8 @@ void ScriptMain() {
           "STATUS: Mode=%d Profile=%s Selector=%s Selected=%d Mem=%u Next=%u "
           "PedalClutch=%.3f Key=%d Coupling=%.3f PowerMul=%.3f "
           "MemClutch=%.3f Actuator=%.3f Throttle=%.3f MemThrottle=%.3f "
-          "Brake=%.3f RPM=%.3f AutoRPM=%.3f "
+          "Brake=%.3f RPM=%.3f AutoRPM=%.3f AutoPhase=%s AutoTarget=%d "
+          "AutoRecover=%d "
           "FreeRev=%d FreeRPM=%.3f WheelRPM=%.3f "
           "SpeedKmH=%.1f SignedMps=%.2f Ratio=%.4f MaxVel=%.2f EstFlat=%.2f "
           "Handling=%d Load=%.3f TorqueReserve=%.3f Stall=%.3f "
@@ -732,6 +735,9 @@ void ScriptMain() {
                         : ClutchSystem::GetNativeActuator(),
           driveThrottle, data.GetThrottle(), absBrake, data.GetRPM(),
           automaticMode ? AutomaticGearbox::GetState().decisionRPM : -1.0f,
+          automaticMode ? AutomaticGearbox::GetShiftPhaseName() : "-",
+          automaticMode ? AutomaticGearbox::GetState().pendingGear : 0,
+          automaticMode && AutomaticGearbox::GetState().rpmRecovery ? 1 : 0,
           EngineModel::GetState().rpmOwned ? 1 : 0,
           EngineModel::GetState().controlledRPM,
           EngineModel::GetState().wheelRPM,

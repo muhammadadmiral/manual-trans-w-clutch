@@ -89,6 +89,13 @@ interlock aktif. P/R juga ditolak bila arah/kecepatan kendaraan belum aman.
 Automatic memakai coupling torque-converter dan tidak menjalankan stall manual.
 Clutch input user diabaikan dan bar clutch disembunyikan.
 
+Perpindahan D/S tidak mengganti gear saat coupling penuh. Controller melewati
+fase torque cut, membuka clutch, memasang target gear sambil menyamakan RPM
+dengan kecepatan roda, lalu menggigit kembali bertahap. Kickdown ditahan sesaat
+setelah upshift agar gearbox tidak hunting 2-3. Throttle internal Enhanced
+ditulis ulang dari pedal GTA yang sudah melewati TCS ketika gear maju aktif;
+ini memulihkan kasus RPM valid tetapi GTA membuang throttle karena gear dipaksa.
+
 Scooter `FAGGIO`, `FAGGIO2`, `FAGGIO3`, dan `PIZZABOY` langsung memakai D
 sebagai CVT gas-rem. Motor lain tetap sequential, tetapi auto-clutch membuka
 driveline sebentar pada shift. EV tetap automatic dan tidak menyediakan manual.

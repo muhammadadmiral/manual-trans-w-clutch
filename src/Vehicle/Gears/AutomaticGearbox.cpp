@@ -20,6 +20,11 @@ static bool IsDriveSelector(Selector selector) {
          selector == Selector::Low2 || selector == Selector::Low1;
 }
 
+static float SmoothStep(float value) {
+  const float t = Clamp01(value);
+  return t * t * (3.0f - 2.0f * t);
+}
+
 static float ResolveFlatVelocity(Vehicle vehicle, VehicleData &data,
                                  int maxGear) {
   const float memoryValue = std::fabs(data.GetDriveMaxFlatVel());
@@ -104,6 +109,7 @@ void Reset(Selector initialSelector) {
   s_state = State{};
   s_state.selector = initialSelector;
   s_state.lastShiftTime = GetTickCount();
+  s_state.phaseStartedAt = s_state.lastShiftTime;
 }
 
 void UpdateSelector(Vehicle vehicle, bool selectorUp, bool selectorDown,
@@ -132,8 +138,11 @@ void UpdateSelector(Vehicle vehicle, bool selectorUp, bool selectorDown,
   const Selector previous = s_state.selector;
   s_state.selector = target;
   s_state.kickdown = false;
+  s_state.shiftPhase = ShiftPhase::Engaged;
+  s_state.phaseStartedAt = GetTickCount();
   if (IsDriveSelector(target) && !IsDriveSelector(previous))
     s_state.currentGear = 1;
+  s_state.pendingGear = s_state.currentGear;
 
   if (previous == Selector::Park && target != Selector::Park)
     VEHICLE::SET_VEHICLE_HANDBRAKE(vehicle, FALSE);
@@ -145,14 +154,18 @@ void UpdateSelector(Vehicle vehicle, bool selectorUp, bool selectorDown,
 int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
            float brake, float signedSpeedMps, bool engineOn) {
   throttle = Clamp01(throttle);
+  s_state.inputThrottle = throttle;
   s_state.kickdown = false;
+  s_state.rpmRecovery = false;
 
   if (s_state.selector == Selector::Park ||
       s_state.selector == Selector::Neutral) {
     s_state.coupling = 0.0f;
+    s_state.shiftPhase = ShiftPhase::Engaged;
     return 0;
   }
   if (s_state.selector == Selector::Reverse) {
+    s_state.shiftPhase = ShiftPhase::Engaged;
     const float speedCoupling = Clamp01(std::fabs(signedSpeedMps) / 6.0f);
     s_state.coupling =
         engineOn ? std::clamp(0.62f + speedCoupling * 0.38f +
@@ -170,7 +183,7 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
     maxGear = 1;
   s_state.currentGear = std::clamp(s_state.currentGear, 1, maxGear);
   const float speedCoupling = Clamp01(std::fabs(signedSpeedMps) / 7.0f);
-  s_state.coupling =
+  const float converterCoupling =
       engineOn ? std::clamp(0.62f + speedCoupling * 0.38f +
                                throttle * 0.10f,
                            0.0f, 1.0f)
@@ -179,6 +192,60 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
   const DWORD now = GetTickCount();
   const DWORD delayMs = static_cast<DWORD>(
       std::clamp(Config::AutomaticShiftDelay, 0.10f, 1.20f) * 1000.0f);
+
+  if (s_state.shiftPhase != ShiftPhase::Engaged) {
+    const DWORD phaseElapsed = now - s_state.phaseStartedAt;
+    const bool sport = s_state.selector == Selector::Sport;
+    const DWORD disengageMs = sport ? 55 : 80;
+    const DWORD synchronizeMs = sport ? 70 : 105;
+    const DWORD engageMs = sport ? 150 : 230;
+
+    if (s_state.shiftPhase == ShiftPhase::Disengaging) {
+      const float progress =
+          static_cast<float>(phaseElapsed) /
+          static_cast<float>((std::max<DWORD>)(1, disengageMs));
+      s_state.coupling = converterCoupling * (1.0f - SmoothStep(progress));
+      if (phaseElapsed >= disengageMs) {
+        s_state.currentGear = s_state.pendingGear;
+        s_state.shiftPhase = ShiftPhase::Synchronizing;
+        s_state.phaseStartedAt = now;
+        s_state.coupling = 0.0f;
+      }
+    } else if (s_state.shiftPhase == ShiftPhase::Synchronizing) {
+      s_state.coupling = 0.0f;
+      s_state.shiftTargetRPM =
+          std::clamp(RoadRPM(vehicle, data, vehicleMaxGear,
+                             s_state.currentGear, signedSpeedMps),
+                     0.20f, 0.97f);
+      if (phaseElapsed >= synchronizeMs) {
+        s_state.shiftPhase = ShiftPhase::Engaging;
+        s_state.phaseStartedAt = now;
+      }
+    } else {
+      const float progress =
+          static_cast<float>(phaseElapsed) /
+          static_cast<float>((std::max<DWORD>)(1, engageMs));
+      s_state.coupling = converterCoupling * SmoothStep(progress);
+      s_state.shiftTargetRPM =
+          std::clamp(RoadRPM(vehicle, data, vehicleMaxGear,
+                             s_state.currentGear, signedSpeedMps),
+                     0.20f, 0.97f);
+      if (phaseElapsed >= engageMs) {
+        s_state.coupling = converterCoupling;
+        s_state.shiftPhase = ShiftPhase::Engaged;
+        s_state.lastShiftTime = now;
+        LOG_DEBUG(Gear,
+                  "Automatic shift engaged: gear=%d targetRPM=%.3f",
+                  s_state.currentGear, s_state.shiftTargetRPM);
+      }
+    }
+    s_state.decisionRPM =
+        RoadRPM(vehicle, data, vehicleMaxGear, s_state.currentGear,
+                signedSpeedMps);
+    return s_state.currentGear;
+  }
+
+  s_state.coupling = converterCoupling;
   const DWORD elapsedSinceShift = now - s_state.lastShiftTime;
   if (elapsedSinceShift < delayMs)
     return s_state.currentGear;
@@ -201,17 +268,29 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
                  0.10f, upThreshold - 0.08f);
   const bool kickdownRequest =
       throttle >= std::clamp(Config::AutomaticKickdownThrottle, 0.40f, 0.98f) &&
-      rpm < (sport ? 0.82f : 0.72f) && s_state.currentGear > 1;
+      rpm < (sport ? 0.64f : 0.56f) && s_state.currentGear > 1;
+  const float lowerGearRPM =
+      s_state.currentGear > 1
+          ? RoadRPM(vehicle, data, vehicleMaxGear,
+                    s_state.currentGear - 1, signedSpeedMps)
+          : 1.0f;
+  const DWORD kickdownHoldMs =
+      (std::max<DWORD>)(1800, delayMs * 4);
+  const bool postUpshiftHold =
+      s_state.lastShiftDirection > 0 &&
+      elapsedSinceShift < kickdownHoldMs;
   const float estimatedTopSpeed =
       (std::max)(8.0f, VEHICLE::GET_VEHICLE_ESTIMATED_MAX_SPEED(vehicle));
   const float upshiftMinSpeed =
       estimatedTopSpeed * static_cast<float>(s_state.currentGear) *
       (sport ? 0.060f : 0.050f);
   const bool nativeLimiterPressure =
-      throttle > 0.70f && nativeRPM > 0.78f && rpm > 0.62f;
+      throttle > 0.70f &&
+      ((s_state.currentGear == 1 && nativeRPM > 0.80f && rpm > 0.62f) ||
+       (s_state.currentGear > 1 && nativeRPM > 0.94f && rpm > 0.76f));
 
   int targetGear = s_state.currentGear;
-  if (kickdownRequest &&
+  if (kickdownRequest && !postUpshiftHold && lowerGearRPM < 0.94f &&
       DownshiftIsSafe(vehicle, data, vehicleMaxGear, s_state.currentGear,
                       s_state.currentGear - 1, signedSpeedMps)) {
     targetGear = s_state.currentGear - 1;
@@ -240,22 +319,29 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
     }
 
     const int previous = s_state.currentGear;
-    s_state.currentGear = targetGear;
-    s_state.lastShiftTime = now;
+    s_state.shiftFromGear = previous;
+    s_state.pendingGear = targetGear;
+    s_state.shiftTargetRPM =
+        std::clamp(RoadRPM(vehicle, data, vehicleMaxGear, targetGear,
+                           signedSpeedMps),
+                   0.20f, 0.97f);
+    s_state.shiftPhase = ShiftPhase::Disengaging;
+    s_state.phaseStartedAt = now;
     s_state.lastShiftDirection = direction;
     GearboxSystem::NotifyAutomaticShift(data, previous, targetGear, sport);
     LOG_INFO(Gear,
-             "Automatic %s shift: %d -> %d roadRPM=%.3f nativeRPM=%.3f "
-             "throttle=%.3f",
-             sport ? "S" : "D", previous, targetGear, rpm, nativeRPM,
-             throttle);
+             "Automatic %s shift start: %d -> %d roadRPM=%.3f "
+             "targetRPM=%.3f nativeRPM=%.3f throttle=%.3f",
+             sport ? "S" : "D", previous, targetGear, rpm,
+             s_state.shiftTargetRPM, nativeRPM, throttle);
   }
 
   (void)vehicle;
   return s_state.currentGear;
 }
 
-void ApplyToMemory(Vehicle vehicle, VehicleData &data, int activeGear) {
+void ApplyToMemory(Vehicle vehicle, VehicleData &data, int activeGear,
+                   float driveThrottle) {
   const float openClutch =
       ENTITY::GET_ENTITY_SPEED(vehicle) < 1.0f ? -5.0f : -0.5f;
   if (s_state.selector == Selector::Park) {
@@ -279,7 +365,35 @@ void ApplyToMemory(Vehicle vehicle, VehicleData &data, int activeGear) {
     const uint8_t gear = static_cast<uint8_t>(activeGear);
     data.SetGear(gear);
     data.SetNextGear(gear);
-    data.SetClutch(s_state.coupling);
+    data.SetClutch(s_state.coupling <= 0.05f ? openClutch
+                                             : s_state.coupling);
+
+    const float pedal = Clamp01(driveThrottle);
+    float engineThrottle = pedal;
+    if (s_state.shiftPhase == ShiftPhase::Disengaging)
+      engineThrottle *= std::clamp(s_state.coupling, 0.15f, 1.0f);
+    else if (s_state.shiftPhase == ShiftPhase::Synchronizing)
+      engineThrottle *= 0.20f;
+    else if (s_state.shiftPhase == ShiftPhase::Engaging)
+      engineThrottle *= 0.30f + s_state.coupling * 0.70f;
+
+    // Enhanced kadang membuang throttle internal setelah gear dipaksa.
+    // Tulis ulang pedal GTA yang sudah lewat TCS supaya gear tinggi tetap narik.
+    data.SetThrottle(engineThrottle);
+    data.SetThrottlePedal(engineThrottle);
+
+    if ((s_state.shiftPhase == ShiftPhase::Synchronizing ||
+         s_state.shiftPhase == ShiftPhase::Engaging) &&
+        s_state.coupling < 0.82f) {
+      data.SetRPM(std::clamp(s_state.shiftTargetRPM, 0.20f, 0.97f));
+    } else if (s_state.shiftPhase == ShiftPhase::Engaged &&
+               pedal > 0.02f && s_state.decisionRPM > 0.24f &&
+               data.GetRPM() + 0.10f < s_state.decisionRPM) {
+      // RPM poros input tidak boleh jatuh jauh di bawah RPM roda saat lock-up.
+      // Ini recovery sempit buat throttle-cut native, bukan RPM controller.
+      data.SetRPM(std::clamp(s_state.decisionRPM, 0.20f, 0.97f));
+      s_state.rpmRecovery = true;
+    }
   }
 }
 
@@ -289,6 +403,7 @@ float GetCoupling() { return s_state.coupling; }
 float GetClutchDisengagement() { return 1.0f - s_state.coupling; }
 bool IsSport() { return s_state.selector == Selector::Sport; }
 bool IsKickdownActive() { return s_state.kickdown; }
+bool IsShifting() { return s_state.shiftPhase != ShiftPhase::Engaged; }
 bool WasSelectorRejected() { return s_state.selectorRejected; }
 
 const char *GetSelectorName() {
@@ -307,6 +422,20 @@ const char *GetSelectorName() {
     return "L2";
   case Selector::Low1:
     return "L1";
+  }
+  return "?";
+}
+
+const char *GetShiftPhaseName() {
+  switch (s_state.shiftPhase) {
+  case ShiftPhase::Engaged:
+    return "ENG";
+  case ShiftPhase::Disengaging:
+    return "CUT";
+  case ShiftPhase::Synchronizing:
+    return "SYNC";
+  case ShiftPhase::Engaging:
+    return "GRAB";
   }
   return "?";
 }
