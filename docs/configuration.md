@@ -8,12 +8,12 @@ Semua opsi berikut tersedia dari menu dalam game dan disimpan ke
 `Transmission Mode`:
 
 - `OFF`: mod tidak menulis gear atau clutch; gearbox native GTA mengambil alih.
-- `AUTOMATIC`: selector P-R-N-D-S dan shift map custom aktif.
+- `AUTOMATIC`: selector P-R-N-D-S-L2-L1 dan shift map custom aktif.
 - `MANUAL`: sequential R-N-1-2 dan seterusnya.
 
-Kendaraan listrik selalu memakai automatic walaupun konfigurasi global memilih
-manual. Selector automatic memakai binding Shift Down untuk bergerak dari P ke
-S dan Shift Up untuk arah sebaliknya.
+Kendaraan listrik dan scooter CVT selalu memakai automatic walaupun konfigurasi
+global memilih manual. LShift maju dari P menuju L1; LCtrl kembali menuju P.
+Motor non-scooter tetap sequential dan memakai auto-clutch.
 
 ## Engine / Stall
 
@@ -23,8 +23,10 @@ S dan Shift Up untuk arah sebaliknya.
 - `Idle Torque`: cadangan torsi kendaraan saat throttle nol.
 - `Starter Interlock`: manual wajib netral/clutch; automatic wajib P/N.
 - `Auto Start Needs Brake`: menambah syarat brake pada starter automatic.
-- `RPM Sync`: kekuatan koreksi RPM ketika driveline sudah tersambung.
 - `Launch Control` dan `Launch RPM`: limiter launch manual atau automatic.
+
+`ConnectedRPMSync` tetap dibaca dari INI lama untuk kompatibilitas, tetapi tidak
+lagi menulis RPM.
 
 ## Clutch
 
@@ -34,7 +36,7 @@ S dan Shift Up untuk arah sebaliknya.
 - `Dump Rate`: kecepatan release minimum yang dianggap clutch dump.
 - `Dump Shock`: intensitas feedback dump.
 
-## Automatic D / S
+## Automatic D / S / L
 
 - `Brake Interlock`: syarat brake dan direction lock selector.
 - `Shift Delay`: dwell minimum untuk mencegah hunting.
@@ -42,7 +44,8 @@ S dan Shift Up untuk arah sebaliknya.
   menggeser threshold secara dinamis.
 - `Kickdown Pedal`: bukaan throttle minimum untuk downshift paksa yang masih
   aman terhadap over-rev.
-- `S Torque Boost`: multiplier tenaga khusus selector S.
+- `S Torque Boost`: nama legacy untuk agresivitas sport pedal map; tidak
+  menambah peak power atau memakai cheat-power native.
 - `Brake Overrides Gas`, `Override Delay`, `Override Cut`: ECU pedal overlap.
 
 ## Gearbox Penalty
@@ -71,11 +74,13 @@ TCS dan ABS hanya mengintervensi bila minimal dua sample roda valid.
 3. Manual N ke gear 2 dan low-RPM upshift: gear tetap masuk dan throttle tetap
    aktif, tetapi acceleration berat sesuai torque reserve.
 4. Manual R: W mundur, S mengerem dan tidak menaikkan RPM.
-5. Automatic: tahan brake, Shift Down sampai D, lepas brake untuk creep.
+5. Automatic: tahan brake, tekan LShift dari P sampai D, lepas brake untuk
+   creep. L2 hanya memakai gear 1-2 dan L1 mengunci gear 1.
 6. Bandingkan D dan S: S harus menahan gear lebih lama, kickdown lebih dini,
    dan memberi respons torsi lebih kuat.
 7. Coba P/R saat masih melaju: selector harus menolak perpindahan.
 
-Baris `STATUS` di `manual-trans.log` memuat mode, selector, gear memory, clutch,
-RPM target, torque reserve, stall progress, clash, money shift, temperatur rem,
-fade, TCS, dan ABS.
+Baris `STATUS` di `manual-trans.log` dicatat setelah final drivetrain write dan
+memuat profile kendaraan, selector, logical/physical gear, clutch, RPM native,
+ratio, max velocity, status handling pointer, torque reserve, stall, clash,
+money shift, starter, TCS, dan ABS.

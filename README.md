@@ -1,7 +1,7 @@
 # Manual Transmission with Clutch — GTA V
 
 Plugin ScriptHookV open-source untuk mengganti perilaku transmisi GTA V dengan
-mode Off, automatic P-R-N-D-S, atau manual sequential. Simulasi mencakup clutch,
+mode Off, automatic P-R-N-D-S-L2-L1, atau manual sequential. Simulasi mencakup clutch,
 free-rev netral, creep, stall berbasis beban drivetrain, pedal interlock, dan
 assist yang hanya aktif kalau telemetry memory-nya tervalidasi.
 
@@ -10,18 +10,22 @@ assist yang hanya aktif kalau telemetry memory-nya tervalidasi.
 Sprint drivetrain aktif. Fokus saat ini:
 
 - netral dan clutch memutus drivetrain tanpa mematikan throttle mesin;
-- RPM bebas mengikuti throttle dan `fDriveInertia` kendaraan;
+- RPM, limiter, audio mesin, dan top speed tetap dihitung engine native GTA;
 - pelepasan clutch gradual memakai actuator clutch internal GTA;
-- dump clutch, bog, dan stall dihitung dari RPM, rasio gear, kecepatan roda,
-  serta `fDriveMaxFlatVel`;
+- clutch mentok melakukan hard-disconnect tanpa menghapus logical gear pilihan;
+- dump clutch, bog, dan stall memakai RPM, rasio/handling yang tervalidasi,
+  lalu fallback data native per kendaraan bila optional pointer tidak tersedia;
 - shift manual tanpa clutch tetap masuk, tetapi menghasilkan clash, torque cut,
   shock, wear, dan risiko over-rev saat salah downshift;
 - automatic D melakukan shift santai, sedangkan S menahan RPM, lebih cepat
-  kickdown, memberi engine braking lebih kuat, dan punya torque boost terpisah;
+  kickdown, dan memakai sport pedal map tanpa cheat-power global;
+- L2/L1 membatasi gear tertinggi; LShift maju di gate selector dan LCtrl kembali;
+- Faggio/Faggio2/Faggio3/Pizza Boy diprofilkan sebagai scooter CVT gas-rem,
+  motor lain sequential dengan auto-clutch, dan EV dikunci ke automatic;
 - selector automatic punya brake interlock serta lockout P/R saat kendaraan
   masih bergerak ke arah yang salah;
 - TCS dan ABS memakai telemetry `CWheel`, bukan estimasi RPM palsu;
-- launch control opsional dengan target RPM yang bisa diatur;
+- launch control opsional memakai soft throttle cut tanpa menulis RPM;
 - temperatur rem, brake fade, clutch heat, dan brake-throttle override dapat
   dituning lewat GUI.
 
@@ -40,6 +44,7 @@ src/
    ├─ Clutch/            kurva pedal, slip/heat, actuator drivetrain
    ├─ Brakes/            ABS berbasis roda dan parking brake
    ├─ VehicleData.*      facade memory per kendaraan
+   ├─ VehicleProfile.*   EV, scooter CVT, dan motor sequential
    ├─ LightsLogic.*
    └─ TelemetryLogger.*
 ```
@@ -92,12 +97,12 @@ SportTorqueBoost=0.10
 ```
 
 `Mode=0` melepas kontrol drivetrain ke GTA, `Mode=1` mengaktifkan automatic
-P-R-N-D-S, dan `Mode=2` mengaktifkan manual sequential. Kendaraan listrik
-selalu memakai automatic.
+P-R-N-D-S-L2-L1, dan `Mode=2` mengaktifkan manual sequential. Kendaraan
+listrik dan scooter CVT selalu memakai automatic.
 
-Throttle, brake, dan steer dibaca dari control value GTA. `ClutchAttack` dan
-`ClutchRelease` hanya membentuk pedal digital; pedal analog nantinya dapat
-memberikan travel langsung.
+Throttle, brake, steer, RPM, limiter, dan engine audio tetap berasal dari GTA.
+`ClutchAttack` dan `ClutchRelease` membentuk travel clutch digital. S di gear
+maju/netral diblok dari reverse axis GTA sehingga fungsinya tetap rem saja.
 
 ## Batas keselamatan memory
 

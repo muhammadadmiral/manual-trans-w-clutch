@@ -2,25 +2,20 @@
 
 ## Netral
 
-`Gear` dan `NextGear` memakai sentinel netral GTA. Clutch actuator diberi nilai
-open dan engine bebas rev. Karena GTA tidak konsisten menaikkan RPM saat clutch
-terbuka, kenaikan RPM dilengkapi memakai:
-
-```text
-ΔRPM = throttle × 2 × fDriveInertia × Δt
-```
-
-Drag, idle, audio dasar, dan limiter tetap berasal dari engine GTA. Field
-throttle internal ikut ditulis hanya ketika drivetrain open supaya suara engine
-selaras dengan RPM.
+`Gear` dan `NextGear` memakai sentinel netral GTA. W tetap masuk sebagai
+throttle native, jadi engine bebas rev sementara drivetrain nol. Mod tidak
+menulis RPM atau field throttle internal. Drag, inertia, limiter, dashboard,
+dan audio engine berasal dari state mesin GTA yang sama.
 
 ## Clutch
 
 Pedal bernilai `0` saat dilepas dan `1` saat diinjak. Free play dan bite range
 diubah dengan smoothstep menjadi engagement `0..1`.
 
-- gear tetap terpilih ketika pedal diinjak;
-- `fClutch` yang memutus torque;
+- logical gear tetap terpilih ketika pedal diinjak;
+- `fClutch` membentuk torque capacity di bite range;
+- pedal mentok juga menulis physical gear netral sebagai hard-disconnect,
+  lalu logical gear masuk kembali saat pedal melewati bite point;
 - pelepasan pelan menaikkan torque capacity bertahap;
 - pelepasan cepat menghasilkan perubahan capacity cepat;
 - dump terdeteksi dari laju release pedal, bukan hanya posisi akhirnya;
@@ -34,17 +29,20 @@ clutch secara fisik pada satu profil yang sama.
 
 ## Load dan stall
 
-Kecepatan minimum drivetrain dihitung dari idle RPM, `fDriveMaxFlatVel`, dan
-rasio gear aktif. Stall progress hanya naik bila:
+Kecepatan minimum drivetrain memakai idle RPM, `fDriveMaxFlatVel`, dan rasio
+gear bila pointer handling valid. Bila pointer optional tidak tersedia, model
+memakai `GET_VEHICLE_ESTIMATED_MAX_SPEED` dan
+`GET_VEHICLE_ACCELERATION`, sehingga fallback tetap beda per kendaraan.
+Stall progress hanya naik bila:
 
 - clutch sudah menggigit kuat;
 - RPM jatuh ke idle;
 - kecepatan aktual masih di bawah kecepatan idle gear tersebut.
 
-Throttle tidak langsung dipakai sebagai pengecualian. Bila mesin punya torsi
-cukup, RPM native naik dan stall progress batal. Ini membuat kendaraan kuat bisa
-berangkat tanpa clutch, sementara throttle kecil atau gear tinggi lebih mudah
-bog/stall.
+Cadangan torsi memperhitungkan throttle, leverage gear, brake load, dan pitch.
+Kendaraan kuat bisa menarik lebih cepat; gear tinggi, tanjakan, atau rem yang
+ditahan mempercepat bog/stall. Memasukkan gear dari netral tanpa clutch dan
+tanpa throttle yang cukup menghasilkan stall request langsung.
 
 Idle creep hanya diinjeksikan pada gear 1/reverse ketika brake dan throttle
 dilepas. Pada tanjakan tidak ada hill-hold manual di gear: bila torque idle
@@ -55,30 +53,44 @@ kalah oleh beban, kendaraan boleh rollback dan mesin dapat stall.
 - Shift tanpa clutch tetap memilih gear; RPM mismatch menentukan clash,
   torque cut, getaran, dan wear.
 - No-lift shift menyimpan shock sampai clutch menggigit kembali.
-- Downshift dengan target RPM di atas limiter ditandai sebagai money shift dan
-  mengurangi gearbox health.
+- Downshift dengan target RPM di atas limiter ditandai sebagai money shift,
+  memberi shake, mengurangi gearbox health, dan merusak engine health native.
+- Mod tidak mematikan engine untuk menyembunyikan over-rev. Gear native yang
+  terpilih menentukan raungan; engine hanya mati lewat stall atau kerusakan.
 - Reverse dari netral ditolak di atas batas kecepatan yang dikonfigurasi.
 - Netral ke gear 2 atau upshift di RPM rendah tidak mematikan throttle. Rasio
   gear hanya menurunkan torque reserve sehingga mobil terasa berat atau stall
   bila torsi benar-benar tidak cukup.
 
-## Automatic P-R-N-D-S
+## Automatic P-R-N-D-S-L2-L1
 
-Shift Down menggerakkan selector `P → R → N → D → S`; Shift Up bergerak ke
-arah sebaliknya.
+LShift menggerakkan selector `P → R → N → D → S → L2 → L1`; LCtrl bergerak
+ke arah sebaliknya.
 
 - P membuka driveline dan mengunci parking brake.
 - R memakai W sebagai throttle mundur dan S sebagai rem.
 - N membuka driveline dan tetap mengizinkan free-rev.
 - D melakukan upshift lebih awal dan downshift lebih rendah.
 - S menahan RPM, lebih responsif melakukan kickdown, mempertahankan gear rendah
-  saat braking, dan memakai torque multiplier terpisah.
+  saat braking, dan memakai mapping pedal lebih agresif. Peak power tetap dari
+  handling GTA.
+- L2 membatasi automatic ke gear 1-2 dan L1 mengunci gear 1.
 
 Keluar dari P, memilih R, dan memilih arah drive dari N memerlukan brake bila
 interlock aktif. P/R juga ditolak bila arah/kecepatan kendaraan belum aman.
 Automatic memakai coupling torque-converter dan tidak menjalankan stall manual.
+Clutch input user diabaikan dan bar clutch disembunyikan.
 
-## Pedal dan rem
+Scooter `FAGGIO`, `FAGGIO2`, `FAGGIO3`, dan `PIZZABOY` langsung memakai D
+sebagai CVT gas-rem. Motor lain tetap sequential, tetapi auto-clutch membuka
+driveline sebentar pada shift. EV tetap automatic dan tidak menyediakan manual.
+
+## Pedal, reverse, dan rem
+
+W selalu dibaca sebagai throttle. Di R, W dipetakan ke reverse axis GTA. S
+selalu menjadi brake: pada gear maju/netral, reverse axis diblok saat kendaraan
+nyaris berhenti sehingga menahan S tidak bisa mengambil alih dan memundurkan
+kendaraan.
 
 Gas+rem yang ditahan bersamaan memicu brake-throttle override setelah delay,
 kecuali clutch manual sedang terbuka untuk heel-toe/rev-match atau launch
