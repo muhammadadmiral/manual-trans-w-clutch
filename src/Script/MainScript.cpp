@@ -240,7 +240,7 @@ void ScriptMain() {
       const VehicleOffsets &off = VehicleData::GetResolvedOffsets();
       const std::string bv = VehicleData::GetGameBuildVersion();
       char notify[256]{};
-      sprintf_s(notify, "Manual trans r3: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
+      sprintf_s(notify, "Manual trans r4: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
                 VehicleData::GetOffsetSourceName(),
                 bv.empty() ? "?" : bv.c_str(), off.Gear, off.NextGear, off.RPM,
                 off.Clutch);
