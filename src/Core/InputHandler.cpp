@@ -92,6 +92,7 @@ static float s_reverseInjectedBrakeAxis = 0.0f;
 
 // ── Raw state ─────────────────────────────────────────────────────────────────
 static bool  s_throttleDown  = false;
+static bool  s_keyboardThrottle = false;
 static bool  s_brakeDown     = false;
 static bool  s_clutchDown    = false;
 static float s_rawSteerTarget = 0.0f;
@@ -135,6 +136,7 @@ void Update(int selectedGear) {
 
     // ── Throttle: W or UP ──────────────────────────────────────────────────────
     const bool keyboardThrottle = keyDown(0x57) || keyDown(VK_UP);
+    s_keyboardThrottle = keyboardThrottle;
     const float nativeThrottle = Clamp01(PAD::GET_CONTROL_NORMAL(0, 71));
     s_throttleDown = nativeThrottle > 0.001f || keyboardThrottle;
     s_smoothedThrottle =
@@ -237,6 +239,7 @@ void ResetEdges() {
     s_smoothedThrottle = s_smoothedBrake = s_smoothedClutch = 0.0f;
     s_smoothedSteer = s_rawSteerTarget = s_driveCoupling = 0.0f;
     s_reverseInjectedBrakeAxis = 0.0f;
+    s_keyboardThrottle = false;
 }
 
 // =============================================================================
@@ -250,6 +253,7 @@ bool IsSignalRightJustPressed()  { return s_signalRightJustPressed;   }
 bool IsSignalHazardJustPressed() { return s_signalHazardJustPressed;  }
 
 bool IsThrottleDown() { return s_throttleDown; }
+bool IsKeyboardThrottle() { return s_keyboardThrottle; }
 bool IsBrakeDown()    { return s_brakeDown;     }
 bool IsClutchDown()   { return s_clutchDown;    }
 

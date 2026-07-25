@@ -37,6 +37,7 @@ float GetDriveCoupling();        // Last torque coupling sent to the game
 
 // ── Raw digital state ─────────────────────────────────────────────────────────
 bool IsThrottleDown();
+bool IsKeyboardThrottle();
 bool IsBrakeDown();
 bool IsClutchDown();
 

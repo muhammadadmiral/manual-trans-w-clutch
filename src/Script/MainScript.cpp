@@ -247,7 +247,7 @@ void ScriptMain() {
       const VehicleOffsets &off = VehicleData::GetResolvedOffsets();
       const std::string bv = VehicleData::GetGameBuildVersion();
       char notify[256]{};
-      sprintf_s(notify, "Manual trans r13: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
+      sprintf_s(notify, "Manual trans r14: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
                 VehicleData::GetOffsetSourceName(),
                 bv.empty() ? "?" : bv.c_str(), off.Gear, off.NextGear, off.RPM,
                 off.Clutch);
@@ -645,6 +645,14 @@ void ScriptMain() {
       if (!scooterVehicle) {
         AutomaticGearbox::UpdateSelector(
             vehicle, shiftUpPressed, shiftDownPressed, brake, forwardSpeed);
+      }
+      if (AutomaticGearbox::GetSelector() ==
+              AutomaticGearbox::Selector::Drive &&
+          InputHandler::IsKeyboardThrottle()) {
+        throttle =
+            std::min(throttle,
+                     std::clamp(Config::AutomaticDKeyboardThrottle,
+                                0.30f, 0.90f));
       }
       manualGear = AutomaticGearbox::Update(
           vehicle, data, maxGear, throttle, brake, forwardSpeed, isEngineOn);

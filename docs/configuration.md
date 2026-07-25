@@ -54,6 +54,9 @@ tidak lagi menjadi faktor tunggal.
   aman terhadap over-rev.
 - `S Torque Boost`: nama legacy untuk agresivitas sport pedal map; tidak
   menambah peak power atau memakai cheat-power native.
+- `D Keyboard Pedal`: batas intent throttle tombol W di selector D. Keyboard
+  tidak punya pedal parsial, jadi default `0.62` menjaga D tetap santai;
+  selector S tetap menerima W sebagai full throttle.
 - `Brake Overrides Gas`, `Override Delay`, `Override Cut`: ECU pedal overlap.
 
 ## Gearbox Penalty
@@ -92,6 +95,11 @@ fiturnya mati. Cek `TCSEn`/`ABSEn` untuk konfigurasi dan
 6. Bandingkan D dan S: S harus menahan gear lebih lama, kickdown lebih dini,
    dan memberi respons torsi lebih kuat.
 7. Coba P/R saat masih melaju: selector harus menolak perpindahan.
+8. D dengan throttle parsial harus naik gear lebih awal dan mempertahankan RPM
+   rendah. Full throttle memang meminta kickdown.
+9. Bandingkan kendaraan stock dan engine/transmission upgrade. Cek
+   `EngMod`, `TransMod`, `Race`, `ShiftQuick`, `ShiftPower`, dan
+   `ShiftSynchro` di log.
 
 Baris `STATUS` di `manual-trans.log` dicatat setelah final drivetrain write dan
 memuat profile kendaraan, selector, logical/physical gear, clutch, RPM native,
@@ -102,3 +110,7 @@ dipakai ketika GTA menahan forced gear di low RPM. Untuk assist, suffix `En`
 berarti enabled, `Ready` berarti telemetry tersedia, dan nilai tanpa suffix
 berarti sedang mengintervensi. Launch control memang mati jika `LCEn=0`;
 aktifkan `LaunchControl=1` lewat menu atau bagian `[Engine]`.
+
+`RuntimeForce`, `ForceMul`, dan `ForceApplied` menunjukkan recovery tingkat
+kedua yang bekerja di drive-force runtime GTA. `Condition` berasal dari engine
+health. Nilai upgrade dibaca langsung dari mod kendaraan, bukan INI.

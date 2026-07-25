@@ -295,6 +295,10 @@ void Menu::Initialize() {
       "S Pedal Response", MenuItem::Float, &Config::AutomaticSTorqueBoost,
       0.01f, 0.00f, 0.50f));
   automatic.items.push_back(MenuItem(
+      "D Keyboard Pedal", MenuItem::Float,
+      &Config::AutomaticDKeyboardThrottle,
+      0.01f, 0.30f, 0.90f));
+  automatic.items.push_back(MenuItem(
       "Brake Overrides Gas", MenuItem::Bool,
       &Config::BrakeThrottleOverride));
   automatic.items.push_back(MenuItem(

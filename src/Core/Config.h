@@ -74,6 +74,7 @@ extern float AutomaticSUpRPM;
 extern float AutomaticSDownRPM;
 extern float AutomaticKickdownThrottle;
 extern float AutomaticSTorqueBoost;
+extern float AutomaticDKeyboardThrottle;
 extern bool BrakeThrottleOverride;
 extern float BrakeOverrideDelay;
 extern float BrakeOverrideCut;

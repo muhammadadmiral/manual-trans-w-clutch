@@ -158,5 +158,34 @@ defisit torsi/deceleration bertahan, timer naik sampai mesin mati. Partial
 clutch mengurangi load sehingga start dari gear 2 tetap mungkin, tetapi lebih
 lama dan lebih panas.
 
+Build r13 memakai dua tingkat recovery. `PowerMul` membentuk envelope torque
+umum, sedangkan `ForceMul` mengoreksi drive-force runtime CVehicle ketika solver
+GTA masih memotong forced gear. Base value disimpan per sesi kendaraan dan
+selalu direstore saat mode OFF, keluar/ganti kendaraan, atau mesin stall.
+Kecepatan dan angular velocity roda tetap tidak pernah ditulis.
+
 Automatic D membuka torque converter lebih banyak pada low RPM supaya mesin
 tidak langsung terkunci ke putaran roda. S tetap lebih rapat dan agresif.
+
+Shift map D memakai upshift lebih awal dan downshift lebih rendah saat throttle
+ringan. Pedal besar tetap dianggap permintaan kickdown; pengujian cruising
+efisien dilakukan dengan throttle parsial, bukan full throttle.
+
+## Upgrade kendaraan dan shift assist
+
+Mod native GTA dibaca langsung dari kategori engine `11`, transmission `13`,
+dan turbo `18`.
+
+- Engine level 1-3 menambah idle reserve dan stall resistance, serta
+  mengurangi damage over-rev. Engine health rendah mengurangi torque dan
+  mempercepat stall.
+- Transmission upgrade mengurangi grind, clash, dan shift shock secara
+  bertahap. Level tertinggi dianggap race transmission.
+- Motor dengan transmission upgrade memperoleh quickshifter untuk upshift:
+  clutch tidak dibuka, tetapi ignition/throttle dipotong sangat singkat.
+- Mobil race-transmission mendukung powershift ketika clutch diinjak, gear
+  dinaikkan, dan throttle tetap besar.
+- Clutchless shift dengan throttle terangkat dan RPM yang sudah sinkron
+  diperlakukan sebagai synchro shift dengan penalty kecil.
+- Money shift tetap berbahaya meskipun memakai race transmission; upgrade
+  durability mengurangi damage tetapi tidak menghapus over-rev.

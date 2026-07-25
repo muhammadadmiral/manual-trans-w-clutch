@@ -28,6 +28,8 @@ Sprint drivetrain aktif. Fokus saat ini:
 - selector automatic punya brake interlock serta lockout P/R saat kendaraan
   masih bergerak ke arah yang salah;
 - TCS dan ABS memakai telemetry `CWheel`, bukan estimasi RPM palsu;
+- engine/transmission upgrade native memengaruhi stall resistance, durability,
+  quickshift, powershift, dan shift penalty;
 - launch control opsional memakai soft throttle cut tanpa menulis RPM;
 - temperatur rem, brake fade, clutch heat, dan brake-throttle override dapat
   dituning lewat GUI.
@@ -67,7 +69,7 @@ dijelaskan di [docs/configuration.md](docs/configuration.md).
    memuat ScriptHookV.
 
 Sesudah mengganti ASI, cek awal `manual-trans.log`. Build sprint ini wajib
-mencetak `Runtime=driveline-r13` dan path file yang benar-benar dimuat. Kalau
+mencetak `Runtime=driveline-r14` dan path file yang benar-benar dimuat. Kalau
 baris itu tidak ada, GTA masih memakai salinan ASI lama.
 
 Artefak yang sudah diverifikasi pada sprint ini:
@@ -105,6 +107,7 @@ DDownRPM=0.22
 SUpRPM=0.84
 SDownRPM=0.34
 SportTorqueBoost=0.10
+DKeyboardThrottle=0.62
 ```
 
 `Mode=0` melepas kontrol drivetrain ke GTA, `Mode=1` mengaktifkan automatic

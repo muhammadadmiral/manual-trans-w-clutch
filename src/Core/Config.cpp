@@ -77,6 +77,7 @@ float AutomaticSUpRPM = 0.84f;
 float AutomaticSDownRPM = 0.34f;
 float AutomaticKickdownThrottle = 0.72f;
 float AutomaticSTorqueBoost = 0.10f;
+float AutomaticDKeyboardThrottle = 0.62f;
 bool BrakeThrottleOverride = true;
 float BrakeOverrideDelay = 0.20f;
 float BrakeOverrideCut = 0.85f;
@@ -248,6 +249,8 @@ void ReadConfig(HMODULE module) {
         ReadFloat("Automatic", "KickdownThrottle", 0.72f, ini);
     AutomaticSTorqueBoost =
         ReadFloat("Automatic", "SportTorqueBoost", 0.10f, ini);
+    AutomaticDKeyboardThrottle =
+        ReadFloat("Automatic", "DKeyboardThrottle", 0.62f, ini);
 
     BrakeThrottleOverride =
         GetPrivateProfileIntA("Pedals", "BrakeThrottleOverride", 1, ini) != 0;
@@ -384,6 +387,8 @@ void SaveConfig(HMODULE module) {
                AutomaticKickdownThrottle, ini);
     WriteFloat("Automatic", "SportTorqueBoost",
                AutomaticSTorqueBoost, ini);
+    WriteFloat("Automatic", "DKeyboardThrottle",
+               AutomaticDKeyboardThrottle, ini);
 
     WriteInt("Pedals", "BrakeThrottleOverride",
              BrakeThrottleOverride ? 1 : 0, ini);
