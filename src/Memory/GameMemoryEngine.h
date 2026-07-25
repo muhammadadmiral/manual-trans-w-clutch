@@ -10,6 +10,14 @@ struct VehicleOffsets;
 
 namespace GameMemory {
 
+struct WheelTelemetry {
+  float angularVelocity = 0.0f;
+  float load = 0.0f;
+  float brakePressure = 0.0f;
+  float power = 0.0f;
+  bool valid = false;
+};
+
 // A robust pointer traversal helper that validates memory at every step.
 // For example, to read: [[[worldPtr] + 0x8] + 0xD28]
 template <typename T>
@@ -55,11 +63,9 @@ public:
 
   bool IsValid() const { return m_address != 0 && m_offsets != nullptr; }
 
-  // Returns the array of GearRatios.
-  // In GTA V, gear ratios are an array of floats, usually up to 8 gears.
-  float GetGearRatio(uint8_t gearIndex) const;
-
   float GetDriveForce() const;
+  float GetDriveInertia() const;
+  float GetDriveMaxFlatVel() const;
   void SetDriveForce(float force);
 
 private:
@@ -81,8 +87,13 @@ public:
   uint8_t GetGear() const;
   uint8_t GetNextGear() const;
   uint8_t GetTopGear() const;
+  float GetGearRatio(uint8_t gearIndex) const;
   float GetClutch() const;
   float GetRPM() const;
+  float GetThrottle() const;
+  float GetThrottlePedal() const;
+  uint8_t GetWheelCount() const;
+  WheelTelemetry GetWheelTelemetry(uint8_t index) const;
   float GetFuelLevel() const;
   float GetHoverTransformRatioLerp() const;
   uint8_t GetLightsBroken() const;
@@ -93,6 +104,8 @@ public:
   void SetTopGear(uint8_t gear);
   void SetClutch(float clutch);
   void SetRPM(float rpm);
+  void SetThrottle(float throttle);
+  void SetThrottlePedal(float throttle);
   void SetLightsBroken(uint8_t state);
   void SetLightsVisuallyBroken(uint8_t state);
 

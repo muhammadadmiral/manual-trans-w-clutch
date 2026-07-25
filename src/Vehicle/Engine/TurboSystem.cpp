@@ -3,8 +3,8 @@
 // Turbo simulation logic. ModKit id 18 is the Turbo in GTA V.
 // =============================================================================
 #include "TurboSystem.h"
-#include "VehicleData.h"
-#include "../../sdk/inc/natives.h"
+#include "../VehicleData.h"
+#include "../../../sdk/inc/natives.h"
 
 namespace TurboSystem {
 

@@ -2,8 +2,8 @@
 // FuelSystem.cpp  —  Realistic fuel consumption, oil temp, refueling
 // =============================================================================
 #include "FuelSystem.h"
-#include "VehicleData.h"
-#include "../../sdk/inc/natives.h"
+#include "../VehicleData.h"
+#include "../../../sdk/inc/natives.h"
 #include <cmath>
 #include <cstdlib>
 #include <Windows.h>

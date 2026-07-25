@@ -82,6 +82,11 @@ void Menu::Initialize() {
       MenuItem("Allow Quadbikes", MenuItem::Bool, &Config::AllowQuadbikes));
   settings.items.push_back(
       MenuItem("Use Real Clutch", MenuItem::Bool, &Config::UseRealClutch));
+  settings.items.push_back(
+      MenuItem("Launch Control", MenuItem::Bool, &Config::LaunchControl));
+  settings.items.push_back(MenuItem("Launch RPM", MenuItem::Float,
+                                    &Config::LaunchControlRPM,
+                                    0.01f, 0.40f, 0.95f));
   menus.push_back(settings);
 
   // 2: Analog Tuning

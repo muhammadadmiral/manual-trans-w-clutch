@@ -8,46 +8,31 @@ namespace GameMemory {
 
 
 // --- CHandlingData Implementation ---
-float CHandlingData::GetGearRatio(uint8_t gearIndex) const {
-  if (!IsValid() || gearIndex > 32)
+float CHandlingData::GetDriveForce() const {
+  if (!IsValid() || m_offsets->DriveForce == 0)
     return 0.0f;
-
-  // In GTA V, GearRatios is a pointer to an array of floats inside
-  // CHandlingData. Wait, no, GearRatios is inside CVehicleHandlingData, or
-  // CHandlingData! Ikt's pattern for GearRatios was: `baseGearOffset + 8` from
-  // the Gear pattern. Which actually resolves directly to the GearRatios array
-  // pointer!
-
-  uintptr_t ratiosArrayPtr = 0;
-  // If the offset is in CVehicle, we can read the pointer directly.
   __try {
-    ratiosArrayPtr =
-        *reinterpret_cast<uintptr_t *>(m_address + m_offsets->GearRatios);
-  } __except (EXCEPTION_EXECUTE_HANDLER) {
-    return 0.0f;
-  }
-
-  if (ratiosArrayPtr == 0)
-    return 0.0f;
-
-  __try {
-    return *reinterpret_cast<float *>(ratiosArrayPtr +
-                                      (gearIndex * sizeof(float)));
+    return *reinterpret_cast<float *>(m_address + m_offsets->DriveForce);
   } __except (EXCEPTION_EXECUTE_HANDLER) {
     return 0.0f;
   }
 }
 
-float CHandlingData::GetDriveForce() const {
-  if (!IsValid())
+float CHandlingData::GetDriveInertia() const {
+  if (!IsValid() || m_offsets->DriveInertia == 0)
     return 0.0f;
   __try {
-    // DriveForce is usually a float directly inside CHandlingData.
-    // The pattern in OffsetResolver found the displacement for DriveForce.
-    // Is it in CVehicle or CHandlingData?
-    // If the instruction was `movss xmm0, [rcx+offset]`, it depends on what rcx
-    // was. Assuming the offset is from CVehicle for now.
-    return *reinterpret_cast<float *>(m_address + m_offsets->DriveForce);
+    return *reinterpret_cast<float *>(m_address + m_offsets->DriveInertia);
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return 0.0f;
+  }
+}
+
+float CHandlingData::GetDriveMaxFlatVel() const {
+  if (!IsValid() || m_offsets->DriveMaxFlatVel == 0)
+    return 0.0f;
+  __try {
+    return *reinterpret_cast<float *>(m_address + m_offsets->DriveMaxFlatVel);
   } __except (EXCEPTION_EXECUTE_HANDLER) {
     return 0.0f;
   }
@@ -55,9 +40,17 @@ float CHandlingData::GetDriveForce() const {
 
 // --- CVehicle Implementation ---
 CHandlingData CVehicle::GetHandlingData() const {
-  // If we had the pointer offset to CHandlingData, we would traverse it here.
-  // For now, we pass the vehicle address and let CHandlingData use the offsets.
-  return CHandlingData(m_address, m_offsets);
+  if (!IsValid() || m_offsets->HandlingPtr == 0)
+    return CHandlingData(0, m_offsets);
+  __try {
+    const uintptr_t handling =
+        *reinterpret_cast<uintptr_t *>(m_address + m_offsets->HandlingPtr);
+    if (!AOBScanner::IsReadable(handling, 0x100))
+      return CHandlingData(0, m_offsets);
+    return CHandlingData(handling, m_offsets);
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return CHandlingData(0, m_offsets);
+  }
 }
 
 uint8_t CVehicle::GetGear() const {
@@ -90,6 +83,21 @@ uint8_t CVehicle::GetTopGear() const {
   }
 }
 
+float CVehicle::GetGearRatio(uint8_t gearIndex) const {
+  if (!IsValid() || m_offsets->GearRatios == 0 || gearIndex > 32)
+    return 0.0f;
+  __try {
+    const uintptr_t ratios =
+        *reinterpret_cast<uintptr_t *>(m_address + m_offsets->GearRatios);
+    if (!AOBScanner::IsReadable(ratios + gearIndex * sizeof(float),
+                                sizeof(float)))
+      return 0.0f;
+    return *reinterpret_cast<float *>(ratios + gearIndex * sizeof(float));
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return 0.0f;
+  }
+}
+
 float CVehicle::GetClutch() const {
   if (!IsValid())
     return 0.0f;
@@ -98,6 +106,74 @@ float CVehicle::GetClutch() const {
   } __except (EXCEPTION_EXECUTE_HANDLER) {
     return 0.0f;
   }
+}
+
+float CVehicle::GetThrottle() const {
+  if (!IsValid() || m_offsets->Throttle == 0)
+    return 0.0f;
+  __try {
+    return *reinterpret_cast<float *>(m_address + m_offsets->Throttle);
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return 0.0f;
+  }
+}
+
+float CVehicle::GetThrottlePedal() const {
+  if (!IsValid() || m_offsets->ThrottlePedal == 0)
+    return 0.0f;
+  __try {
+    return *reinterpret_cast<float *>(m_address + m_offsets->ThrottlePedal);
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return 0.0f;
+  }
+}
+
+uint8_t CVehicle::GetWheelCount() const {
+  if (!IsValid() || m_offsets->WheelCount == 0)
+    return 0;
+  __try {
+    const int count =
+        *reinterpret_cast<int *>(m_address + m_offsets->WheelCount);
+    return count > 0 && count <= 16 ? static_cast<uint8_t>(count) : 0;
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return 0;
+  }
+}
+
+WheelTelemetry CVehicle::GetWheelTelemetry(uint8_t index) const {
+  WheelTelemetry out{};
+  const uint8_t count = GetWheelCount();
+  if (!IsValid() || index >= count || m_offsets->WheelsPtr == 0 ||
+      m_offsets->WheelAngularVelocity == 0)
+    return out;
+
+  __try {
+    const uintptr_t wheelArray =
+        *reinterpret_cast<uintptr_t *>(m_address + m_offsets->WheelsPtr);
+    if (!AOBScanner::IsReadable(wheelArray + index * sizeof(uintptr_t),
+                                sizeof(uintptr_t)))
+      return out;
+    const uintptr_t wheel =
+        *reinterpret_cast<uintptr_t *>(wheelArray +
+                                      index * sizeof(uintptr_t));
+    if (!AOBScanner::IsReadable(wheel + m_offsets->WheelAngularVelocity,
+                                sizeof(float)))
+      return out;
+
+    out.angularVelocity =
+        *reinterpret_cast<float *>(wheel + m_offsets->WheelAngularVelocity);
+    if (m_offsets->WheelLoad != 0)
+      out.load = *reinterpret_cast<float *>(wheel + m_offsets->WheelLoad);
+    if (m_offsets->WheelBrakePressure != 0)
+      out.brakePressure =
+          *reinterpret_cast<float *>(wheel + m_offsets->WheelBrakePressure);
+    if (m_offsets->WheelPower != 0)
+      out.power = *reinterpret_cast<float *>(wheel + m_offsets->WheelPower);
+    out.valid = true;
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return WheelTelemetry{};
+  }
+  return out;
 }
 
 float CVehicle::GetRPM() const {
@@ -202,6 +278,24 @@ void CVehicle::SetRPM(float rpm) {
     return;
   __try {
     *reinterpret_cast<float *>(m_address + m_offsets->RPM) = rpm;
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+  }
+}
+
+void CVehicle::SetThrottle(float throttle) {
+  if (!IsValid() || m_offsets->Throttle == 0)
+    return;
+  __try {
+    *reinterpret_cast<float *>(m_address + m_offsets->Throttle) = throttle;
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+  }
+}
+
+void CVehicle::SetThrottlePedal(float throttle) {
+  if (!IsValid() || m_offsets->ThrottlePedal == 0)
+    return;
+  __try {
+    *reinterpret_cast<float *>(m_address + m_offsets->ThrottlePedal) = throttle;
   } __except (EXCEPTION_EXECUTE_HANDLER) {
   }
 }

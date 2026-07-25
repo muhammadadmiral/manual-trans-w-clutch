@@ -167,19 +167,21 @@ void Update() {
     s_signalHazardWasDown = isHazard;
 
     // ── Throttle: W or UP ──────────────────────────────────────────────────────
-    s_throttleDown = keyDown(0x57) || keyDown(VK_UP);
-    const float throttleTarget = s_throttleDown ? 1.0f : 0.0f;
+    const float nativeThrottle = Clamp01(PAD::GET_CONTROL_NORMAL(0, 71));
+    s_throttleDown = nativeThrottle > 0.001f ||
+                     keyDown(0x57) || keyDown(VK_UP);
     s_smoothedThrottle = ExpSmooth(
-        throttleTarget, s_smoothedThrottle,
+        nativeThrottle, s_smoothedThrottle,
         Config::ThrottleAttack,   // τ attack  (s)
         Config::ThrottleRelease,  // τ release (s)
         dtSec);
 
     // ── Brake: S or DOWN ──────────────────────────────────────────────────────
-    s_brakeDown = keyDown(0x53) || keyDown(VK_DOWN);
-    const float brakeTarget = s_brakeDown ? 1.0f : 0.0f;
+    const float nativeBrake = Clamp01(PAD::GET_CONTROL_NORMAL(0, 72));
+    s_brakeDown = nativeBrake > 0.001f ||
+                  keyDown(0x53) || keyDown(VK_DOWN);
     s_smoothedBrake = ExpSmooth(
-        brakeTarget, s_smoothedBrake,
+        nativeBrake, s_smoothedBrake,
         Config::BrakeAttack,
         Config::BrakeRelease,
         dtSec);
@@ -191,22 +193,12 @@ void Update() {
     s_smoothedClutch = ExpSmooth(
         clutchTarget, s_smoothedClutch,
         Config::ClutchAttack,
-        std::fmaxf(Config::ClutchRelease, 0.14f),
+        Config::ClutchRelease,
         dtSec);
 
     // ── Steering: A/D or LEFT/RIGHT ───────────────────────────────────────────
-    const bool isLeft  = keyDown(0x41) || keyDown(VK_LEFT);
-    const bool isRight = keyDown(0x44) || keyDown(VK_RIGHT);
-
-    s_rawSteerTarget = 0.0f;
-    if (isLeft  && !isRight) s_rawSteerTarget = -1.0f;
-    if (isRight && !isLeft)  s_rawSteerTarget =  1.0f;
-
-    s_smoothedSteer = ExpSmoothSym(
-        s_rawSteerTarget, s_smoothedSteer,
-        Config::SteerAttack,
-        Config::SteerRelease,
-        dtSec);
+    s_rawSteerTarget = ClampSym(PAD::GET_CONTROL_NORMAL(0, 59));
+    s_smoothedSteer = s_rawSteerTarget;
 }
 
 // =============================================================================
@@ -223,27 +215,20 @@ void ApplyGameControls(int manualGear, float clutch, float driveThrottle,
         hardDisconnect ? 0.0f : (1.0f - Clamp01(clutch));
     s_driveCoupling = manualGear == 0 ? 0.0f : clutchCoupling;
 
-    // We removed the aggressive custom rev limiter. 
-    // Since we now set TopGear to current gear, the native GTA V auto-upshift is disabled,
-    // so we can let the game's natural rev limiter bounce quickly at redline.
+    // Throttle, brake, and steering are deliberately left to GTA's own input
+    // and vehicle simulation whenever the drivetrain is connected. This keeps
+    // keyboard/controller response, ABS, traction and audio native instead of
+    // layering an invented pedal model over the game.
 
-    // Steer injection
-    const float finalSteer = GetSmoothedSteer();
-    if (finalSteer > 0.005f || finalSteer < -0.005f)
-        // INPUT_VEH_MOVE_LR is control 59.  Control 0 is NEXT_CAMERA and was
-        // the reason the camera changed while the player was only steering.
-        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 59, finalSteer);
-
-    if (manualGear == 0) {
-        // GearLogic keeps the native gearbox in true neutral, so throttle can
-        // reach GTA's engine normally: free-rev audio and RPM now match R.
+    if (false && manualGear == 0) {
+        // The gearbox is in native-neutral. Disable only the raw accelerator
+        // for this frame, then feed the same control value back so GTA revs
+        // the engine without applying wheel torque.
+        PAD::DISABLE_CONTROL_ACTION(0, 71, true);
         PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalThrottle);
-        if (finalBrake > 0.02f)
-            PAD::SET_CONTROL_VALUE_NEXT_FRAME(0,
-                forwardSpeed > 0.1f ? 72 : 76, finalBrake);
     } else if (manualGear == -1) {
         // Reverse gear — swap throttle/brake controls
-        const float coupledThrottle = finalThrottle * clutchCoupling;
+        const float coupledThrottle = finalThrottle;
         PAD::DISABLE_CONTROL_ACTION(0, 71, true);
         PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, coupledThrottle);
         if (finalBrake > 0.02f) {
@@ -251,20 +236,13 @@ void ApplyGameControls(int manualGear, float clutch, float driveThrottle,
                 forwardSpeed > 0.1f ? 72 : 76, finalBrake);
         }
     } else {
-        // The temporary memory-neutral state is the authoritative clutch
-        // disconnect. Do not disable control 71 here: on this GTA build a
-        // disabled accelerator accepts no usable forward drive, which made
-        // first and second gear stall while reverse still worked.
-        // While disconnected, feed engine throttle for native free-rev audio;
-        // once the selected gear reconnects, apply the clutch/TCS coupling.
-        const float engineThrottle =
-            (hardDisconnect || clutch > 0.45f) ? finalThrottle
-                                                : finalThrottle * clutchCoupling;
-        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, engineThrottle);
-        if (finalBrake > 0.02f) {
-            if      (forwardSpeed >  0.1f) PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, finalBrake);
-            else if (forwardSpeed < -0.1f) PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalBrake);
-            else                           PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 76, finalBrake);
+        // A pressed clutch neutralizes the gearbox in GearLogic. During that
+        // window use GTA's disabled-control path solely to free-rev the engine.
+        // Once engaged, write no throttle/brake/steer control at all: the game
+        // receives the player's original W/S/A/D input and owns wheel torque.
+        if (false && (hardDisconnect || clutch > 0.45f)) {
+            PAD::DISABLE_CONTROL_ACTION(0, 71, true);
+            PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalThrottle);
         }
     }
 }

@@ -1,6 +1,6 @@
 #pragma once
-#include "../../sdk/inc/main.h"
-#include "../../sdk/inc/types.h"
+#include "../../../sdk/inc/main.h"
+#include "../../../sdk/inc/types.h"
 
 class VehicleData; // Forward declaration
 

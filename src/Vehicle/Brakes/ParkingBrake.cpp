@@ -2,8 +2,8 @@
 // ParkingBrake.cpp  —  Persistent handbrake + hill-hold
 // =============================================================================
 #include "ParkingBrake.h"
-#include "VehicleData.h"
-#include "../../sdk/inc/natives.h"
+#include "../VehicleData.h"
+#include "../../../sdk/inc/natives.h"
 #include <Windows.h>
 
 // Key default (0x50 = 'P'). Updated at runtime by ParkingBrake::SetKey().

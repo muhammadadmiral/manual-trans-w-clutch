@@ -32,7 +32,26 @@ bool OffsetResolver::ScanPatterns(VehicleOffsets &outOffsets,
   VehicleOffsets offsets{};
   uintptr_t addr = 0;
 
-  // 1. Core Transmission (Gear / NextGear / TopGear / GearRatios)
+  // 1. Core Engine (RPM / Clutch / engine-sound throttle).
+  // These three floats are members of CVehicle. The relationship is stable:
+  // fClutch = fCurrentRPM + 0xC and fThrottle = fCurrentRPM + 0x10.
+  addr = AOBScanner::FindUnique(
+      "76 03 0F 28 F0 F3 44 0F 10 93 ? ? ? ?");
+  if (addr != 0 && TryReadU32(addr + 10, offsets.RPM)) {
+    offsets.Clutch = offsets.RPM + 0xC;
+    offsets.Throttle = offsets.RPM + 0x10;
+  } else {
+    // Older fallback retained for builds whose surrounding code changed.
+    addr = AOBScanner::FindUnique("F6 83 ? ? ? ? 07 75 ? 44 0F");
+    if (addr == 0 || !TryReadU32(addr - 42, offsets.RPM)) {
+      outFailureReason = "Could not resolve the RPM/clutch pattern.";
+      return false;
+    }
+    offsets.Clutch = offsets.RPM + 0xC;
+    offsets.Throttle = offsets.RPM + 0x10;
+  }
+
+  // 2. Core Transmission (Gear / NextGear / TopGear / GearRatios)
   addr = AOBScanner::FindUnique("48 8D 8F ? ? ? ? 4C 8B C3 F3 0F 11 7C 24");
   if (addr == 0) addr = AOBScanner::FindUnique("88 8F ? ? ? ? 8B D1 48 8B 01 FF 90");
   if (addr == 0) addr = AOBScanner::FindUnique("88 8F ? ? ? ? 44 0F B6 C6");
@@ -54,24 +73,12 @@ bool OffsetResolver::ScanPatterns(VehicleOffsets &outOffsets,
     return false;
   }
 
-  // 2. Core Engine (RPM / Clutch)
-  addr = AOBScanner::FindUnique("F6 83 ? ? ? ? 07 75 ? 44 0F");
-  if (addr != 0) {
-    if (TryReadU32(addr - 42, offsets.RPM)) {
-      offsets.Clutch = offsets.RPM + 12;
-    } else {
-      outFailureReason = "Failed to read RPM displacement.";
-      return false;
-    }
-  } else {
-    outFailureReason = "Could not find RPM pattern.";
-    return false;
-  }
+  EnrichOptionalOffsets(offsets);
 
   // 3. Drive Force
   // "F3 0F 10 8F A4 08 00 00 F3 0F 5E F0 41 0F 2F CA"
   addr = AOBScanner::FindUnique("F3 0F 10 8F ? ? ? ? F3 0F 5E F0 41 0F 2F CA");
-  if (addr != 0) {
+  if (addr != 0 && offsets.HandlingPtr == 0) {
     offsets.DriveForce = ResolveRipDisplacement(addr, 4);
   }
 
@@ -114,4 +121,60 @@ bool OffsetResolver::ScanPatterns(VehicleOffsets &outOffsets,
 
   outOffsets = offsets;
   return true;
+}
+
+void OffsetResolver::EnrichOptionalOffsets(VehicleOffsets &offsets) {
+  if (offsets.RPM != 0) {
+    offsets.Clutch = offsets.RPM + 0xC;
+    offsets.Throttle = offsets.RPM + 0x10;
+  }
+
+  // CVehicle::m_handlingData. The handling fields below are offsets inside
+  // CHandlingData, not displacements from CVehicle.
+  uintptr_t addr = AOBScanner::FindUnique(
+      "3C 03 0F 85 ? ? ? ? 48 8B 41 20 48 8B 88");
+  if (addr != 0) {
+    offsets.HandlingPtr = ResolveRipDisplacement(addr, 0x16);
+    if (offsets.HandlingPtr != 0) {
+      offsets.DriveInertia = 0x54;
+      offsets.DriveForce = 0x60;
+      offsets.DriveMaxFlatVel = 0x64;
+    }
+  }
+
+  // fThrottleP shares the group following steering input in CVehicle.
+  addr = AOBScanner::FindUnique(
+      "74 0A F3 0F 11 B3 ? ? ? ? EB 25");
+  if (addr != 0) {
+    const uint32_t steeringInput = ResolveRipDisplacement(addr, 6);
+    if (steeringInput != 0)
+      offsets.ThrottlePedal = steeringInput + 0x10;
+  }
+
+  addr = AOBScanner::FindUnique("3B B7 ? ? ? ? 7D 0D");
+  if (addr != 0) {
+    offsets.WheelCount = ResolveRipDisplacement(addr, 2);
+    if (offsets.WheelCount >= 8)
+      offsets.WheelsPtr = offsets.WheelCount - 8;
+  }
+
+  addr = AOBScanner::FindUnique(
+      "45 0F 57 C9 F3 0F 11 83 ? ? ? ? F3 0F 5C");
+  if (addr != 0) {
+    const uint32_t suspensionCompression =
+        ResolveRipDisplacement(addr, 8);
+    if (suspensionCompression != 0)
+      offsets.WheelAngularVelocity = suspensionCompression + 0xC;
+  }
+
+  addr = AOBScanner::FindUnique(
+      "0F 2F 81 ? ? ? ? 0F 97 C0 EB ? D1 ?");
+  if (addr != 0) {
+    const uint32_t steeringAngle = ResolveRipDisplacement(addr, 3);
+    if (steeringAngle != 0) {
+      offsets.WheelLoad = steeringAngle - 0x10;
+      offsets.WheelBrakePressure = steeringAngle + 0x4;
+      offsets.WheelPower = steeringAngle + 0x8;
+    }
+  }
 }

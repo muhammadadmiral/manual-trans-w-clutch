@@ -45,6 +45,8 @@ extern bool AllowQuadbikes;
 extern bool UseRealClutch;
 extern bool RequireColdStart;
 extern bool ForceRecalibrate;
+extern bool LaunchControl;
+extern float LaunchControlRPM;
 
 // ── Analog smoothing — time constants τ in seconds ────────────────────────────
 // See header comment above for interpretation.

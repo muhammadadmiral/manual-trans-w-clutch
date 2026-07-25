@@ -534,24 +534,16 @@ bool Update(int vehicleHandle, bool isEngineOn, bool isRevving, uint8_t maxGear,
             VehicleOffsets cand = VehicleData::GetResolvedOffsets();
             cand.RPM       = rpmOff;
             
-            // In older builds (e.g. 1.0.1180), Clutch was RPM + 12.
-            // In newer builds (e.g. 3095), Clutch is RPM + 4.
-            // Since fClutch mimics fRPM in neutral, the true Clutch offset MUST be in s_rpmCandidates!
-            cand.Clutch = rpmOff + 12; // fallback
-            for (uint32_t c : s_rpmCandidates) {
-                if (c == rpmOff + 4) {
-                    cand.Clutch = rpmOff + 4;
-                    break;
-                } else if (c == rpmOff + 12) {
-                    cand.Clutch = rpmOff + 12;
-                    break;
-                }
-            }
+            // fClutch is a writable actuator at fCurrentRPM + 0xC. Do not
+            // select RPM+4 merely because it happens to mirror RPM at idle.
+            cand.Clutch = rpmOff + 0xC;
+            cand.Throttle = rpmOff + 0x10;
 
             cand.Gear      = cluster.gearOff;
             cand.NextGear  = cluster.nextGearOff;
             cand.TopGear   = cluster.topGearOff;
             cand.GearRatios = cluster.ratiosOff;
+            OffsetResolver::EnrichOptionalOffsets(cand);
 
             if (!OffsetsAreSane(cand)) {
                 LOG_DEBUG(Calib,

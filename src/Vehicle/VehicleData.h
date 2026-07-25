@@ -86,6 +86,12 @@ public:
     uint8_t GetTopGear()                 const;
     float   GetClutch()                  const;
     float   GetRPM()                     const;
+    float   GetThrottle()                const;
+    float   GetThrottlePedal()           const;
+    float   GetDriveInertia()            const;
+    float   GetDriveMaxFlatVel()         const;
+    uint8_t GetWheelCount()              const;
+    GameMemory::WheelTelemetry GetWheelTelemetry(uint8_t index) const;
     float   GetDriveForce()              const;
     float   GetOriginalDriveForce()      const;
     float   GetFuelLevel()               const;
@@ -100,6 +106,8 @@ public:
     bool SetTopGear(uint8_t gear);
     bool SetClutch(float clutch);
     bool SetRPM(float rpm);
+    bool SetThrottle(float throttle);
+    bool SetThrottlePedal(float throttle);
     bool SetDriveForce(float force);
     bool SetLightsBroken(uint8_t state);
     bool SetLightsVisuallyBroken(uint8_t state);

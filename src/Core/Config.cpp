@@ -33,6 +33,8 @@ bool AllowQuadbikes  = true;
 bool UseRealClutch   = true;
 bool RequireColdStart = true;
 bool ForceRecalibrate = false;
+bool LaunchControl = false;
+float LaunchControlRPM = 0.72f;
 
 // ── Analog smoothing — τ in seconds ──────────────────────────────────────────
 // Recommended defaults for keyboard play:
@@ -141,6 +143,8 @@ void ReadConfig(HMODULE module) {
     AllowQuadbikes   = GetPrivateProfileIntA("Vehicles", "AllowQuadbikes",  1, ini) != 0;
     UseRealClutch    = GetPrivateProfileIntA("Vehicles", "UseRealClutch",   1, ini) != 0;
     RequireColdStart = GetPrivateProfileIntA("Vehicles", "RequireColdStart",1, ini) != 0;
+    LaunchControl = GetPrivateProfileIntA("Engine", "LaunchControl", 0, ini) != 0;
+    LaunchControlRPM = ReadFloat("Engine", "LaunchControlRPM", 0.72f, ini);
 
     // Analog smoothing τ (seconds)
     ThrottleAttack   = ReadFloat("Analog", "ThrottleAttack",   0.08f,  ini);
@@ -197,6 +201,8 @@ void SaveConfig(HMODULE module) {
     WriteInt("Vehicles", "AllowQuadbikes",   AllowQuadbikes   ? 1 : 0, ini);
     WriteInt("Vehicles", "UseRealClutch",    UseRealClutch    ? 1 : 0, ini);
     WriteInt("Vehicles", "RequireColdStart", RequireColdStart ? 1 : 0, ini);
+    WriteInt("Engine", "LaunchControl", LaunchControl ? 1 : 0, ini);
+    WriteFloat("Engine", "LaunchControlRPM", LaunchControlRPM, ini);
 
     WriteFloat("Analog", "ThrottleAttack",   ThrottleAttack,  ini);
     WriteFloat("Analog", "ThrottleRelease",  ThrottleRelease, ini);

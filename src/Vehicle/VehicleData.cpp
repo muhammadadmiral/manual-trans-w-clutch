@@ -186,6 +186,17 @@ bool VehicleData::LoadOffsetsFromIni(HMODULE pluginModule, VehicleOffsets& resul
         out.NextGear              = ReadHexOffset(iniPath, section, "NextGear");
         out.Clutch                = ReadHexOffset(iniPath, section, "Clutch");
         out.RPM                   = ReadHexOffset(iniPath, section, "RPM");
+        out.Throttle              = ReadHexOffset(iniPath, section, "Throttle");
+        out.ThrottlePedal         = ReadHexOffset(iniPath, section, "ThrottlePedal");
+        out.HandlingPtr           = ReadHexOffset(iniPath, section, "HandlingPtr");
+        out.DriveInertia          = ReadHexOffset(iniPath, section, "DriveInertia");
+        out.DriveMaxFlatVel       = ReadHexOffset(iniPath, section, "DriveMaxFlatVel");
+        out.WheelsPtr             = ReadHexOffset(iniPath, section, "WheelsPtr");
+        out.WheelCount            = ReadHexOffset(iniPath, section, "WheelCount");
+        out.WheelAngularVelocity  = ReadHexOffset(iniPath, section, "WheelAngularVelocity");
+        out.WheelLoad             = ReadHexOffset(iniPath, section, "WheelLoad");
+        out.WheelBrakePressure    = ReadHexOffset(iniPath, section, "WheelBrakePressure");
+        out.WheelPower            = ReadHexOffset(iniPath, section, "WheelPower");
         out.TopGear               = ReadHexOffset(iniPath, section, "TopGear");
         out.DriveForce            = ReadHexOffset(iniPath, section, "DriveForce");
         out.FuelLevel             = ReadHexOffset(iniPath, section, "FuelLevel");
@@ -198,9 +209,14 @@ bool VehicleData::LoadOffsetsFromIni(HMODULE pluginModule, VehicleOffsets& resul
         if (out.TopGear == 0 && out.NextGear != 0) {
             out.TopGear = out.NextGear + 2;
         }
-        
-        // Never invent writable offsets. DriveForce=0 means unsupported until
-        // a build-specific pattern resolves it safely.
+
+        if (out.RPM != 0 && out.Clutch != out.RPM + 0xC) {
+            LOG_WARN(Memory,
+                     "Correcting stale clutch offset 0x%X -> 0x%X "
+                     "(RPM+0xC)",
+                     out.Clutch, out.RPM + 0xC);
+        }
+        OffsetResolver::EnrichOptionalOffsets(out);
     };
 
     // Prefer version-specific section (e.g. [Offsets.1.0.3274.0])
@@ -243,6 +259,17 @@ void VehicleData::SaveOffsetsToIni(HMODULE pluginModule,
         write(section, "NextGear",               offsets.NextGear);
         write(section, "Clutch",                 offsets.Clutch);
         write(section, "RPM",                    offsets.RPM);
+        write(section, "Throttle",               offsets.Throttle);
+        write(section, "ThrottlePedal",          offsets.ThrottlePedal);
+        write(section, "HandlingPtr",             offsets.HandlingPtr);
+        write(section, "DriveInertia",            offsets.DriveInertia);
+        write(section, "DriveMaxFlatVel",         offsets.DriveMaxFlatVel);
+        write(section, "WheelsPtr",               offsets.WheelsPtr);
+        write(section, "WheelCount",              offsets.WheelCount);
+        write(section, "WheelAngularVelocity",    offsets.WheelAngularVelocity);
+        write(section, "WheelLoad",               offsets.WheelLoad);
+        write(section, "WheelBrakePressure",      offsets.WheelBrakePressure);
+        write(section, "WheelPower",              offsets.WheelPower);
         write(section, "TopGear",                offsets.TopGear);
         write(section, "DriveForce",             offsets.DriveForce);
         write(section, "FuelLevel",              offsets.FuelLevel);
@@ -397,6 +424,8 @@ uint8_t VehicleData::GetNextGear()           const { return m_vehicle.GetNextGea
 uint8_t VehicleData::GetTopGear()            const { return m_vehicle.GetTopGear(); }
 float   VehicleData::GetClutch()             const { return m_vehicle.GetClutch(); }
 float   VehicleData::GetRPM()               const { return m_vehicle.GetRPM(); }
+float   VehicleData::GetThrottle()          const { return m_vehicle.GetThrottle(); }
+float   VehicleData::GetThrottlePedal()     const { return m_vehicle.GetThrottlePedal(); }
 float   VehicleData::GetFuelLevel()          const { return m_vehicle.GetFuelLevel(); }
 uint8_t VehicleData::GetLightsBroken()       const { return m_vehicle.GetLightsBroken(); }
 uint8_t VehicleData::GetLightsVisuallyBroken() const { return m_vehicle.GetLightsVisuallyBroken(); }
@@ -408,14 +437,35 @@ float VehicleData::GetDriveForce() const {
     return h.IsValid() ? h.GetDriveForce() : 0.0f;
 }
 
+float VehicleData::GetDriveInertia() const {
+    if (!m_isValid) return 0.0f;
+    auto h = m_vehicle.GetHandlingData();
+    return h.IsValid() ? h.GetDriveInertia() : 0.0f;
+}
+
+float VehicleData::GetDriveMaxFlatVel() const {
+    if (!m_isValid) return 0.0f;
+    auto h = m_vehicle.GetHandlingData();
+    return h.IsValid() ? h.GetDriveMaxFlatVel() : 0.0f;
+}
+
+uint8_t VehicleData::GetWheelCount() const {
+    return m_isValid ? m_vehicle.GetWheelCount() : 0;
+}
+
+GameMemory::WheelTelemetry
+VehicleData::GetWheelTelemetry(uint8_t index) const {
+    return m_isValid ? m_vehicle.GetWheelTelemetry(index)
+                     : GameMemory::WheelTelemetry{};
+}
+
 float VehicleData::GetOriginalDriveForce() const {
     return m_originalDriveForce;
 }
 
 float VehicleData::GetGearRatio(uint8_t gear) const {
     if (!m_isValid) return 0.0f;
-    auto h = m_vehicle.GetHandlingData();
-    return h.IsValid() ? h.GetGearRatio(gear) : 0.0f;
+    return m_vehicle.GetGearRatio(gear);
 }
 
 // ── Setters ──────────────────────────────────────────────────────────────────
@@ -442,6 +492,16 @@ bool VehicleData::SetClutch(float clutch) {
 bool VehicleData::SetRPM(float rpm) {
     if (!m_isValid || !std::isfinite(rpm)) return false;
     m_vehicle.SetRPM(rpm);
+    return true;
+}
+bool VehicleData::SetThrottle(float throttle) {
+    if (!m_isValid || !std::isfinite(throttle)) return false;
+    m_vehicle.SetThrottle(throttle);
+    return true;
+}
+bool VehicleData::SetThrottlePedal(float throttle) {
+    if (!m_isValid || !std::isfinite(throttle)) return false;
+    m_vehicle.SetThrottlePedal(throttle);
     return true;
 }
 bool VehicleData::SetDriveForce(float force) {

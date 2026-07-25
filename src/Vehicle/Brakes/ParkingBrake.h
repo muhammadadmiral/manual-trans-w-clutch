@@ -1,5 +1,5 @@
 // =============================================================================
-// ParkingBrake.h
+// ParkingBrake
 // Implements a persistent handbrake (parking brake) that holds the vehicle
 // still even after the player releases the brake pedal. Engages/disengages
 // with a dedicated key. Compatible with hill-hold scenarios.

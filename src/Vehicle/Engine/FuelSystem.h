@@ -1,5 +1,5 @@
 // =============================================================================
-// FuelSystem.h
+// FuelSystem
 // Simulates realistic fuel consumption, oil temperature, fuel gauge HUD,
 // and refueling mechanics. Reads and writes FuelLevel/OilLevel from memory.
 // =============================================================================

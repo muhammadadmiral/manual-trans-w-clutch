@@ -1,0 +1,32 @@
+#pragma once
+
+class VehicleData;
+using Vehicle = int;
+
+namespace EngineModel {
+
+struct State {
+  float idleRPM = 0.2f;
+  float inertia = 1.0f;
+  float load = 0.0f;
+  float stallProgress = 0.0f;
+  float engineBrake = 0.0f;
+  float previousRPM = 0.2f;
+  bool freeRevActive = false;
+  bool handlingBacked = false;
+};
+
+void Reset();
+
+// Return true kalau beban drivetrain sukses bikin mesin mati.
+bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
+            float clutchDisengagement, float clutchEngagement,
+            float throttle, float speedMps, bool engineOn);
+
+float GetLoad();
+float GetStallProgress();
+float GetEngineBrake();
+float GetInertia();
+const State &GetState();
+
+} // namespace EngineModel

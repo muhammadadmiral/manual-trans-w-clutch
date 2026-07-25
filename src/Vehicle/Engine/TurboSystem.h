@@ -1,5 +1,5 @@
 // =============================================================================
-// TurboSystem.h
+// TurboSystem
 // Simulates turbo lag and boost curves. Modulates the vehicle's engine power
 // dynamically based on simulated exhaust gas pressure.
 // =============================================================================
