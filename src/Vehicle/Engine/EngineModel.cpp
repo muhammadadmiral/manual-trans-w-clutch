@@ -17,39 +17,8 @@ void Reset() {
   s_state = State{};
 }
 
-static void UpdateFreeRev(VehicleData &data, bool drivelineOpen,
-                          float throttle, bool engineOn, float dt) {
-  const float rpm = data.GetRPM();
-  if (!engineOn || !drivelineOpen) {
-    s_state.freeRevActive = false;
-    s_state.previousRPM = rpm;
-    return;
-  }
-
-  if (!s_state.freeRevActive) {
-    s_state.previousRPM = rpm;
-    s_state.freeRevActive = true;
-  }
-
-  data.SetThrottle(throttle > 0.001f ? 1.0f : 0.0f);
-  data.SetThrottlePedal(throttle);
-
-  if (throttle <= 0.001f) {
-    s_state.previousRPM = rpm;
-    return;
-  }
-
-  // GTA gak free-rev konsisten saat clutch kebuka. Tambah RPM pakai inertia
-  // handling kendaraan, sementara drag dan limiter tetap milik engine GTA.
-  const float rpmDrop =
-      s_state.previousRPM > rpm ? s_state.previousRPM - rpm : 0.0f;
-  const float next =
-      Clamp01(rpm + rpmDrop + throttle * 2.0f * s_state.inertia * dt);
-  data.SetRPM(next);
-  s_state.previousRPM = next;
-}
-
-static bool UpdateLoadAndStall(VehicleData &data, int gear,
+static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
+                               int maxGear,
                                float engagement, float throttle,
                                float brake, float speedMps, bool engineOn, float dt,
                                bool automaticMode) {
@@ -70,14 +39,18 @@ static bool UpdateLoadAndStall(VehicleData &data, int gear,
       std::isfinite(ratio) && ratio > 0.01f &&
       std::isfinite(maxFlatVel) && maxFlatVel > 1.0f;
 
-  if (!hasDrivelineData) {
-    s_state.load = 0.0f;
-    s_state.stallProgress =
-        std::max(0.0f, s_state.stallProgress - dt * 3.0f);
-    return false;
-  }
-
-  const float idleRoadSpeed = s_state.idleRPM * maxFlatVel / ratio;
+  const float nativeTopSpeed =
+      std::max(1.0f, VEHICLE::GET_VEHICLE_ESTIMATED_MAX_SPEED(vehicle));
+  const float fallbackRatio =
+      1.0f / static_cast<float>((std::max)(1, std::abs(gear)));
+  const float effectiveRatio = hasDrivelineData ? ratio : fallbackRatio;
+  const float effectiveTopSpeed = hasDrivelineData ? maxFlatVel : nativeTopSpeed;
+  const float idleRoadSpeed =
+      hasDrivelineData
+          ? s_state.idleRPM * effectiveTopSpeed / effectiveRatio
+          : s_state.idleRPM * effectiveTopSpeed *
+                static_cast<float>((std::max)(1, std::abs(gear))) /
+                static_cast<float>((std::max)(1, maxGear));
   const float directionalSpeed =
       gear < 0 ? -speedMps : speedMps;
   const float usefulSpeed = std::max(0.0f, directionalSpeed);
@@ -101,12 +74,16 @@ static bool UpdateLoadAndStall(VehicleData &data, int gear,
 
   const float firstRatio = std::fabs(data.GetGearRatio(1));
   const float gearLeverage =
-      firstRatio > 0.01f ? Clamp01(ratio / firstRatio) : 1.0f;
+      firstRatio > 0.01f && hasDrivelineData
+          ? Clamp01(effectiveRatio / firstRatio)
+          : fallbackRatio;
   const float driveForce = data.GetDriveForce();
+  const float nativeAcceleration =
+      std::max(0.01f, VEHICLE::GET_VEHICLE_ACCELERATION(vehicle));
   const float driveScale =
       std::isfinite(driveForce) && driveForce > 0.01f
           ? std::clamp(driveForce / 0.30f, 0.35f, 2.0f)
-          : 1.0f;
+          : std::clamp(nativeAcceleration / 0.30f, 0.45f, 1.80f);
   const float effectiveThrottle =
       std::max(Clamp01(throttle), s_state.creepThrottle);
   const float idleTorque =
@@ -120,17 +97,24 @@ static bool UpdateLoadAndStall(VehicleData &data, int gear,
   const float rpm = data.GetRPM();
   const float stallClutch =
       std::clamp(Config::StallClutchThreshold, 0.30f, 0.95f);
+  const float uphillLoad =
+      Clamp01(std::max(0.0f, ENTITY::GET_ENTITY_PITCH(vehicle)) / 18.0f);
   const bool bogging = !automaticMode && Config::StallEnabled &&
                        engagement > stallClutch &&
-                       rpm <= s_state.idleRPM + 0.012f &&
+                       rpm <= s_state.idleRPM + 0.035f &&
                        usefulSpeed < idleRoadSpeed &&
-                       s_state.torqueReserve < 0.0f;
+                       (s_state.torqueReserve - uphillLoad * 0.35f) < 0.0f;
   if (bogging) {
     const float clutchLoad =
         Clamp01((engagement - stallClutch) / (1.0f - stallClutch));
-    const float torqueDeficit = Clamp01(-s_state.torqueReserve);
+    const float torqueDeficit =
+        Clamp01(-(s_state.torqueReserve - uphillLoad * 0.35f));
+    const float brakeLoad = 1.0f + Clamp01(brake) * 1.25f;
+    const float highGearLoad =
+        1.0f + 0.30f * static_cast<float>(
+                          (std::max)(0, std::abs(gear) - 1));
     s_state.stallProgress +=
-        clutchLoad * speedGap * torqueDeficit * dt *
+        clutchLoad * speedGap * torqueDeficit * brakeLoad * highGearLoad * dt *
         std::max(0.10f, Config::StallRate);
   } else {
     s_state.stallProgress =
@@ -160,35 +144,22 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
   s_state.inertia = s_state.handlingBacked ? inertia : 1.0f;
 
   const bool open = gear == 0 || clutchDisengagement > 0.40f;
-  UpdateFreeRev(data, open, Clamp01(throttle), engineOn, dt);
+  s_state.freeRevActive = engineOn && open;
+  s_state.previousRPM = rpm;
 
-  if (!open && engineOn) {
-    data.SetThrottle(Clamp01(throttle));
-    data.SetThrottlePedal(Clamp01(throttle));
-
-    const uint8_t ratioIndex =
-        gear < 0 ? 0 : static_cast<uint8_t>(gear);
-    const float connectedRatio = std::fabs(data.GetGearRatio(ratioIndex));
-    const float maxFlatVel = std::fabs(data.GetDriveMaxFlatVel());
-    if (connectedRatio > 0.01f && maxFlatVel > 1.0f) {
-      s_state.expectedRPM = std::clamp(
-          std::max(s_state.idleRPM,
-                   std::fabs(speedMps) * connectedRatio / maxFlatVel),
-          s_state.idleRPM, 1.0f);
-      const bool shouldSync =
-          clutchEngagement > 0.80f &&
-          (std::fabs(speedMps) > 1.5f || throttle < 0.10f);
-      if (shouldSync) {
-        const float syncRate =
-            std::clamp(Config::ConnectedRPMSync, 0.0f, 1.0f);
-        const float corrected =
-            data.GetRPM() + (s_state.expectedRPM - data.GetRPM()) *
-                                Clamp01(syncRate * dt * 8.0f);
-        data.SetRPM(std::clamp(corrected, s_state.idleRPM, 1.0f));
-      }
-    }
+  // expectedRPM cuma telemetry. Jangan tulis RPM/throttle internal: audio,
+  // limiter, inertia, dan perbedaan handling kendaraan harus tetap milik GTA.
+  const uint8_t ratioIndex =
+      gear < 0 ? 0 : static_cast<uint8_t>(gear);
+  const float connectedRatio = std::fabs(data.GetGearRatio(ratioIndex));
+  const float maxFlatVel = std::fabs(data.GetDriveMaxFlatVel());
+  if (!open && connectedRatio > 0.01f && maxFlatVel > 1.0f) {
+    s_state.expectedRPM = std::clamp(
+        std::max(s_state.idleRPM,
+                 std::fabs(speedMps) * connectedRatio / maxFlatVel),
+        s_state.idleRPM, 1.0f);
   } else {
-    s_state.expectedRPM = data.GetRPM();
+    s_state.expectedRPM = rpm;
   }
 
   float ratio = gear > 0 ? data.GetGearRatio(static_cast<uint8_t>(gear)) : 0.0f;
@@ -206,12 +177,9 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
         (0.0f - s_state.engineBrake) * Clamp01(dt * 8.0f);
   }
 
-  const bool stalled = UpdateLoadAndStall(
-      data, gear, clutchEngagement, throttle, brake, speedMps, engineOn, dt,
-      automaticMode);
-  if (stalled)
-    VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
-  return stalled;
+  return UpdateLoadAndStall(
+      vehicle, data, gear, maxGear, clutchEngagement, throttle, brake,
+      speedMps, engineOn, dt, automaticMode);
 }
 
 float GetLoad() { return s_state.load; }

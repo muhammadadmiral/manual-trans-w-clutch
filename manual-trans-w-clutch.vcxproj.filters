@@ -102,6 +102,9 @@
     <ClCompile Include="src\Vehicle\VehicleData.cpp">
       <Filter>Source Files\Vehicle</Filter>
     </ClCompile>
+    <ClCompile Include="src\Vehicle\VehicleProfile.cpp">
+      <Filter>Source Files\Vehicle</Filter>
+    </ClCompile>
     <ClCompile Include="src\Vehicle\Engine\FuelSystem.cpp">
       <Filter>Source Files\Vehicle\Engine</Filter>
     </ClCompile>
@@ -171,6 +174,9 @@
       <Filter>Header Files\Memory</Filter>
     </ClInclude>
     <ClInclude Include="src\Vehicle\VehicleData.h">
+      <Filter>Header Files\Vehicle</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vehicle\VehicleProfile.h">
       <Filter>Header Files\Vehicle</Filter>
     </ClInclude>
     <ClInclude Include="src\Vehicle\Engine\FuelSystem.h">

@@ -3,13 +3,16 @@
 // =============================================================================
 #pragma once
 
+using Vehicle = int;
+
 namespace InputHandler {
 
 // ── Frame update ─────────────────────────────────────────────────────────────
 void Update();
 
 // Apply computed control values to the GTA V input system.
-void ApplyGameControls(int manualGear, float clutch, float driveThrottle,
+void ApplyGameControls(Vehicle vehicle, int manualGear, float clutch,
+                       float driveThrottle,
                        float driveBrake, int maxGear,
                        float forwardSpeed);
 

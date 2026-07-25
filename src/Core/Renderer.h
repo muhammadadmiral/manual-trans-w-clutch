@@ -12,7 +12,7 @@ void DrawBar(float x, float y, float width, float height, float fraction, int r,
              int g, int b, const char *label);
 
 void DrawGearHUD(int manualGear, int maxGear, int activeSignal, bool isEngineOn,
-                 int transmissionMode = 2,
+                 bool engineStarting, int transmissionMode = 2,
                  const char *automaticSelector = nullptr);
 
 void DrawGrindWarning();

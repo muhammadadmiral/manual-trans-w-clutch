@@ -27,6 +27,7 @@
     <ClCompile Include="src\Memory\GameMemoryEngine.cpp" />
     <ClCompile Include="src\Memory\OffsetResolver.cpp" />
     <ClCompile Include="src\Vehicle\VehicleData.cpp" />
+    <ClCompile Include="src\Vehicle\VehicleProfile.cpp" />
     <ClCompile Include="src\Vehicle\Engine\EngineModel.cpp" />
     <ClCompile Include="src\Vehicle\Engine\FuelSystem.cpp" />
     <ClCompile Include="src\Vehicle\Engine\LaunchControl.cpp" />
@@ -58,6 +59,7 @@
     <ClInclude Include="src\Memory\GameMemoryEngine.h" />
     <ClInclude Include="src\Memory\OffsetResolver.h" />
     <ClInclude Include="src\Vehicle\VehicleData.h" />
+    <ClInclude Include="src\Vehicle\VehicleProfile.h" />
     <ClInclude Include="src\Vehicle\Engine\EngineModel.h" />
     <ClInclude Include="src\Vehicle\Engine\FuelSystem.h" />
     <ClInclude Include="src\Vehicle\Engine\LaunchControl.h" />

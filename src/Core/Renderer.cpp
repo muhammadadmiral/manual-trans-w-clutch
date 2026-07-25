@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <string>
 #include <Windows.h>
 
 namespace Renderer {
@@ -48,79 +49,115 @@ void DrawBar(float x, float y, float width, float height, float fraction, int r,
 }
 
 void DrawGearHUD(int manualGear, int maxGear, int activeSignal, bool isEngineOn,
-                 int transmissionMode, const char *automaticSelector) {
-    // Positioning - Bottom right corner, sleek and minimalist
-    const float badgeX = 0.12f;
-    const float badgeY = 0.85f;
-    const float badgeW = 0.055f;
-    const float badgeH = 0.085f;
-
-    // Dark sleek backdrop
-    GRAPHICS::DRAW_RECT(badgeX, badgeY, badgeW, badgeH, 15, 15, 18, 220, 0);
-    // Subtle top border/accent
-    GRAPHICS::DRAW_RECT(badgeX, badgeY - (badgeH / 2.0f) + 0.002f, badgeW, 0.004f, 60, 200, 255, 255, 0);
-
-    // Label "GEAR" (clean font)
-    DrawTextOverlay("GEAR", badgeX, badgeY - 0.038f, 0.25f, 150, 150, 150, 255, 0, false, true);
-
-    // Determine Label and Color
-    char gearStr[8]{};
-    int r = 255, g = 255, b = 255;
-    if (!isEngineOn) {
-        strcpy_s(gearStr, "OFF");
-        r = 120; g = 120; b = 120;
-    } else if (transmissionMode == 1 && automaticSelector &&
-               (automaticSelector[0] == 'P' ||
-                automaticSelector[0] == 'N' ||
-                automaticSelector[0] == 'R')) {
-        strcpy_s(gearStr, automaticSelector);
-        if (automaticSelector[0] == 'R') {
-            r = 255; g = 60; b = 60;
-        } else if (automaticSelector[0] == 'P') {
-            r = 150; g = 190; b = 255;
-        } else {
-            r = 255; g = 180; b = 40;
-        }
-    } else if (transmissionMode == 1 && automaticSelector) {
-        sprintf_s(gearStr, "%s%d", automaticSelector, manualGear);
-        if (automaticSelector[0] == 'S') {
-            r = 255; g = 150; b = 40;
-        } else {
-            r = 60; g = 200; b = 255;
-        }
-    } else if (manualGear == -1) {
-        strcpy_s(gearStr, "R");
-        r = 255; g = 60; b = 60; // Red Reverse
-    } else if (manualGear == 0) {
-        strcpy_s(gearStr, "N");
-        r = 255; g = 180; b = 40; // Orange Neutral
-    } else {
-        sprintf_s(gearStr, "%d", manualGear);
-        // Cyan for normal, Green for cruising gears, Yellow for max gear
-        if (manualGear <= 3) { r = 60; g = 200; b = 255; }
-        else if (manualGear < maxGear) { r = 100; g = 255; b = 100; }
-        else { r = 255; g = 220; b = 50; }
-    }
-
-    // Draw Big Gear Text (Font 2 is Chalet London, very clean, much better than 0 or 4)
-    DrawTextOverlay(gearStr, badgeX, badgeY - 0.025f, 1.0f, r, g, b, 255, 2, false, true);
-
-    // Turn Signals at the bottom
+                 bool engineStarting, int transmissionMode,
+                 const char *automaticSelector) {
+    const float badgeX = 0.91f;
+    const float badgeY = 0.72f;
+    const float badgeW = 0.072f;
+    const float badgeH = 0.145f;
     const ULONGLONG tick = GetTickCount64();
-    const bool blink = (tick % 700) < 350; // slightly faster sleek blink
 
-    int lR = 50, lG = 50, lB = 50, lA = 120;
-    int rR = 50, rG = 50, rB = 50, rA = 120;
+    auto formatGear = [&](int gear) -> std::string {
+        if (gear < 0) return "R";
+        if (gear == 0) return "N";
+        return std::to_string(gear);
+    };
 
-    if (blink) {
-        if (activeSignal == 1 || activeSignal == 3) { lR = 60; lG = 255; lB = 60; lA = 255; }
-        if (activeSignal == 2 || activeSignal == 3) { rR = 60; rG = 255; rB = 60; rA = 255; }
+    std::string label;
+    int r = 255, g = 255, b = 255;
+    if (engineStarting) {
+        label = "START";
+        r = 255; g = 190; b = 70;
+    } else if (!isEngineOn) {
+        label = "OFF";
+        r = 120; g = 120; b = 120;
+    } else if (transmissionMode == 1 && automaticSelector) {
+        const char selector = automaticSelector[0];
+        if (selector == 'D' || selector == 'S')
+            label = std::string(automaticSelector) + std::to_string(manualGear);
+        else
+            label = automaticSelector;
+        if (selector == 'R') {
+            r = 255; g = 70; b = 70;
+        } else if (selector == 'S' || selector == 'L') {
+            r = 255; g = 155; b = 45;
+        } else if (selector == 'N') {
+            r = 255; g = 190; b = 60;
+        } else {
+            r = 70; g = 205; b = 255;
+        }
+    } else {
+        label = formatGear(manualGear);
+        if (manualGear < 0) {
+            r = 255; g = 70; b = 70;
+        } else if (manualGear == 0) {
+            r = 255; g = 190; b = 60;
+        } else if (manualGear == maxGear) {
+            r = 255; g = 225; b = 70;
+        } else {
+            r = 70; g = 205; b = 255;
+        }
     }
 
-    // Left indicator
-    DrawTextOverlay("~u~<", badgeX - 0.018f, badgeY + 0.015f, 0.45f, lR, lG, lB, lA, 0, false, true);
-    // Right indicator
-    DrawTextOverlay("~u~>", badgeX + 0.018f, badgeY + 0.015f, 0.45f, rR, rG, rB, rA, 0, false, true);
+    static std::string currentLabel;
+    static std::string previousLabel;
+    static ULONGLONG changeTick = 0;
+    if (label != currentLabel) {
+        previousLabel = currentLabel;
+        currentLabel = label;
+        changeTick = tick;
+    }
+    const float anim =
+        std::clamp(static_cast<float>(tick - changeTick) / 230.0f, 0.0f, 1.0f);
+    const float eased = 1.0f - (1.0f - anim) * (1.0f - anim);
+
+    GRAPHICS::DRAW_RECT(badgeX, badgeY, badgeW, badgeH,
+                        10, 13, 18, 210, 0);
+    GRAPHICS::DRAW_RECT(badgeX, badgeY - badgeH * 0.5f + 0.002f,
+                        badgeW, 0.004f, r, g, b, 240, 0);
+    DrawTextOverlay(transmissionMode == 1 ? "AUTO" : "GEAR",
+                    badgeX, badgeY - 0.068f, 0.24f,
+                    145, 155, 170, 230, 0, false, true);
+
+    if (!previousLabel.empty() && anim < 1.0f) {
+        const int alpha = static_cast<int>((1.0f - anim) * 190.0f);
+        DrawTextOverlay(previousLabel.c_str(), badgeX,
+                        badgeY - 0.014f - eased * 0.035f,
+                        0.70f - eased * 0.22f,
+                        r, g, b, alpha, 2, false, true);
+    }
+    DrawTextOverlay(currentLabel.c_str(), badgeX,
+                    badgeY - 0.014f + (1.0f - eased) * 0.032f,
+                    0.76f + eased * 0.18f,
+                    r, g, b, static_cast<int>(120 + eased * 135),
+                    2, true, true);
+
+    if (isEngineOn && !engineStarting && transmissionMode != 1) {
+        const int above = (std::min)(maxGear, manualGear + 1);
+        const int below = (std::max)(-1, manualGear - 1);
+        if (above != manualGear) {
+            const std::string text = formatGear(above);
+            DrawTextOverlay(text.c_str(), badgeX, badgeY - 0.050f,
+                            0.38f, 150, 160, 175, 75, 2, false, true);
+        }
+        if (below != manualGear) {
+            const std::string text = formatGear(below);
+            DrawTextOverlay(text.c_str(), badgeX, badgeY + 0.026f,
+                            0.38f, 150, 160, 175, 75, 2, false, true);
+        }
+    }
+
+    const bool blink = (tick % 700) < 350;
+    const bool leftOn = blink && (activeSignal == 1 || activeSignal == 3);
+    const bool rightOn = blink && (activeSignal == 2 || activeSignal == 3);
+    DrawTextOverlay("<", badgeX - 0.022f, badgeY + 0.049f, 0.40f,
+                    leftOn ? 60 : 55, leftOn ? 255 : 65,
+                    leftOn ? 70 : 55, leftOn ? 255 : 100,
+                    0, false, true);
+    DrawTextOverlay(">", badgeX + 0.022f, badgeY + 0.049f, 0.40f,
+                    rightOn ? 60 : 55, rightOn ? 255 : 65,
+                    rightOn ? 70 : 55, rightOn ? 255 : 100,
+                    0, false, true);
 }
 
 void DrawGrindWarning() {

@@ -1,6 +1,7 @@
 #include "LaunchControl.h"
 #include "../VehicleData.h"
 #include "../../Core/Config.h"
+#include "../../../sdk/inc/natives.h"
 #include <algorithm>
 #include <cmath>
 
@@ -22,8 +23,9 @@ void Update(VehicleData &data, int gear, float clutchDisengagement,
                    drivelineHeld &&
                    throttle > 0.90f && std::fabs(speedMps) < 1.0f;
   if (s_state.active && data.GetRPM() > s_state.targetRPM) {
-    data.SetRPM(s_state.targetRPM);
-    data.SetThrottle(0.0f);
+    // Soft cut lewat pedal GTA; jangan menulis RPM mesin.
+    PAD::DISABLE_CONTROL_ACTION(0, 71, true);
+    PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, 0.0f);
   }
 }
 

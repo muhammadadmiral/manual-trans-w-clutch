@@ -13,7 +13,7 @@ void Reset() {
   s_state = State{};
 }
 
-void Update(VehicleData &data, int gear, int maxGear,
+void Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
             float clutchDisengagement, float throttle, bool engineOn) {
   const float dt = std::clamp(MISC::GET_FRAME_TIME(), 0.001f, 0.05f);
   const float rpm = data.GetRPM();
@@ -41,13 +41,6 @@ void Update(VehicleData &data, int gear, int maxGear,
         std::clamp(Config::ShiftShockStrength, 0.0f, 1.0f) *
         s_state.clashSeverity * envelope;
 
-    const float rpm = data.GetRPM();
-    const float corrected =
-        rpm + (s_state.shiftTargetRPM - rpm) *
-                  std::clamp(dt * (4.0f + s_state.clashSeverity * 8.0f),
-                             0.0f, 1.0f);
-    data.SetRPM(std::clamp(corrected, 0.0f, 1.0f));
-
     if (gear > 0 && throttle > 0.01f && s_state.torqueCut > 0.01f) {
       PAD::DISABLE_CONTROL_ACTION(0, 71, true);
       PAD::SET_CONTROL_VALUE_NEXT_FRAME(
@@ -56,6 +49,16 @@ void Update(VehicleData &data, int gear, int maxGear,
     if (s_state.clashSeverity > 0.15f)
       PAD::SET_CONTROL_SHAKE(0, 90,
           static_cast<int>(80.0f + s_state.clashSeverity * 120.0f));
+    if (s_state.moneyShift && !s_state.damageApplied) {
+      const float currentHealth =
+          VEHICLE::GET_VEHICLE_ENGINE_HEALTH(vehicle);
+      const float damage =
+          std::max(0.0f, Config::OverRevShiftDamage) *
+          (160.0f + s_state.moneyShiftSeverity * 340.0f);
+      VEHICLE::SET_VEHICLE_ENGINE_HEALTH(
+          vehicle, std::max(-4000.0f, currentHealth - damage));
+      s_state.damageApplied = true;
+    }
   } else {
     s_state.torqueCut = 0.0f;
     s_state.clashActive = false;
@@ -83,10 +86,14 @@ void NotifyShift(VehicleData &data, int fromGear, int toGear,
 
   s_state.shiftTargetRPM = rpm;
   s_state.moneyShift = false;
+  s_state.moneyShiftSeverity = 0.0f;
+  s_state.damageApplied = false;
   if (fromGear != 0 && toGear != 0 && fromRatio > 0.01f &&
       toRatio > 0.01f) {
     const float rawTarget = rpm * toRatio / fromRatio;
     s_state.moneyShift = rawTarget > 1.0f;
+    s_state.moneyShiftSeverity =
+        std::clamp(rawTarget - 1.0f, 0.0f, 2.0f);
     s_state.shiftTargetRPM =
         std::clamp(rawTarget, 0.15f, 1.0f);
     if (s_state.moneyShift) {
@@ -97,9 +104,22 @@ void NotifyShift(VehicleData &data, int fromGear, int toGear,
                         (0.5f + overSpeed));
     }
   }
+  if (fromGear != 0 && toGear != 0 &&
+      (fromRatio <= 0.01f || toRatio <= 0.01f)) {
+    const float ratioApprox =
+        static_cast<float>((std::max)(1, std::abs(fromGear))) /
+        static_cast<float>((std::max)(1, std::abs(toGear)));
+    const float rawTarget = rpm * ratioApprox;
+    s_state.moneyShift = toGear > 0 && toGear < fromGear && rawTarget > 1.0f;
+    s_state.moneyShiftSeverity =
+        std::clamp(rawTarget - 1.0f, 0.0f, 2.0f);
+    s_state.shiftTargetRPM = std::clamp(rawTarget, 0.15f, 1.0f);
+  }
   s_state.syncError = std::fabs(s_state.shiftTargetRPM - rpm);
 
   const bool clutchless = clutchDisengagement < 0.35f;
+  if (fromGear == 0 && toGear != 0 && clutchless && throttle < 0.45f)
+    s_state.stallRequest = true;
   const float noLift =
       throttle * std::clamp(Config::NoLiftShiftPenalty, 0.0f, 1.0f);
   s_state.clashSeverity = std::clamp(
@@ -153,6 +173,11 @@ void NotifyRevMatch(float currentRPM, float targetRPM) {
 
 float GetHealth() { return s_state.health; }
 bool IsSeized() { return s_state.health <= 0.0f; }
+bool ConsumeStallRequest() {
+  const bool requested = s_state.stallRequest;
+  s_state.stallRequest = false;
+  return requested;
+}
 const State &GetState() { return s_state; }
 
 } // namespace GearboxSystem

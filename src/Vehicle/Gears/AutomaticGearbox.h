@@ -12,7 +12,9 @@ enum class Selector : int {
   Reverse = 1,
   Neutral = 2,
   Drive = 3,
-  Sport = 4
+  Sport = 4,
+  Low2 = 5,
+  Low1 = 6
 };
 
 struct State {
@@ -24,7 +26,7 @@ struct State {
   bool selectorRejected = false;
 };
 
-void Reset();
+void Reset(Selector initialSelector = Selector::Park);
 void UpdateSelector(Vehicle vehicle, bool selectorUp, bool selectorDown,
                     float brake, float signedSpeedMps);
 int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,

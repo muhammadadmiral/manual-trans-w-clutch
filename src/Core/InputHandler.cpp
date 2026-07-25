@@ -163,7 +163,8 @@ void Update() {
 // =============================================================================
 // ApplyGameControls
 // =============================================================================
-void ApplyGameControls(int manualGear, float clutch, float driveThrottle,
+void ApplyGameControls(Vehicle vehicle, int manualGear, float clutch,
+                       float driveThrottle,
                        float driveBrake,
                        int /*maxGear*/,
                        float forwardSpeed)
@@ -175,23 +176,27 @@ void ApplyGameControls(int manualGear, float clutch, float driveThrottle,
         hardDisconnect ? 0.0f : (1.0f - Clamp01(clutch));
     s_driveCoupling = manualGear == 0 ? 0.0f : clutchCoupling;
 
-    // Reverse doang yang perlu tuker axis. Clutch tetap ngurus torque sendiri.
+    // GTA memakai axis brake sebagai throttle mundur. Kita putus jalur itu
+    // supaya S selalu rem, termasuk waktu mobil berhenti di gear maju/netral.
+    const bool braking = finalBrake > 0.02f;
+    VEHICLE::SET_VEHICLE_BRAKE(vehicle, braking ? TRUE : FALSE);
+
     if (manualGear == -1) {
         PAD::DISABLE_CONTROL_ACTION(0, 71, true);
-        PAD::DISABLE_CONTROL_ACTION(0, 72, true);
-        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, finalThrottle);
-        if (finalBrake > 0.02f) {
-            // Di reverse, axis accelerate GTA jadi rem lawan arah.
-            PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalBrake);
+        if (braking) {
+            PAD::DISABLE_CONTROL_ACTION(0, 72, true);
+        } else {
+            // W dibaca dari control 71, tapi drivetrain reverse GTA bergerak
+            // lewat control 72. Jangan disable target sebelum reinjection.
+            PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, finalThrottle);
         }
     } else {
         if (std::fabs(finalThrottle - s_smoothedThrottle) > 0.005f) {
             PAD::DISABLE_CONTROL_ACTION(0, 71, true);
             PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalThrottle);
         }
-        if (std::fabs(finalBrake - s_smoothedBrake) > 0.005f) {
+        if (braking) {
             PAD::DISABLE_CONTROL_ACTION(0, 72, true);
-            PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, finalBrake);
         }
     }
     (void)forwardSpeed;

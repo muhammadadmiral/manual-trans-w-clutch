@@ -25,9 +25,11 @@
 #include "../Vehicle/LightsLogic.h"
 #include "../Vehicle/TelemetryLogger.h"
 #include "../Vehicle/VehicleData.h"
+#include "../Vehicle/VehicleProfile.h"
 
 #include <Windows.h>
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <unordered_map>
 
@@ -168,11 +170,14 @@ void ScriptMain() {
   Vehicle activeVehicle = 0;
   bool activeLayoutValid = false;
   bool isEngineOn = true;
+  bool engineStarting = false;
+  ULONGLONG engineStartTick = 0;
   int grindWarningTimer = 0;
   int manualGear = 0;
   int activeTransmissionMode = -1;
   int activeSignal = 0;
   ULONGLONG vehicleEnterTick = 0;
+  ULONGLONG automaticClutchUntil = 0;
 
   CalibrationState lastCalibState = CalibrationState::None;
 
@@ -238,6 +243,8 @@ void ScriptMain() {
     VehicleData data(vehicle);
     const bool actualEngineOn =
         (VEHICLE::GET_IS_VEHICLE_ENGINE_RUNNING(vehicle) != 0);
+    const VehicleProfile::Drivetrain vehicleProfile =
+        VehicleProfile::Detect(vehicle);
 
     // ── Vehicle change ────────────────────────────────────────────────────
     if (vehicle != activeVehicle) {
@@ -247,6 +254,9 @@ void ScriptMain() {
       activeLayoutValid = true;
 
       isEngineOn = Config::RequireColdStart ? false : actualEngineOn;
+      engineStarting = false;
+      engineStartTick = 0;
+      automaticClutchUntil = 0;
       if (Config::RequireColdStart) {
         VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
         LOG_INFO(Script,
@@ -267,6 +277,9 @@ void ScriptMain() {
       TractionControl::Reset();
       TurboSystem::Reset();
       TurboSystem::InitializeForVehicle(vehicle);
+      VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, 1.0f);
+      LOG_INFO(Script, "Vehicle profile=%s",
+               VehicleProfile::GetName(vehicleProfile));
 
       if (TelemetryLogger::IsLogging()) {
         TelemetryLogger::StopSession();
@@ -291,14 +304,13 @@ void ScriptMain() {
       bool canStart = true;
       if (!isEngineOn && VehicleData::IsInitialized() &&
           Config::StarterInterlock && Config::TransmissionMode != 0) {
-        const bool vehicleElectric =
-            VEHICLE::_GET_IS_VEHICLE_ELECTRIC(
-                ENTITY::GET_ENTITY_MODEL(vehicle)) != 0;
         const bool automaticStart =
-            vehicleElectric || Config::TransmissionMode == 1;
+            VehicleProfile::ForcesAutomatic(vehicleProfile) ||
+            Config::TransmissionMode == 1;
         if (automaticStart) {
           const auto selector = AutomaticGearbox::GetSelector();
           const bool safeSelector =
+              vehicleProfile == VehicleProfile::Drivetrain::ScooterCVT ||
               selector == AutomaticGearbox::Selector::Park ||
               selector == AutomaticGearbox::Selector::Neutral;
           const bool brakeReady =
@@ -311,13 +323,32 @@ void ScriptMain() {
       }
 
       if (canStart) {
-        isEngineOn = !isEngineOn;
-        VEHICLE::SET_VEHICLE_ENGINE_ON(
-            vehicle, isEngineOn ? TRUE : FALSE, TRUE, TRUE);
-        LOG_INFO(Script, "Engine key → %s", isEngineOn ? "ON" : "OFF");
+        if (isEngineOn || engineStarting) {
+          isEngineOn = false;
+          engineStarting = false;
+          VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
+          LOG_INFO(Script, "Engine key -> OFF");
+        } else {
+          engineStarting = true;
+          engineStartTick = GetTickCount64();
+          VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, TRUE, FALSE, TRUE);
+          LOG_INFO(Script, "Engine key -> STARTING");
+        }
       } else {
         Renderer::ShowNotification(
             "~r~Starter interlock:~w~ clutch / brake dan posisi gear belum aman");
+      }
+    } else if (engineStarting) {
+      const ULONGLONG crankMs = GetTickCount64() - engineStartTick;
+      if (actualEngineOn && crankMs >= 450) {
+        engineStarting = false;
+        isEngineOn = true;
+        LOG_INFO(Script, "Starter completed in %llums", crankMs);
+      } else if (crankMs > 2500) {
+        engineStarting = false;
+        isEngineOn = actualEngineOn;
+        LOG_WARN(Script, "Starter timeout actual=%d",
+                 actualEngineOn ? 1 : 0);
       }
     } else if (!isEngineOn && actualEngineOn) {
       // Game AI turned it back on — force our state.
@@ -325,10 +356,16 @@ void ScriptMain() {
       LOG_DEBUG(Script,
                 "Engine mismatch corrected: we=OFF game=ON → forcing OFF");
     } else if (isEngineOn && !actualEngineOn) {
-      // Died externally (fire / destroyed / fuel empty)
-      isEngineOn = false;
-      LOG_WARN(Script,
-               "Engine died externally (fire/destroyed). Reflecting state.");
+      const float engineHealth =
+          VEHICLE::GET_VEHICLE_ENGINE_HEALTH(vehicle);
+      if (!VEHICLE::IS_VEHICLE_DRIVEABLE(vehicle, TRUE) ||
+          engineHealth <= 0.0f) {
+        isEngineOn = false;
+        LOG_WARN(Script, "Engine unavailable health=%.1f", engineHealth);
+      } else {
+        // Flag engine native kadang drop sesaat saat downshift ekstrem.
+        VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, TRUE, FALSE, TRUE);
+      }
     }
 
     // ── Turn signals ──────────────────────────────────────────────────────
@@ -426,27 +463,35 @@ void ScriptMain() {
       continue;
     }
 
-    const bool electricVehicle =
-        VEHICLE::_GET_IS_VEHICLE_ELECTRIC(ENTITY::GET_ENTITY_MODEL(vehicle)) !=
-        0;
     const int requestedMode = std::clamp(Config::TransmissionMode, 0, 2);
-    const int transmissionMode = electricVehicle ? 1 : requestedMode;
+    const bool electricVehicle =
+        vehicleProfile == VehicleProfile::Drivetrain::Electric;
+    const bool scooterVehicle =
+        vehicleProfile == VehicleProfile::Drivetrain::ScooterCVT;
+    const int transmissionMode =
+        VehicleProfile::ForcesAutomatic(vehicleProfile) ? 1 : requestedMode;
     if (transmissionMode != activeTransmissionMode) {
       if (activeTransmissionMode == 1)
         VEHICLE::SET_VEHICLE_HANDBRAKE(vehicle, FALSE);
       GearLogic::Reset(0);
-      AutomaticGearbox::Reset();
+      AutomaticGearbox::Reset(
+          scooterVehicle ? AutomaticGearbox::Selector::Drive
+                         : AutomaticGearbox::Selector::Park);
       GearboxSystem::Reset();
       ClutchSystem::Reset();
       EngineModel::Reset();
       PedalModel::Reset();
       manualGear = 0;
+      automaticClutchUntil = 0;
       data.SetClutch(1.0f);
       activeTransmissionMode = transmissionMode;
 
       if (electricVehicle && requestedMode == 2) {
         Renderer::ShowNotification(
-            "~y~EV detected:~w~ manual locked, automatic P-R-N-D-S active");
+            "~y~EV detected:~w~ manual locked, automatic active");
+      } else if (scooterVehicle && requestedMode != 1) {
+        Renderer::ShowNotification(
+            "~y~Scooter CVT:~w~ gas/rem only, clutch dan manual nonaktif");
       } else {
         Renderer::ShowNotification(
             transmissionMode == 0
@@ -455,9 +500,9 @@ void ScriptMain() {
                        ? "Transmission: ~b~AUTOMATIC P-R-N-D-S"
                        : "Transmission: ~g~MANUAL SEQUENTIAL"));
       }
-      LOG_INFO(Gear, "Transmission mode=%d requested=%d electric=%d",
+      LOG_INFO(Gear, "Transmission mode=%d requested=%d profile=%s",
                transmissionMode, requestedMode,
-               electricVehicle ? 1 : 0);
+               VehicleProfile::GetName(vehicleProfile));
     }
 
     if (transmissionMode == 0) {
@@ -474,10 +519,22 @@ void ScriptMain() {
     // still shapes release/travel, but can never leave residual drive while
     // the key is physically held.
     const bool automaticMode = transmissionMode == 1;
+    const bool motorcycleAutoClutch =
+        transmissionMode == 2 &&
+        vehicleProfile == VehicleProfile::Drivetrain::MotorcycleSequential;
+    const bool shiftUpPressed = InputHandler::IsShiftUpJustPressed();
+    const bool shiftDownPressed = InputHandler::IsShiftDownJustPressed();
+    if (motorcycleAutoClutch && (shiftUpPressed || shiftDownPressed))
+      automaticClutchUntil = GetTickCount64() + 170;
+    const bool automaticClutchOpen =
+        motorcycleAutoClutch && GetTickCount64() < automaticClutchUntil;
     const float clutch =
-        !automaticMode && InputHandler::IsClutchDown()
+        automaticClutchOpen
             ? 1.0f
-            : (!automaticMode ? InputHandler::GetSmoothedClutch() : 0.0f);
+            : (!automaticMode && InputHandler::IsClutchDown()
+                   ? 1.0f
+                   : (!automaticMode ? InputHandler::GetSmoothedClutch()
+                                     : 0.0f));
     const float rawThrottle = InputHandler::GetSmoothedThrottle();
     const float rawBrake = InputHandler::GetSmoothedBrake();
     const float rpm = data.GetRPM();
@@ -493,16 +550,17 @@ void ScriptMain() {
     float brake = PedalModel::GetBrake();
 
     if (automaticMode) {
-      AutomaticGearbox::UpdateSelector(
-          vehicle, InputHandler::IsShiftUpJustPressed(),
-          InputHandler::IsShiftDownJustPressed(), brake, forwardSpeed);
+      if (!scooterVehicle) {
+        AutomaticGearbox::UpdateSelector(
+            vehicle, shiftUpPressed, shiftDownPressed, brake, forwardSpeed);
+      }
       manualGear = AutomaticGearbox::Update(
           vehicle, data, maxGear, throttle, brake, forwardSpeed, isEngineOn);
       simulatedClutch = AutomaticGearbox::GetClutchDisengagement();
     } else {
       manualGear = GearLogic::Update(
-          vehicle, data, maxGear, InputHandler::IsShiftUpJustPressed(),
-          InputHandler::IsShiftDownJustPressed(), simulatedClutch, throttle,
+          vehicle, data, maxGear, shiftUpPressed, shiftDownPressed,
+          simulatedClutch, throttle,
           speedKmH, isEngineOn, grindWarningTimer);
     }
 
@@ -521,60 +579,24 @@ void ScriptMain() {
     if (BrakeSystem::IsABSActive())
       LOG_VERBOSE(Physics, "ABS active — brake limited to %.3f", absBrake);
 
-    static DWORD s_lastStatusLog = 0;
-    if (GetTickCount() - s_lastStatusLog > 1000) {
-      LOG_INFO(Gear, "STATUS: Mode=%d Selector=%s Selected=%d MemGear=%u Next=%u "
-               "PedalClutch=%.3f ClutchKey=%d Coupling=%.3f "
-               "NativeClutch=%.3f Actuator=%.3f Throttle=%.3f Brake=%.3f "
-               "RPM=%.3f SpeedKmH=%.1f SignedMps=%.2f "
-               "Inertia=%.3f ExpectedRPM=%.3f Load=%.3f Creep=%.3f "
-               "TorqueReserve=%.3f Stall=%.3f Wheels=%d "
-               "Clash=%.3f Shock=%.3f Dump=%.3f Money=%d "
-               "BrakeTemp=%.3f Fade=%.3f BTO=%d Kick=%d | "
-               "TCS=%.2f ABS=%.2f Park=%d | Sig=%d Rev=%d",
-               transmissionMode,
-               automaticMode ? AutomaticGearbox::GetSelectorName() : "M",
-               manualGear, static_cast<unsigned>(data.GetGear()),
-               static_cast<unsigned>(data.GetNextGear()), simulatedClutch,
-               InputHandler::IsClutchDown() ? 1 : 0,
-               InputHandler::GetDriveCoupling(), data.GetClutch(),
-               ClutchSystem::GetNativeActuator(), tcsThrottle, absBrake, rpm,
-               speedKmH, forwardSpeed, EngineModel::GetInertia(),
-               EngineModel::GetExpectedRPM(), EngineModel::GetLoad(),
-               EngineModel::GetCreepThrottle(),
-               EngineModel::GetTorqueReserve(),
-               EngineModel::GetStallProgress(),
-               static_cast<int>(data.GetWheelCount()),
-               GearboxSystem::GetState().clashSeverity,
-               GearboxSystem::GetState().shockRemaining,
-               ClutchSystem::GetDumpSeverity(),
-               GearboxSystem::GetState().moneyShift ? 1 : 0,
-               BrakeSystem::GetTemperature(), BrakeSystem::GetFadeLevel(),
-               PedalModel::IsBrakeOverrideActive() ? 1 : 0,
-               AutomaticGearbox::IsKickdownActive() ? 1 : 0,
-               TractionControl::IsTCSActive() ? 1.0f : 0.0f,
-               BrakeSystem::IsABSActive() ? 1.0f : 0.0f,
-               parkingBrakeOn ? 1 : 0,
-               activeSignal, (manualGear == -1) ? 1 : 0);
-      s_lastStatusLog = GetTickCount();
-    }
-
-    float turboMul =
+    const float turboMul =
         TurboSystem::Update(vehicle, data, rpm, throttle, isEngineOn);
-    const float sportTorqueMul =
-        automaticMode && AutomaticGearbox::IsSport()
-            ? 1.0f +
-                  std::clamp(Config::AutomaticSTorqueBoost, 0.0f, 0.50f)
-            : 1.0f;
-    VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(
-        vehicle, turboMul * sportTorqueMul);
     if (turboMul > 1.05f) {
-      LOG_DEBUG_T(Turbo, 1000, "Boost active: mul=%.3f press=%.3f", turboMul,
+      LOG_DEBUG_T(Turbo, 1000,
+                  "Boost telemetry: native power, mul=%.3f press=%.3f",
+                  turboMul,
                   TurboSystem::GetBoostPressure());
     }
 
-    InputHandler::ApplyGameControls(manualGear, simulatedClutch, tcsThrottle,
-                                    absBrake, maxGear, forwardSpeed);
+    const float driveThrottle =
+        automaticMode && AutomaticGearbox::IsSport()
+            ? std::pow(std::clamp(tcsThrottle, 0.0f, 1.0f),
+                       1.0f - std::clamp(Config::AutomaticSTorqueBoost,
+                                         0.0f, 0.50f))
+            : tcsThrottle;
+    InputHandler::ApplyGameControls(vehicle, manualGear, simulatedClutch,
+                                    driveThrottle, absBrake, maxGear,
+                                    forwardSpeed);
 
     if (automaticMode) {
       AutomaticGearbox::ApplyToMemory(vehicle, data, manualGear);
@@ -592,10 +614,11 @@ void ScriptMain() {
         automaticMode);
     LaunchControl::Update(data, manualGear, simulatedClutch, throttle,
                           absBrake, forwardSpeed, isEngineOn, automaticMode);
-    GearboxSystem::Update(data, manualGear, maxGear, simulatedClutch,
+    GearboxSystem::Update(vehicle, data, manualGear, maxGear, simulatedClutch,
                           throttle, isEngineOn);
 
-    if (engineStall && isEngineOn) {
+    const bool shiftStall = GearboxSystem::ConsumeStallRequest();
+    if ((engineStall || shiftStall) && isEngineOn) {
       isEngineOn = false;
       VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
       LOG_WARN(Physics,
@@ -620,13 +643,52 @@ void ScriptMain() {
     // Memory writes + lights
     LightsLogic::Update(vehicle, data, manualGear,
                         InputHandler::GetSmoothedBrake(), throttle);
+    if (!automaticMode)
+      ClutchSystem::ApplyToVehicle(data, manualGear, forwardSpeed);
+
+    static DWORD s_lastStatusLog = 0;
+    if (GetTickCount() - s_lastStatusLog > 1000) {
+      const uint8_t ratioIndex =
+          manualGear < 0 ? 0 : static_cast<uint8_t>(manualGear);
+      LOG_INFO(
+          Gear,
+          "STATUS: Mode=%d Profile=%s Selector=%s Selected=%d Mem=%u Next=%u "
+          "PedalClutch=%.3f Key=%d Coupling=%.3f NativeClutch=%.3f "
+          "Actuator=%.3f Throttle=%.3f Brake=%.3f RPM=%.3f "
+          "SpeedKmH=%.1f SignedMps=%.2f Ratio=%.4f MaxVel=%.2f "
+          "Handling=%d Load=%.3f TorqueReserve=%.3f Stall=%.3f "
+          "Clash=%.3f Shock=%.3f Money=%d Start=%d TCS=%d ABS=%d",
+          transmissionMode, VehicleProfile::GetName(vehicleProfile),
+          automaticMode ? AutomaticGearbox::GetSelectorName() : "M",
+          manualGear, static_cast<unsigned>(data.GetGear()),
+          static_cast<unsigned>(data.GetNextGear()), simulatedClutch,
+          (!automaticMode && InputHandler::IsClutchDown()) ? 1 : 0,
+          InputHandler::GetDriveCoupling(), data.GetClutch(),
+          automaticMode ? AutomaticGearbox::GetCoupling()
+                        : ClutchSystem::GetNativeActuator(),
+          driveThrottle, absBrake, data.GetRPM(), speedKmH, forwardSpeed,
+          data.GetGearRatio(ratioIndex), data.GetDriveMaxFlatVel(),
+          EngineModel::GetState().handlingBacked ? 1 : 0,
+          EngineModel::GetLoad(), EngineModel::GetTorqueReserve(),
+          EngineModel::GetStallProgress(),
+          GearboxSystem::GetState().clashSeverity,
+          GearboxSystem::GetState().shockRemaining,
+          GearboxSystem::GetState().moneyShift ? 1 : 0,
+          engineStarting ? 1 : 0,
+          TractionControl::IsTCSActive() ? 1 : 0,
+          BrakeSystem::IsABSActive() ? 1 : 0);
+      s_lastStatusLog = GetTickCount();
+    }
 
     // ── HUD ───────────────────────────────────────────────────────────────
-    Renderer::DrawGearHUD(
-        manualGear, maxGear, activeSignal, isEngineOn, transmissionMode,
-        automaticMode ? AutomaticGearbox::GetSelectorName() : nullptr);
+    if (!Menu::IsOpen()) {
+      Renderer::DrawGearHUD(
+          manualGear, maxGear, activeSignal, isEngineOn, engineStarting,
+          transmissionMode,
+          automaticMode ? AutomaticGearbox::GetSelectorName() : nullptr);
+    }
 
-    if (grindWarningTimer > 0) {
+    if (grindWarningTimer > 0 && !Menu::IsOpen()) {
       --grindWarningTimer;
       Renderer::DrawGrindWarning();
       LOG_WARN_T(Gear, 2000, "Gear grind: gear=%d clutch=%.3f rpm=%.4f",
@@ -640,8 +702,10 @@ void ScriptMain() {
           VehicleData::GetOffsetSourceName());
     }
 
-    if (Config::OverlayBars) {
-      Renderer::DrawPedalsOverlay(rpm, simulatedClutch, throttle,
+    if (Config::OverlayBars && !Menu::IsOpen()) {
+      Renderer::DrawPedalsOverlay(rpm,
+                                  automaticMode ? 0.0f : simulatedClutch,
+                                  throttle,
                                   InputHandler::GetSmoothedBrake());
       Renderer::DrawSimulationOverlay(
           FuelSystem::GetFuelLevel(), FuelSystem::GetOilTemperature(),
@@ -649,23 +713,23 @@ void ScriptMain() {
           ParkingBrake::IsEngaged(), BrakeSystem::IsABSActive(),
           EngineModel::GetEngineBrake());
 
-      Renderer::DrawTextOverlay(
-          (std::string("TCS: ") +
-           (TractionControl::IsTCSActive() ? "~y~ON" : "~g~OK") +
-           " | ABS: " + (BrakeSystem::IsABSActive() ? "~y~ON" : "~g~OK") +
-           (LaunchControl::IsActive() ? " | LC: ~b~HOLD" : "") +
-           (PedalModel::IsBrakeOverrideActive() ? " | PEDAL: ~r~BTO" : "") +
-           (ClutchSystem::IsDumpActive() ? " | CLUTCH: ~r~DUMP" : "") +
-           (GearboxSystem::GetState().moneyShift ? " | GEAR: ~r~OVERREV" : "") +
-           (BrakeSystem::GetFadeLevel() > 0.01f ? " | BRAKE: ~r~FADE" : "") +
-           (GearboxSystem::GetState().clashActive ? " | GEAR: ~r~CLASH" : "") +
-           (TurboSystem::HasTurbo()
-                ? (" | BOOST: " +
-                   std::to_string(TurboSystem::GetBoostPressure()).substr(0, 4))
-                : ""))
-              .c_str(),
-          Config::OverlayPosX,
-          Config::OverlayPosY + Config::OverlayBarHeight * 5.0f, 0.35f);
+      std::string warnings;
+      if (TractionControl::IsTCSActive()) warnings += "~y~TCS ";
+      if (BrakeSystem::IsABSActive()) warnings += "~y~ABS ";
+      if (LaunchControl::IsActive()) warnings += "~b~LC ";
+      if (PedalModel::IsBrakeOverrideActive()) warnings += "~r~BTO ";
+      if (ClutchSystem::IsDumpActive()) warnings += "~r~CLUTCH DUMP ";
+      if (GearboxSystem::GetState().moneyShift) warnings += "~r~OVERREV ";
+      if (BrakeSystem::GetFadeLevel() > 0.01f) warnings += "~r~BRAKE FADE ";
+      if (GearboxSystem::GetState().clashActive) warnings += "~r~GEAR CLASH ";
+      if (TurboSystem::HasTurbo() &&
+          TurboSystem::GetBoostPressure() > 0.05f)
+        warnings += "~b~BOOST ";
+      if (!warnings.empty()) {
+        Renderer::DrawTextOverlay(
+            warnings.c_str(), 0.88f, 0.80f, 0.34f,
+            255, 255, 255, 255, 0, true, true);
+      }
     }
     Menu::Draw();
   } // while (true)

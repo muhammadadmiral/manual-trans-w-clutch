@@ -22,7 +22,7 @@ void Reset();
 // rawPedal: 0 dilepas, 1 diinjak penuh.
 float UpdatePedal(float rawPedal, float throttle, bool engineOn);
 
-// Gear tetap kepasang; field clutch asli yang mutus torsinya.
+// Logical gear tetap kepasang; hard-open juga dinetralkan oleh GearLogic.
 void ApplyToVehicle(VehicleData &data, int gear, float speedMps);
 
 float GetEngagement();

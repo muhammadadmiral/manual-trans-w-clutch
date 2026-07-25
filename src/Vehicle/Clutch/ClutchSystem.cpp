@@ -94,15 +94,13 @@ void ApplyToVehicle(VehicleData &data, int gear, float speedMps) {
   const bool fullyOpen = s_state.disengagement >= 0.995f;
 
   if (gear == 0 || fullyOpen) {
-    s_state.nativeActuator = std::fabs(speedMps) < 1.0f ? -5.0f : -0.5f;
-  } else if (gear > 1 && s_state.disengagement > 0.001f) {
-    // Di gear tinggi GTA baru nangkep slip mulai sekitar 0.6.
-    s_state.nativeActuator = 0.6f + s_state.engagement * 0.4f;
+    s_state.nativeActuator = 0.0f;
   } else {
     s_state.nativeActuator = s_state.engagement;
   }
 
   data.SetClutch(s_state.nativeActuator);
+  (void)speedMps;
 }
 
 float GetEngagement() { return s_state.engagement; }

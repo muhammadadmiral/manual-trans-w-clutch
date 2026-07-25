@@ -16,7 +16,8 @@ static float Clamp01(float value) {
 }
 
 static bool IsDriveSelector(Selector selector) {
-  return selector == Selector::Drive || selector == Selector::Sport;
+  return selector == Selector::Drive || selector == Selector::Sport ||
+         selector == Selector::Low2 || selector == Selector::Low1;
 }
 
 static bool CanSelect(Selector from, Selector target, float brake,
@@ -51,8 +52,9 @@ static bool DownshiftIsSafe(VehicleData &data, int fromGear, int toGear) {
   return data.GetRPM() * toRatio / fromRatio < 0.98f;
 }
 
-void Reset() {
+void Reset(Selector initialSelector) {
   s_state = State{};
+  s_state.selector = initialSelector;
   s_state.lastShiftTime = GetTickCount();
 }
 
@@ -62,9 +64,10 @@ void UpdateSelector(Vehicle vehicle, bool selectorUp, bool selectorDown,
   if (selectorUp == selectorDown)
     return;
 
-  const int delta = selectorDown ? 1 : -1;
+  // LShift maju di gate P-R-N-D-S-L2-L1, LCtrl balik.
+  const int delta = selectorUp ? 1 : -1;
   const int current = static_cast<int>(s_state.selector);
-  const int requested = std::clamp(current + delta, 0, 4);
+  const int requested = std::clamp(current + delta, 0, 6);
   if (requested == current)
     return;
 
@@ -112,6 +115,10 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
   }
 
   maxGear = (std::max)(1, maxGear);
+  if (s_state.selector == Selector::Low2)
+    maxGear = (std::min)(2, maxGear);
+  else if (s_state.selector == Selector::Low1)
+    maxGear = 1;
   s_state.currentGear = std::clamp(s_state.currentGear, 1, maxGear);
   const float speedCoupling = Clamp01(std::fabs(signedSpeedMps) / 7.0f);
   s_state.coupling =
@@ -174,7 +181,7 @@ void ApplyToMemory(Vehicle vehicle, VehicleData &data, int activeGear) {
   if (s_state.selector == Selector::Park) {
     data.SetGear(0xFF);
     data.SetNextGear(0xFF);
-    data.SetClutch(-5.0f);
+    data.SetClutch(0.0f);
     VEHICLE::SET_VEHICLE_HANDBRAKE(vehicle, TRUE);
     PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 76, 1.0f);
     return;
@@ -183,7 +190,7 @@ void ApplyToMemory(Vehicle vehicle, VehicleData &data, int activeGear) {
   if (activeGear == 0) {
     data.SetGear(0xFF);
     data.SetNextGear(0xFF);
-    data.SetClutch(-5.0f);
+    data.SetClutch(0.0f);
   } else if (activeGear < 0) {
     data.SetGear(0);
     data.SetNextGear(0);
@@ -216,6 +223,10 @@ const char *GetSelectorName() {
     return "D";
   case Selector::Sport:
     return "S";
+  case Selector::Low2:
+    return "L2";
+  case Selector::Low1:
+    return "L1";
   }
   return "?";
 }

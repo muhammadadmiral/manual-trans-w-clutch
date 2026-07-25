@@ -1,6 +1,7 @@
 #pragma once
 
 class VehicleData;
+using Vehicle = int;
 
 namespace GearboxSystem {
 
@@ -17,12 +18,15 @@ struct State {
   bool clashActive = false;
   bool pendingEngagement = false;
   bool moneyShift = false;
+  bool damageApplied = false;
+  bool stallRequest = false;
+  float moneyShiftSeverity = 0.0f;
   int lastFromGear = 0;
   int lastToGear = 0;
 };
 
 void Reset();
-void Update(VehicleData &data, int gear, int maxGear,
+void Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
             float clutchDisengagement, float throttle, bool engineOn);
 void NotifyGrind();
 void NotifyShift(VehicleData &data, int fromGear, int toGear,
@@ -33,6 +37,7 @@ void NotifyRevMatch(float currentRPM, float targetRPM);
 
 float GetHealth();
 bool IsSeized();
+bool ConsumeStallRequest();
 const State &GetState();
 
 } // namespace GearboxSystem
