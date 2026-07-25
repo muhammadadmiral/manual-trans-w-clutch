@@ -69,9 +69,19 @@ extern float AutomaticDDownRPM;
 extern float AutomaticSUpRPM;
 extern float AutomaticSDownRPM;
 extern float AutomaticKickdownThrottle;
+extern float AutomaticSTorqueBoost;
 extern bool BrakeThrottleOverride;
 extern float BrakeOverrideDelay;
 extern float BrakeOverrideCut;
+extern float ReverseLockoutSpeedKmH;
+extern float OverRevShiftDamage;
+extern float ClutchDumpRate;
+extern float ClutchDumpShock;
+extern bool BrakeFadeEnabled;
+extern float BrakeHeatRate;
+extern float BrakeCoolRate;
+extern float BrakeFadeStart;
+extern float BrakeFadeStrength;
 
 // ── Analog smoothing — time constants τ in seconds ────────────────────────────
 // See header comment above for interpretation.

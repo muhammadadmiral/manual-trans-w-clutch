@@ -71,9 +71,19 @@ float AutomaticDDownRPM = 0.28f;
 float AutomaticSUpRPM = 0.90f;
 float AutomaticSDownRPM = 0.42f;
 float AutomaticKickdownThrottle = 0.72f;
+float AutomaticSTorqueBoost = 0.10f;
 bool BrakeThrottleOverride = true;
 float BrakeOverrideDelay = 0.20f;
 float BrakeOverrideCut = 0.85f;
+float ReverseLockoutSpeedKmH = 5.0f;
+float OverRevShiftDamage = 0.12f;
+float ClutchDumpRate = 8.0f;
+float ClutchDumpShock = 0.70f;
+bool BrakeFadeEnabled = true;
+float BrakeHeatRate = 0.018f;
+float BrakeCoolRate = 0.035f;
+float BrakeFadeStart = 0.78f;
+float BrakeFadeStrength = 0.45f;
 
 // ── Analog smoothing — τ in seconds ──────────────────────────────────────────
 // Recommended defaults for keyboard play:
@@ -210,6 +220,8 @@ void ReadConfig(HMODULE module) {
     AutomaticSDownRPM = ReadFloat("Automatic", "SDownRPM", 0.42f, ini);
     AutomaticKickdownThrottle =
         ReadFloat("Automatic", "KickdownThrottle", 0.72f, ini);
+    AutomaticSTorqueBoost =
+        ReadFloat("Automatic", "SportTorqueBoost", 0.10f, ini);
 
     BrakeThrottleOverride =
         GetPrivateProfileIntA("Pedals", "BrakeThrottleOverride", 1, ini) != 0;
@@ -217,6 +229,21 @@ void ReadConfig(HMODULE module) {
         ReadFloat("Pedals", "BrakeOverrideDelay", 0.20f, ini);
     BrakeOverrideCut =
         ReadFloat("Pedals", "BrakeOverrideCut", 0.85f, ini);
+
+    ReverseLockoutSpeedKmH =
+        ReadFloat("Gearbox", "ReverseLockoutSpeedKmH", 5.0f, ini);
+    OverRevShiftDamage =
+        ReadFloat("Gearbox", "OverRevShiftDamage", 0.12f, ini);
+    ClutchDumpRate = ReadFloat("Clutch", "DumpRate", 8.0f, ini);
+    ClutchDumpShock = ReadFloat("Clutch", "DumpShock", 0.70f, ini);
+
+    BrakeFadeEnabled =
+        GetPrivateProfileIntA("Brakes", "FadeEnabled", 1, ini) != 0;
+    BrakeHeatRate = ReadFloat("Brakes", "HeatRate", 0.018f, ini);
+    BrakeCoolRate = ReadFloat("Brakes", "CoolRate", 0.035f, ini);
+    BrakeFadeStart = ReadFloat("Brakes", "FadeStart", 0.78f, ini);
+    BrakeFadeStrength =
+        ReadFloat("Brakes", "FadeStrength", 0.45f, ini);
 
     TcsEnabled = GetPrivateProfileIntA("Assists", "TCS", 1, ini) != 0;
     TcsSlipTarget = ReadFloat("Assists", "TCSSlipTarget", 0.12f, ini);
@@ -316,11 +343,25 @@ void SaveConfig(HMODULE module) {
     WriteFloat("Automatic", "SDownRPM", AutomaticSDownRPM, ini);
     WriteFloat("Automatic", "KickdownThrottle",
                AutomaticKickdownThrottle, ini);
+    WriteFloat("Automatic", "SportTorqueBoost",
+               AutomaticSTorqueBoost, ini);
 
     WriteInt("Pedals", "BrakeThrottleOverride",
              BrakeThrottleOverride ? 1 : 0, ini);
     WriteFloat("Pedals", "BrakeOverrideDelay", BrakeOverrideDelay, ini);
     WriteFloat("Pedals", "BrakeOverrideCut", BrakeOverrideCut, ini);
+
+    WriteFloat("Gearbox", "ReverseLockoutSpeedKmH",
+               ReverseLockoutSpeedKmH, ini);
+    WriteFloat("Gearbox", "OverRevShiftDamage", OverRevShiftDamage, ini);
+    WriteFloat("Clutch", "DumpRate", ClutchDumpRate, ini);
+    WriteFloat("Clutch", "DumpShock", ClutchDumpShock, ini);
+
+    WriteInt("Brakes", "FadeEnabled", BrakeFadeEnabled ? 1 : 0, ini);
+    WriteFloat("Brakes", "HeatRate", BrakeHeatRate, ini);
+    WriteFloat("Brakes", "CoolRate", BrakeCoolRate, ini);
+    WriteFloat("Brakes", "FadeStart", BrakeFadeStart, ini);
+    WriteFloat("Brakes", "FadeStrength", BrakeFadeStrength, ini);
 
     WriteInt("Assists", "TCS", TcsEnabled ? 1 : 0, ini);
     WriteFloat("Assists", "TCSSlipTarget", TcsSlipTarget, ini);

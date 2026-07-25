@@ -186,6 +186,12 @@ void Menu::Initialize() {
   clutchMenu.items.push_back(MenuItem("Fade Strength", MenuItem::Float,
                                       &Config::ClutchFadeStrength,
                                       0.01f, 0.00f, 1.00f));
+  clutchMenu.items.push_back(MenuItem("Dump Rate", MenuItem::Float,
+                                      &Config::ClutchDumpRate,
+                                      0.25f, 1.00f, 30.00f));
+  clutchMenu.items.push_back(MenuItem("Dump Shock", MenuItem::Float,
+                                      &Config::ClutchDumpShock,
+                                      0.01f, 0.00f, 1.00f));
   menus.push_back(clutchMenu);
 
   Submenu assists;
@@ -206,6 +212,20 @@ void Menu::Initialize() {
   assists.items.push_back(MenuItem("ABS Max Release", MenuItem::Float,
                                    &Config::AbsMaxRelease,
                                    0.01f, 0.00f, 1.00f));
+  assists.items.push_back(MenuItem(
+      "Brake Fade", MenuItem::Bool, &Config::BrakeFadeEnabled));
+  assists.items.push_back(MenuItem("Brake Heat Rate", MenuItem::Float,
+                                   &Config::BrakeHeatRate,
+                                   0.001f, 0.000f, 0.100f));
+  assists.items.push_back(MenuItem("Brake Cool Rate", MenuItem::Float,
+                                   &Config::BrakeCoolRate,
+                                   0.001f, 0.000f, 0.150f));
+  assists.items.push_back(MenuItem("Brake Fade Start", MenuItem::Float,
+                                   &Config::BrakeFadeStart,
+                                   0.01f, 0.40f, 0.99f));
+  assists.items.push_back(MenuItem("Brake Fade Strength", MenuItem::Float,
+                                   &Config::BrakeFadeStrength,
+                                   0.01f, 0.00f, 0.90f));
   menus.push_back(assists);
 
   Submenu gearbox;
@@ -221,6 +241,12 @@ void Menu::Initialize() {
   gearbox.items.push_back(MenuItem("No-lift Penalty", MenuItem::Float,
                                    &Config::NoLiftShiftPenalty,
                                    0.01f, 0.00f, 1.00f));
+  gearbox.items.push_back(MenuItem("Reverse Lockout km/h", MenuItem::Float,
+                                   &Config::ReverseLockoutSpeedKmH,
+                                   0.50f, 0.00f, 30.00f));
+  gearbox.items.push_back(MenuItem("Over-rev Damage", MenuItem::Float,
+                                   &Config::OverRevShiftDamage,
+                                   0.01f, 0.00f, 0.50f));
   menus.push_back(gearbox);
 
   Submenu automatic;
@@ -245,6 +271,9 @@ void Menu::Initialize() {
   automatic.items.push_back(MenuItem(
       "Kickdown Pedal", MenuItem::Float, &Config::AutomaticKickdownThrottle,
       0.01f, 0.40f, 0.98f));
+  automatic.items.push_back(MenuItem(
+      "S Torque Boost", MenuItem::Float, &Config::AutomaticSTorqueBoost,
+      0.01f, 0.00f, 0.50f));
   automatic.items.push_back(MenuItem(
       "Brake Overrides Gas", MenuItem::Bool,
       &Config::BrakeThrottleOverride));
