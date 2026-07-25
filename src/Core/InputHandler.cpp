@@ -235,10 +235,9 @@ void ApplyGameControls(int manualGear, float clutch, float driveThrottle,
         PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 59, finalSteer);
 
     if (manualGear == 0) {
-        // True neutral must never let GTA's stock automatic apply forward
-        // drive. Engine RPM remains handled by the transmission memory state.
-        PAD::DISABLE_CONTROL_ACTION(0, 71, true);
-        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, 0.0f);
+        // GearLogic keeps the native gearbox in true neutral, so throttle can
+        // reach GTA's engine normally: free-rev audio and RPM now match R.
+        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalThrottle);
         if (finalBrake > 0.02f)
             PAD::SET_CONTROL_VALUE_NEXT_FRAME(0,
                 forwardSpeed > 0.1f ? 72 : 76, finalBrake);
@@ -252,18 +251,16 @@ void ApplyGameControls(int manualGear, float clutch, float driveThrottle,
                 forwardSpeed > 0.1f ? 72 : 76, finalBrake);
         }
     } else {
-        // The calibrated clutch offset is not trustworthy on this game build.
-        // Disconnect torque at the input layer instead: pedal down (1.0)
-        // progressively removes all drive throttle while still allowing the
-        // engine RPM to be simulated independently.
-        const float coupledThrottle = finalThrottle * clutchCoupling;
-        // SET_CONTROL_VALUE_NEXT_FRAME does not reliably replace a live
-        // keyboard value by itself. Disable GTA's raw W/accelerate path first,
-        // then inject only torque that passed through the clutch and TCS.
-        PAD::DISABLE_CONTROL_ACTION(0, 71, true);
-        if (forwardSpeed <= 0.1f)
-            PAD::DISABLE_CONTROL_ACTION(0, 72, true);
-        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, coupledThrottle);
+        // The temporary memory-neutral state is the authoritative clutch
+        // disconnect. Do not disable control 71 here: on this GTA build a
+        // disabled accelerator accepts no usable forward drive, which made
+        // first and second gear stall while reverse still worked.
+        // While disconnected, feed engine throttle for native free-rev audio;
+        // once the selected gear reconnects, apply the clutch/TCS coupling.
+        const float engineThrottle =
+            (hardDisconnect || clutch > 0.45f) ? finalThrottle
+                                                : finalThrottle * clutchCoupling;
+        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, engineThrottle);
         if (finalBrake > 0.02f) {
             if      (forwardSpeed >  0.1f) PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, finalBrake);
             else if (forwardSpeed < -0.1f) PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalBrake);

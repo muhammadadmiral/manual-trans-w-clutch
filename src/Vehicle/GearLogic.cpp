@@ -8,6 +8,7 @@ namespace GearLogic {
 
 static int s_manualGear = 0;
 static DWORD s_lastShiftTime = 0; // Cooldown to prevent rapid shifting crashes
+static DWORD s_lowRpmSince = 0;
 
 void PlayGearGrindSound(Vehicle vehicle) {
   const Hash model = ENTITY::GET_ENTITY_MODEL(vehicle);
@@ -29,6 +30,7 @@ void PlayGearShiftSound() {
 void Reset(int defaultGear) {
   s_manualGear = defaultGear;
   s_lastShiftTime = GetTickCount();
+  s_lowRpmSince = 0;
 }
 
 int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
@@ -66,13 +68,20 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
   }
 
   // --- Realistic Engine Stall Logic ---
-  // Engine stalls ONLY if in gear (manualGear != 0), vehicle is nearly stopped
-  // (< 1.5m/s), clutch is not pressed (< 0.25f), and player is not applying
-  // throttle / RPM is low.
+  // A stall is a sustained unloaded bog, not one transient RPM sample during
+  // clutch hook-up. Full throttle must be allowed to launch in first or second.
   if (isEngineOn && s_manualGear != 0) {
     const float vehicleSpeed = speedKmH / 3.6f;
-    if (vehicleSpeed < 1.5f && clutch < 0.25f && data.GetRPM() < 0.22f) {
+    const bool bogging = vehicleSpeed < 1.5f && clutch < 0.12f &&
+                         throttle < 0.08f && data.GetRPM() < 0.16f;
+    if (bogging) {
+      if (s_lowRpmSince == 0) s_lowRpmSince = currentTime;
+    } else {
+      s_lowRpmSince = 0;
+    }
+    if (s_lowRpmSince != 0 && currentTime - s_lowRpmSince > 450) {
       isEngineOn = false;
+      s_lowRpmSince = 0;
       VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
       // Will show notification via main loop or renderer, for now just play
       // sound
@@ -129,7 +138,6 @@ void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
   static bool shiftArmed = false;
   static bool clutchWasOpen = false;
   static DWORD nativeShiftUntil = 0;
-  static DWORD reconnectRpmUntil = 0;
 
   if (manualGear != selectedLastFrame) {
     shiftFromGear = selectedLastFrame;
@@ -142,7 +150,6 @@ void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
   // Request it as Current != Next for a short window so GTA's own transmission
   // code performs its torque cut, RPM transition and stock shift audio.
   if (clutchWasOpen && !clutchOpen) {
-    reconnectRpmUntil = GetTickCount() + 500;
     if (shiftArmed) {
       nativeShiftUntil = GetTickCount() + 240;
       shiftArmed = false;
@@ -180,62 +187,9 @@ void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
     data.SetNextGear(targetGear);
   }
 
-  // 0x8CC follows RPM in the captured log, so it is not a safe writable
-  // clutch field on this build.  For neutral or a fully depressed clutch,
-  // synthesize a free-revving engine while ApplyGameControls removes wheel
-  // torque. This also avoids fighting GTA's native hard-cut limiter.
-  const bool disconnected = manualGear == 0 || clutchOpen;
-  if (disconnected) {
-    static float freeRevRPM = 0.20f;
-    const float targetRPM =
-        0.20f + std::clamp(throttle, 0.0f, 1.0f) * 0.78f;
-    const float response = targetRPM > freeRevRPM ? 0.16f : 0.08f;
-    freeRevRPM += (targetRPM - freeRevRPM) * response;
-    data.SetRPM(std::clamp(freeRevRPM, 0.20f, 0.98f));
-  } else {
-    // Once the clutch reconnects, stop writing RPM entirely. Native GTA
-    // already derives the correct RPM and audio pitch from road speed and the
-    // selected gear; forcing an estimated ratio here caused idle lockups.
-    // Once a driven gear reaches redline, hold just below GTA's native hard
-    // cut instead of allowing the stock limiter to drop and rebuild RPM.
-    // A free-rev RPM written while the clutch was open can otherwise survive
-    // after a low-speed shift. Pull it promptly toward road-coupled RPM during
-    // hook-up so second gear lugs and higher gears stall instead of producing
-    // a high-RPM sound at walking speed.
-    if (GetTickCount() < reconnectRpmUntil && manualGear > 0) {
-      const float gearRatio =
-          data.GetGearRatio(static_cast<uint8_t>(manualGear));
-      const float topRatio = data.GetGearRatio(static_cast<uint8_t>(maxGear));
-      if (gearRatio > 0.0f && topRatio > 0.0f) {
-        const float roadRPM = std::clamp(
-            (speedKmH / 300.0f) * (gearRatio / topRatio), 0.0f, 0.98f);
-        const float launchFloor =
-            manualGear == 1
-                ? 0.20f + std::clamp(throttle, 0.0f, 1.0f) * 0.12f
-                : (manualGear == 2
-                       ? 0.20f + std::clamp(throttle, 0.0f, 1.0f) * 0.05f
-                       : 0.20f);
-        const float coupledRPM =
-            roadRPM > launchFloor ? roadRPM : launchFloor;
-        const float correctedRPM =
-            data.GetRPM() + (coupledRPM - data.GetRPM()) * 0.32f;
-        data.SetRPM(std::clamp(correctedRPM, 0.20f, 0.98f));
-      }
-    }
-
-    static int heldGear = 0;
-    static bool holdingRedline = false;
-    if (manualGear != heldGear || throttle < 0.85f) {
-      heldGear = manualGear;
-      holdingRedline = false;
-    }
-    const bool nativeShiftActive = GetTickCount() < nativeShiftUntil;
-    if (!nativeShiftActive && manualGear > 0 && throttle >= 0.85f &&
-        data.GetRPM() >= 0.94f)
-      holdingRedline = true;
-    if (holdingRedline && !nativeShiftActive)
-      data.SetRPM(0.98f);
-  }
+  // RPM offset 0x8CC is read-only on this game build. Native GTA now owns
+  // revving, limiter, and all engine audio in N/R/forward gears. This avoids
+  // a synthetic RPM state fighting the actual drivetrain and causing stalls.
 }
 
 } // namespace GearLogic
