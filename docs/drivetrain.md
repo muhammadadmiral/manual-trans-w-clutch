@@ -23,6 +23,9 @@ diubah dengan smoothstep menjadi engagement `0..1`.
 - `fClutch` yang memutus torque;
 - pelepasan pelan menaikkan torque capacity bertahap;
 - pelepasan cepat menghasilkan perubahan capacity cepat;
+- dump terdeteksi dari laju release pedal, bukan hanya posisi akhirnya;
+- dump memberi shock feedback; hentakan fisik utamanya tetap berasal dari
+  perubahan kapasitas clutch native;
 - slip menambah heat dan heat tinggi mengurangi capacity.
 
 Keyboard hanya punya dua state, jadi kecepatan release berasal dari
@@ -42,6 +45,46 @@ Throttle tidak langsung dipakai sebagai pengecualian. Bila mesin punya torsi
 cukup, RPM native naik dan stall progress batal. Ini membuat kendaraan kuat bisa
 berangkat tanpa clutch, sementara throttle kecil atau gear tinggi lebih mudah
 bog/stall.
+
+Idle creep hanya diinjeksikan pada gear 1/reverse ketika brake dan throttle
+dilepas. Pada tanjakan tidak ada hill-hold manual di gear: bila torque idle
+kalah oleh beban, kendaraan boleh rollback dan mesin dapat stall.
+
+## Manual shift edge cases
+
+- Shift tanpa clutch tetap memilih gear; RPM mismatch menentukan clash,
+  torque cut, getaran, dan wear.
+- No-lift shift menyimpan shock sampai clutch menggigit kembali.
+- Downshift dengan target RPM di atas limiter ditandai sebagai money shift dan
+  mengurangi gearbox health.
+- Reverse dari netral ditolak di atas batas kecepatan yang dikonfigurasi.
+- Netral ke gear 2 atau upshift di RPM rendah tidak mematikan throttle. Rasio
+  gear hanya menurunkan torque reserve sehingga mobil terasa berat atau stall
+  bila torsi benar-benar tidak cukup.
+
+## Automatic P-R-N-D-S
+
+Shift Down menggerakkan selector `P → R → N → D → S`; Shift Up bergerak ke
+arah sebaliknya.
+
+- P membuka driveline dan mengunci parking brake.
+- R memakai W sebagai throttle mundur dan S sebagai rem.
+- N membuka driveline dan tetap mengizinkan free-rev.
+- D melakukan upshift lebih awal dan downshift lebih rendah.
+- S menahan RPM, lebih responsif melakukan kickdown, mempertahankan gear rendah
+  saat braking, dan memakai torque multiplier terpisah.
+
+Keluar dari P, memilih R, dan memilih arah drive dari N memerlukan brake bila
+interlock aktif. P/R juga ditolak bila arah/kecepatan kendaraan belum aman.
+Automatic memakai coupling torque-converter dan tidak menjalankan stall manual.
+
+## Pedal dan rem
+
+Gas+rem yang ditahan bersamaan memicu brake-throttle override setelah delay,
+kecuali clutch manual sedang terbuka untuk heel-toe/rev-match atau launch
+control sedang berada di launch window. ABS tetap fail-open bila telemetry roda
+tidak valid. Temperatur rem tetap dihitung dari brake input dan road speed;
+setelah ambang fade, tekanan maksimum berkurang sampai rem kembali dingin.
 
 ## TCS dan ABS
 

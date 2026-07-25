@@ -2,6 +2,8 @@
 
 - [architecture.md](architecture.md): batas modul dan urutan update.
 - [drivetrain.md](drivetrain.md): clutch, free-rev, inertia, load, dan stall.
+- [configuration.md](configuration.md): mode transmisi, selector, dan tuning
+  seluruh subsystem dari GUI/INI.
 - [memory-offsets.md](memory-offsets.md): field memory tervalidasi dan aturan
   akses.
 - [audio_sprint_plan.md](audio_sprint_plan.md): backlog sprint audio berikutnya.
