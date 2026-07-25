@@ -5,10 +5,10 @@ bukan alamat absolut.
 
 | Field | Object | Resolver / relasi | Akses |
 |---|---|---|---|
-| Current RPM | `CVehicle` | pola engine | read/write |
+| Current RPM | `CVehicle` | pola engine | read-only saat runtime |
 | Clutch | `CVehicle` | `RPM + 0xC` | read/write |
-| Engine throttle | `CVehicle` | `RPM + 0x10` | read/write saat free-rev |
-| Throttle pedal | `CVehicle` | kelompok steering input `+0x10` | opsional write |
+| Engine throttle | `CVehicle` | `RPM + 0x10` | read-only saat runtime |
+| Throttle pedal | `CVehicle` | kelompok steering input `+0x10` | opsional read |
 | Gear / NextGear | `CVehicle` | pola transmission | read/write |
 | Gear ratios | `CVehicle` | pointer setelah cluster gear | read |
 | Handling pointer | `CVehicle` | pola handling | read |
@@ -26,3 +26,7 @@ lama dianggap stale dan dikoreksi saat load.
 Jangan menambah write baru hanya karena sebuah float terlihat bergerak di log.
 Field baru harus punya signature, relasi struct yang konsisten, range check, dan
 jalur no-op ketika resolver gagal.
+
+Wrapper setter RPM/throttle masih ada untuk kompatibilitas kalibrasi dan riset
+offset, tetapi drivetrain runtime tidak memanggilnya. RPM/audio/limiter wajib
+berasal dari state engine GTA.

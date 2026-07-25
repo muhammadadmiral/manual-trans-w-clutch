@@ -104,7 +104,7 @@ void Menu::Initialize() {
   Submenu hud;
   hud.title = "HUD SETTINGS";
   hud.items.push_back(
-      MenuItem("Overlay Status UI", MenuItem::Bool, &Config::DebugOverlay));
+      MenuItem("Verbose Logging", MenuItem::Bool, &Config::DebugOverlay));
   hud.items.push_back(
       MenuItem("Overlay Pedal Bars", MenuItem::Bool, &Config::OverlayBars));
   hud.items.push_back(MenuItem("Overlay X", MenuItem::Float,
@@ -164,9 +164,6 @@ void Menu::Initialize() {
   engine.items.push_back(MenuItem(
       "Auto Start Needs Brake", MenuItem::Bool,
       &Config::AutomaticStartRequiresBrake));
-  engine.items.push_back(MenuItem("RPM Sync", MenuItem::Float,
-                                  &Config::ConnectedRPMSync,
-                                  0.01f, 0.00f, 1.00f));
   engine.items.push_back(
       MenuItem("Launch Control", MenuItem::Bool, &Config::LaunchControl));
   engine.items.push_back(MenuItem("Launch RPM", MenuItem::Float,
@@ -289,7 +286,7 @@ void Menu::Initialize() {
       "Kickdown Pedal", MenuItem::Float, &Config::AutomaticKickdownThrottle,
       0.01f, 0.40f, 0.98f));
   automatic.items.push_back(MenuItem(
-      "S Torque Boost", MenuItem::Float, &Config::AutomaticSTorqueBoost,
+      "S Pedal Response", MenuItem::Float, &Config::AutomaticSTorqueBoost,
       0.01f, 0.00f, 0.50f));
   automatic.items.push_back(MenuItem(
       "Brake Overrides Gas", MenuItem::Bool,

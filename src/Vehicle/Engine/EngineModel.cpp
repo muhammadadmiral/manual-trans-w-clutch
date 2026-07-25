@@ -162,14 +162,30 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
     s_state.expectedRPM = rpm;
   }
 
-  float ratio = gear > 0 ? data.GetGearRatio(static_cast<uint8_t>(gear)) : 0.0f;
-  float top = maxGear > 0
-                  ? data.GetGearRatio(static_cast<uint8_t>(maxGear))
-                  : 0.0f;
+  const float ratio =
+      gear > 0 ? std::fabs(data.GetGearRatio(static_cast<uint8_t>(gear)))
+               : 0.0f;
+  const float top =
+      maxGear > 0
+          ? std::fabs(data.GetGearRatio(static_cast<uint8_t>(maxGear)))
+          : 0.0f;
   if (engineOn && gear > 0 && clutchEngagement > 0.6f &&
-      throttle < 0.05f && ratio > 0.0f && top > 0.0f) {
+      throttle < 0.05f) {
+    const float nativeTop =
+        std::max(1.0f, VEHICLE::GET_VEHICLE_ESTIMATED_MAX_SPEED(vehicle));
+    const float ratioLoad =
+        ratio > 0.01f && top > 0.01f
+            ? Clamp01(ratio / top / static_cast<float>((std::max)(1, maxGear)))
+            : Clamp01(static_cast<float>((std::max)(1, maxGear)) /
+                      static_cast<float>((std::max)(1, gear)) / 3.0f);
+    const float rpmOverrun =
+        Clamp01((rpm - s_state.idleRPM) /
+                std::max(0.05f, 1.0f - s_state.idleRPM));
+    const float roadLoad =
+        Clamp01(std::fabs(speedMps) / nativeTop);
     const float target =
-        Clamp01((ratio / top) * std::fabs(speedMps) / 80.0f);
+        Clamp01(rpmOverrun * (0.45f + ratioLoad * 0.55f) +
+                roadLoad * ratioLoad * 0.35f);
     s_state.engineBrake +=
         (target - s_state.engineBrake) * Clamp01(dt * 8.0f);
   } else {
