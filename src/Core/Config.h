@@ -51,6 +51,8 @@ extern float StallClutchThreshold;
 extern float IdleTorqueFraction;
 extern float LugStallRPM;
 extern float LugStallDelay;
+extern float WaterStallDelay;
+extern float RolloverStallDelay;
 extern bool StarterInterlock;
 extern bool AutomaticStartRequiresBrake;
 

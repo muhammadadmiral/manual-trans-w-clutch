@@ -100,6 +100,8 @@ IdleCreep=1
 StallEnabled=1
 LugStallRPM=1500
 LugStallDelay=2.20
+WaterStallDelay=2.50
+RolloverStallDelay=7.00
 
 [Automatic]
 DUpRPM=0.50

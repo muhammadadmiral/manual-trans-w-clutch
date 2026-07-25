@@ -26,6 +26,9 @@ Motor non-scooter tetap sequential dan memakai auto-clutch.
 - `Lug Stall Delay`: waktu dasar sebelum lugging yang tidak pulih menjadi
   stall. Timer melambat saat defisit kecil dan dipercepat brake, tanjakan,
   clutch lock, serta gear tinggi.
+- `Water Stall Delay`: waktu hydrolock ketika mesin pembakaran terendam.
+- `Rollover Stall`: waktu oil-starvation saat kendaraan terbalik. Motor memakai
+  cutoff lebih cepat; EV dikecualikan dari dua simulasi mesin pembakaran ini.
 - `Starter Interlock`: manual wajib netral/clutch; automatic wajib P/N.
 - `Auto Start Needs Brake`: menambah syarat brake pada starter automatic.
 - `Launch Control` dan `Launch RPM`: limiter launch manual atau automatic.
@@ -111,6 +114,6 @@ berarti enabled, `Ready` berarti telemetry tersedia, dan nilai tanpa suffix
 berarti sedang mengintervensi. Launch control memang mati jika `LCEn=0`;
 aktifkan `LaunchControl=1` lewat menu atau bagian `[Engine]`.
 
-`RuntimeForce`, `ForceMul`, dan `ForceApplied` menunjukkan recovery tingkat
-kedua yang bekerja di drive-force runtime GTA. `Condition` berasal dari engine
-health. Nilai upgrade dibaca langsung dari mod kendaraan, bukan INI.
+`Condition` berasal dari engine health. Nilai upgrade dibaca langsung dari mod
+kendaraan, bukan INI. `LowRec` dan `PowerMul` adalah satu-satunya jalur
+recovery low-RPM pada r15-safe; tidak ada write runtime drive-force.

@@ -165,6 +165,12 @@ void Menu::Initialize() {
   engine.items.push_back(MenuItem("Lug Stall Delay", MenuItem::Float,
                                   &Config::LugStallDelay,
                                   0.10f, 0.40f, 8.00f));
+  engine.items.push_back(MenuItem("Water Stall Delay", MenuItem::Float,
+                                  &Config::WaterStallDelay,
+                                  0.10f, 0.50f, 12.00f));
+  engine.items.push_back(MenuItem("Rollover Stall", MenuItem::Float,
+                                  &Config::RolloverStallDelay,
+                                  0.25f, 1.00f, 20.00f));
   engine.items.push_back(MenuItem(
       "Starter Interlock", MenuItem::Bool, &Config::StarterInterlock));
   engine.items.push_back(MenuItem(

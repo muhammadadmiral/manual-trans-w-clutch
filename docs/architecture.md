@@ -38,10 +38,8 @@ alamat pointer sendiri.
 
 Saat driveline terhubung, target RPM berasal dari road speed dan rasio runtime.
 Saat netral atau clutch-open, `EngineModel` melanjutkan RPM mesin bebas memakai
-inertia. Recovery low-RPM boleh menulis power multiplier dan drive-force
-runtime CVehicle, tetapi tidak pernah menulis roda atau entity speed. Base
-drive-force dicache lalu direstore saat mode Off, sesi berakhir, atau mesin
-stall.
+inertia. Recovery low-RPM hanya memakai power multiplier native; tidak menulis
+runtime drive-force, roda, atau entity speed.
 
 ## Aturan fail-open
 
@@ -49,7 +47,7 @@ stall.
 - Runtime `CTransmission` tidak masuk rentang masuk akal: flat velocity jatuh
   ke handling, lalu ke estimated top speed dan rasio top gear. Inertia tetap
   memakai handling atau karakter acceleration native.
-- Runtime drive-force tidak valid: recovery tingkat kedua dilewati dan hanya
-  power envelope native yang dipakai.
+- Offset `TransmissionDriveForce` selalu dinolkan karena relasi relatif dari
+  gear cluster tidak cukup membuktikan bahwa field aman ditulis.
 - Telemetry roda gagal: TCS dan ABS tidak memotong input.
 - Write opsional selalu no-op bila offset nol.

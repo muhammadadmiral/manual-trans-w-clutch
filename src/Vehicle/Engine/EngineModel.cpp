@@ -99,6 +99,59 @@ void Reset() {
   s_state = State{};
 }
 
+static bool UpdateEnvironment(Vehicle vehicle, bool engineOn, float dt) {
+  const Hash model = ENTITY::GET_ENTITY_MODEL(vehicle);
+  const bool electric = VEHICLE::_GET_IS_VEHICLE_ELECTRIC(model) != FALSE;
+  const bool motorcycle =
+      VEHICLE::IS_THIS_MODEL_A_BIKE(model) ||
+      VEHICLE::IS_THIS_MODEL_A_QUADBIKE(model);
+  s_state.airborne = ENTITY::IS_ENTITY_IN_AIR(vehicle) != FALSE;
+  s_state.upsideDown =
+      ENTITY::IS_ENTITY_UPSIDEDOWN(vehicle) != FALSE ||
+      VEHICLE::IS_VEHICLE_STUCK_ON_ROOF(vehicle) != FALSE;
+  s_state.environmentStall = false;
+
+  if (!engineOn || electric) {
+    s_state.waterIngestion =
+        std::max(0.0f, s_state.waterIngestion - dt * 2.0f);
+    s_state.oilStarvation =
+        std::max(0.0f, s_state.oilStarvation - dt * 2.0f);
+    return false;
+  }
+
+  const float submerged =
+      std::clamp(ENTITY::GET_ENTITY_SUBMERGED_LEVEL(vehicle), 0.0f, 1.0f);
+  if (submerged > 0.58f) {
+    const float waterDelay =
+        std::clamp(Config::WaterStallDelay, 0.50f, 12.0f) *
+        (motorcycle ? 0.65f : 1.0f);
+    s_state.waterIngestion +=
+        dt * (0.35f + submerged * 0.90f) / waterDelay;
+  } else {
+    s_state.waterIngestion =
+        std::max(0.0f, s_state.waterIngestion - dt * 0.75f);
+  }
+
+  if (s_state.upsideDown) {
+    const float rolloverDelay =
+        std::clamp(Config::RolloverStallDelay, 1.0f, 20.0f) *
+        (motorcycle ? 0.24f : 1.0f);
+    s_state.oilStarvation += dt / rolloverDelay;
+  } else {
+    s_state.oilStarvation =
+        std::max(0.0f, s_state.oilStarvation - dt * 0.45f);
+  }
+
+  if (s_state.waterIngestion >= 1.0f ||
+      s_state.oilStarvation >= 1.0f) {
+    s_state.environmentStall = true;
+    s_state.waterIngestion = std::min(s_state.waterIngestion, 1.0f);
+    s_state.oilStarvation = std::min(s_state.oilStarvation, 1.0f);
+    return true;
+  }
+  return false;
+}
+
 static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
                                int maxGear,
                                float engagement, float throttle,
@@ -263,7 +316,8 @@ static void UpdateDriveTorque(int gear, int maxGear, float engagement,
                               float dt) {
   s_state.driveTorqueFactor = 1.0f;
   s_state.redlineCut = false;
-  if (!engineOn || gear == 0 || engagement < 0.08f) {
+  if (!engineOn || gear == 0 || engagement < 0.08f ||
+      s_state.airborne || s_state.upsideDown) {
     s_state.lowRpmRecovery +=
         (0.0f - s_state.lowRpmRecovery) * Clamp01(dt * 6.0f);
     return;
@@ -335,6 +389,8 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
             bool automaticMode) {
   const float dt = std::clamp(MISC::GET_FRAME_TIME(), 0.001f, 0.05f);
   const float rpm = data.GetRPM();
+  const bool environmentStall =
+      UpdateEnvironment(vehicle, engineOn, dt);
   const float directionalSpeed = gear < 0 ? -speedMps : speedMps;
   if (!engineOn || gear == 0) {
     s_state.speedSampleValid = false;
@@ -426,7 +482,8 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
     data.SetThrottle(pedal);
     data.SetThrottlePedal(pedal);
     s_state.expectedRPM = s_state.controlledRPM;
-  } else if (nativeOverride && gear > 0) {
+  } else if (nativeOverride && gear > 0 && !s_state.airborne &&
+             !s_state.upsideDown) {
     if (!s_state.rpmOwned) {
       s_state.controlledRPM =
           std::clamp(std::max(rpm, s_state.idleRPM), s_state.idleRPM, 1.0f);
@@ -515,7 +572,7 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
       speedMps, engineOn, dt, automaticMode);
   UpdateDriveTorque(gear, maxGear, clutchEngagement, throttle, brake,
                     engineOn, dt);
-  return stalled;
+  return stalled || environmentStall;
 }
 
 float GetLoad() { return s_state.load; }

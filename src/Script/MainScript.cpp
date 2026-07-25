@@ -775,7 +775,8 @@ void ScriptMain() {
           "SpeedKmH=%.1f SignedMps=%.2f Ratio=%.4f MaxVel=%.2f EstFlat=%.2f "
           "Handling=%d Load=%.3f TorqueReserve=%.3f TorqueCurve=%.3f "
           "EngineRPM=%.0f IdleRPM=%.0f RedlineRPM=%.0f Condition=%.3f "
-          "Lug=%.3f Stall=%.3f "
+          "Lug=%.3f Stall=%.3f Air=%d Upside=%d Water=%.3f OilStarve=%.3f "
+          "EnvStall=%d "
           "Accel=%.3f LowRec=%.3f "
           "EngMod=%d/%d TransMod=%d/%d Race=%d Quick=%d PowerShift=%d "
           "Clash=%.3f Shock=%.3f ShiftPenalty=%.3f ShiftQuick=%d "
@@ -818,6 +819,11 @@ void ScriptMain() {
           EngineModel::GetState().engineCondition,
           EngineModel::GetState().lugSeverity,
           EngineModel::GetStallProgress(),
+          EngineModel::GetState().airborne ? 1 : 0,
+          EngineModel::GetState().upsideDown ? 1 : 0,
+          EngineModel::GetState().waterIngestion,
+          EngineModel::GetState().oilStarvation,
+          EngineModel::GetState().environmentStall ? 1 : 0,
           EngineModel::GetState().longitudinalAcceleration,
           EngineModel::GetState().lowRpmRecovery,
           VehicleUpgrades::GetState().engineLevel,

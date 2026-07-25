@@ -54,6 +54,8 @@ float StallClutchThreshold = 0.65f;
 float IdleTorqueFraction = 0.18f;
 float LugStallRPM = 1500.0f;
 float LugStallDelay = 2.20f;
+float WaterStallDelay = 2.50f;
+float RolloverStallDelay = 7.00f;
 bool StarterInterlock = true;
 bool AutomaticStartRequiresBrake = true;
 
@@ -219,6 +221,10 @@ void ReadConfig(HMODULE module) {
         ReadFloat("Engine", "LugStallRPM", 1500.0f, ini);
     LugStallDelay =
         ReadFloat("Engine", "LugStallDelay", 2.20f, ini);
+    WaterStallDelay =
+        ReadFloat("Engine", "WaterStallDelay", 2.50f, ini);
+    RolloverStallDelay =
+        ReadFloat("Engine", "RolloverStallDelay", 7.00f, ini);
     StarterInterlock =
         GetPrivateProfileIntA("Engine", "StarterInterlock", 1, ini) != 0;
     AutomaticStartRequiresBrake =
@@ -371,6 +377,8 @@ void SaveConfig(HMODULE module) {
     WriteFloat("Engine", "IdleTorqueFraction", IdleTorqueFraction, ini);
     WriteFloat("Engine", "LugStallRPM", LugStallRPM, ini);
     WriteFloat("Engine", "LugStallDelay", LugStallDelay, ini);
+    WriteFloat("Engine", "WaterStallDelay", WaterStallDelay, ini);
+    WriteFloat("Engine", "RolloverStallDelay", RolloverStallDelay, ini);
     WriteInt("Engine", "StarterInterlock", StarterInterlock ? 1 : 0, ini);
     WriteInt("Engine", "AutomaticStartRequiresBrake",
              AutomaticStartRequiresBrake ? 1 : 0, ini);

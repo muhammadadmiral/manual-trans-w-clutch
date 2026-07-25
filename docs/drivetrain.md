@@ -158,11 +158,12 @@ defisit torsi/deceleration bertahan, timer naik sampai mesin mati. Partial
 clutch mengurangi load sehingga start dari gear 2 tetap mungkin, tetapi lebih
 lama dan lebih panas.
 
-Build r13 memakai dua tingkat recovery. `PowerMul` membentuk envelope torque
-umum, sedangkan `ForceMul` mengoreksi drive-force runtime CVehicle ketika solver
-GTA masih memotong forced gear. Base value disimpan per sesi kendaraan dan
-selalu direstore saat mode OFF, keluar/ganti kendaraan, atau mesin stall.
-Kecepatan dan angular velocity roda tetap tidak pernah ditulis.
+Build r15-safe hanya memakai native `SET_VEHICLE_CHEAT_POWER_INCREASE` untuk
+recovery. Attack recovery diperbesar secara adaptif sampai batas aman saat
+akselerasi tetap negatif. Field CVehicle `NextGear-0x68` dikarantina dan
+dipaksa nol di resolver: r13 membuktikan field tersebut tidak aman ditulis
+walaupun nilai read-nya terlihat masuk akal. Kecepatan dan angular velocity
+roda tetap tidak pernah ditulis.
 
 Automatic D membuka torque converter lebih banyak pada low RPM supaya mesin
 tidak langsung terkunci ke putaran roda. S tetap lebih rapat dan agresif.
@@ -189,3 +190,16 @@ dan turbo `18`.
   diperlakukan sebagai synchro shift dengan penalty kecil.
 - Money shift tetap berbahaya meskipun memakai race transmission; upgrade
   durability mengurangi damage tetapi tidak menghapus over-rev.
+
+## Kondisi lingkungan
+
+- Saat kendaraan airborne atau terbalik, RPM connected dikembalikan ke GTA dan
+  low-RPM recovery dihentikan. Automatic juga menahan keputusan shift sampai
+  kendaraan kembali stabil.
+- Mesin pembakaran yang cukup lama terendam mengakumulasi water ingestion lalu
+  stall. Motor mencapai cutoff lebih cepat.
+- Kendaraan terbalik mengakumulasi oil-starvation. Timer pulih perlahan setelah
+  kendaraan kembali tegak.
+- EV tidak memakai hydrolock atau oil-starvation combustion model.
+- Field log `Air`, `Upside`, `Water`, `OilStarve`, dan `EnvStall` menunjukkan
+  state lingkungan tanpa perlu menebak dari gejala.

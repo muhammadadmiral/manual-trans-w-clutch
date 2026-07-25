@@ -28,6 +28,8 @@ struct State {
   float estimatedRedlineRPM = 6800.0f;
   float engineCondition = 1.0f;
   float lugSeverity = 0.0f;
+  float waterIngestion = 0.0f;
+  float oilStarvation = 0.0f;
   float previousDirectionalSpeed = 0.0f;
   bool freeRevActive = false;
   bool rpmOwned = false;
@@ -35,6 +37,9 @@ struct State {
   bool redlineCut = false;
   bool handlingBacked = false;
   bool speedSampleValid = false;
+  bool airborne = false;
+  bool upsideDown = false;
+  bool environmentStall = false;
 };
 
 void Reset();

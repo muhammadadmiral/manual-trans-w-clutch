@@ -256,6 +256,9 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
   const DWORD elapsedSinceShift = now - s_state.lastShiftTime;
   if (elapsedSinceShift < delayMs)
     return s_state.currentGear;
+  if (ENTITY::IS_ENTITY_IN_AIR(vehicle) ||
+      ENTITY::IS_ENTITY_UPSIDEDOWN(vehicle))
+    return s_state.currentGear;
 
   const float nativeRPM = data.GetRPM();
   const float rpm =
