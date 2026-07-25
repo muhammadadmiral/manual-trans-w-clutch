@@ -19,7 +19,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="src\Mod\DllMain.cpp" />
+    <ClCompile Include="src\Script\MainScript.cpp" />
+    <ClCompile Include="src\Core\ModLogger.cpp" />
     <ClCompile Include="src\Memory\AOBScanner.cpp" />
     <ClCompile Include="src\Memory\GameMemoryEngine.cpp" />
     <ClCompile Include="src\Memory\OffsetResolver.cpp" />
@@ -38,6 +40,9 @@
     <ClCompile Include="src\Core\Renderer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\Script\MainScript.h" />
+    <ClInclude Include="src\Core\ModLogger.h" />
+    <ClInclude Include="src\Core\Config.h" />
     <ClInclude Include="src\Core\Menu.h" />
     <ClInclude Include="src\Core\InputHandler.h" />
     <ClInclude Include="src\Core\Renderer.h" />

@@ -218,13 +218,13 @@ void Menu::Update() {
           k != VK_RETURN && k != Config::KeyMenu) {
         *selectedItem.keyVal = k;
         Config::SaveConfig(g_pluginModule);
-        
-        // Wait until the user releases the key so it doesn't immediately 
+
+        // Wait until the user releases the key so it doesn't immediately
         // trigger another menu action on the very next frame.
         while ((GetAsyncKeyState(k) & 0x8000) != 0) {
-            scriptWait(0);
+          scriptWait(0);
         }
-        
+
         waitingForKeyBind = false;
         return;
       }

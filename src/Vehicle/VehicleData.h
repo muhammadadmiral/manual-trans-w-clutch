@@ -130,8 +130,8 @@ private:
   // the settled one - this was the actual root cause of calibration
   // reliably reaching "Scanning..." and then failing.
   static constexpr uint64_t kEngineOffSettleMs = 2000;
-  static constexpr uint64_t kIdleSettleMs = 1500;
-  static constexpr uint64_t kRevSettleMs = 1200;
+  static constexpr uint64_t kIdleSettleMs = 2500;
+  static constexpr uint64_t kRevSettleMs = 1500;
 
   // Window (in bytes) around the found RPM offset to search for the
   // Gear/NextGear/TopGear/GearRatios cluster. Deliberately wide and NOT

@@ -8,8 +8,15 @@
 namespace Renderer {
 
 void ShowNotification(const char *message) {
-  HUD::BEGIN_TEXT_COMMAND_THEFEED_POST("STRING");
-  HUD::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME(message);
+  HUD::BEGIN_TEXT_COMMAND_THEFEED_POST("CELL_EMAIL_BCON");
+
+  const size_t len = std::strlen(message);
+  for (size_t i = 0; i < len; i += 99) {
+    char chunk[100]{};
+    strncpy_s(chunk, message + i, 99);
+    HUD::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME(chunk);
+  }
+
   HUD::END_TEXT_COMMAND_THEFEED_POST_TICKER(false, false);
 }
 
@@ -105,12 +112,12 @@ void DrawPedalsOverlay(float rpm, float clutch, float throttle, float brake) {
 }
 
 void DrawSimulationOverlay(float fuel, float oilTemp, float gearboxHealth,
-                            float clutchHeat, bool parkingBrake,
-                            bool wheelsLocked, float engineBrake) {
-  const float barX     = Config::OverlayPosX + Config::OverlayBarWidth + 0.015f;
+                           float clutchHeat, bool parkingBrake,
+                           bool wheelsLocked, float engineBrake) {
+  const float barX = Config::OverlayPosX + Config::OverlayBarWidth + 0.015f;
   const float barWidth = Config::OverlayBarWidth;
-  const float barHeight= Config::OverlayBarHeight;
-  const float gap      = barHeight + 0.006f;
+  const float barHeight = Config::OverlayBarHeight;
+  const float gap = barHeight + 0.006f;
   float y = Config::OverlayPosY;
 
   // Fuel: green > yellow > red
@@ -137,7 +144,8 @@ void DrawSimulationOverlay(float fuel, float oilTemp, float gearboxHealth,
   y += gap;
 
   // Engine brake
-  DrawBar(barX, y, barWidth, barHeight, engineBrake, 180, 100, 255, "ENG BRAKE");
+  DrawBar(barX, y, barWidth, barHeight, engineBrake, 180, 100, 255,
+          "ENG BRAKE");
   y += gap;
 
   // Status indicators
@@ -151,4 +159,3 @@ void DrawSimulationOverlay(float fuel, float oilTemp, float gearboxHealth,
 }
 
 } // namespace Renderer
-
