@@ -1,19 +1,4 @@
-// =============================================================================
-// Config.h
-//
-// ── Smoothing time constants (ThrottleAttack, ThrottleRelease, etc.) ─────────
-// These are exponential-decay time constants τ in SECONDS, NOT per-frame steps.
-// Meaning: the smoothed value travels 63 % of the remaining distance to the
-// target in τ seconds, independent of frame rate.
-//
-// Examples:
-//   τ = 0.05  → very fast  (≈50 ms to reach ~63 %) — good for clutch attack
-//   τ = 0.10  → fast       (≈100 ms) — throttle attack feeling
-//   τ = 0.25  → medium     (≈250 ms) — brake ramp-up
-//   τ = 0.50  → slow       (≈500 ms) — coasting throttle release
-//
-// A τ of 0 is treated as "instant" (no smoothing).
-// =============================================================================
+// Konfigurasi runtime. Detail tiap parameter ada di docs/configuration.md.
 #pragma once
 #include <string>
 #include <vector>

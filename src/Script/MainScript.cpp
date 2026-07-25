@@ -1,19 +1,4 @@
-// =============================================================================
-// MainScript.cpp — ScriptHookV main game-loop script
-//
-// Entry point: ScriptMain() — registered in src/Mod/DllMain.cpp
-//
-// This file owns:
-//   • Vehicle validation and change detection
-//   • Per-frame subsystem orchestration:
-//       InputHandler → ClutchSim → ParkingBrake → TCS/ABS →
-//       Turbo → GearLogic → PhysicsEngine → FuelSystem →
-//       Memory writes → HUD / Telemetry
-//   • Calibration HUD overlay
-//
-// Subsystem implementations live in src/Vehicle/ and src/Core/.
-// CalibrationEngine lives in src/Memory/CalibrationEngine.cpp.
-// =============================================================================
+// Orkestrator per-frame. Rumus fisika jangan ditaruh di sini, cuy.
 #define NOMINMAX
 #include "MainScript.h"
 

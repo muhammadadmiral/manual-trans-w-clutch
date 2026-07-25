@@ -1,38 +1,4 @@
-// =============================================================================
-// InputHandler.cpp
-// Time-based analog smoothing for throttle / brake / clutch / steer.
-//
-// ── Why "additive per-frame" smoothing was too fast ───────────────────────────
-// The old code did:
-//     value += attack_constant;   // each frame
-// At 60 fps, attack=0.05 → value reaches 1.0 in just 20 frames = 0.33 s.
-// Even attack=0.01 still reaches 1.0 in 100 frames = 1.67 s at 60 fps, but
-// at 120 fps (0.008 s/frame) the same 0.01 per frame gives 0.01×120 = 1.2/s
-// — nearly instantaneous.
-//
-// ── New approach: exponential decay with real deltaTime ───────────────────────
-// The smoothed value V is driven toward the target T as:
-//     V += (T - V) × (1 - exp(-Δt / τ))
-// where τ (tau) is the time constant in seconds.
-//   τ = 0.05 → reaches 63 % of target in 50 ms  (very fast — clutch snap)
-//   τ = 0.15 → reaches 63 % of target in 150 ms (throttle attack)
-//   τ = 0.30 → reaches 63 % of target in 300 ms (throttle release — coasting)
-//   τ = 0.50 → reaches 63 % of target in 500 ms (smooth braking ramp)
-//
-// This is framerate-independent: a 120 Hz player and a 30 Hz player feel
-// exactly the same pedal response.
-//
-// ── Expo curve (optional shaping on top) ─────────────────────────────────────
-// After smoothing, an optional cubic expo curve re-maps the value:
-//     y = x × (1 - expo) + x³ × expo
-// expo=0 is linear, expo=0.5 gives gentle deadband+progression,
-// expo=1.0 is full cubic (slow centre, fast edges).
-//
-// ── Keyboard vs controller ────────────────────────────────────────────────────
-// Since GTA V keyboard gives only 0/1 targets, smoothing IS the entire
-// feel of the pedal. The time constants in the config INI should be tuned to
-// taste — recommended starting points are in Config.cpp (e.g. τ_throttle = 0.10).
-// =============================================================================
+// Ambil pedal GTA apa adanya; smoothing custom cuma dipakai buat clutch digital.
 #define NOMINMAX
 #include "InputHandler.h"
 #include "../../sdk/inc/natives.h"
@@ -170,21 +136,13 @@ void Update() {
     const float nativeThrottle = Clamp01(PAD::GET_CONTROL_NORMAL(0, 71));
     s_throttleDown = nativeThrottle > 0.001f ||
                      keyDown(0x57) || keyDown(VK_UP);
-    s_smoothedThrottle = ExpSmooth(
-        nativeThrottle, s_smoothedThrottle,
-        Config::ThrottleAttack,   // τ attack  (s)
-        Config::ThrottleRelease,  // τ release (s)
-        dtSec);
+    s_smoothedThrottle = nativeThrottle;
 
     // ── Brake: S or DOWN ──────────────────────────────────────────────────────
     const float nativeBrake = Clamp01(PAD::GET_CONTROL_NORMAL(0, 72));
     s_brakeDown = nativeBrake > 0.001f ||
                   keyDown(0x53) || keyDown(VK_DOWN);
-    s_smoothedBrake = ExpSmooth(
-        nativeBrake, s_smoothedBrake,
-        Config::BrakeAttack,
-        Config::BrakeRelease,
-        dtSec);
+    s_smoothedBrake = nativeBrake;
 
     // ── Clutch ────────────────────────────────────────────────────────────────
     s_clutchDown = keyDown(Config::KeyClutch);
@@ -209,40 +167,19 @@ void ApplyGameControls(int manualGear, float clutch, float driveThrottle,
                        float forwardSpeed)
 {
     const float finalThrottle = Clamp01(driveThrottle);
-    float finalBrake    = GetSmoothedBrake();
+    const float finalBrake = GetSmoothedBrake();
     const bool hardDisconnect = IsClutchDown() || clutch >= 0.98f;
     const float clutchCoupling =
         hardDisconnect ? 0.0f : (1.0f - Clamp01(clutch));
     s_driveCoupling = manualGear == 0 ? 0.0f : clutchCoupling;
 
-    // Throttle, brake, and steering are deliberately left to GTA's own input
-    // and vehicle simulation whenever the drivetrain is connected. This keeps
-    // keyboard/controller response, ABS, traction and audio native instead of
-    // layering an invented pedal model over the game.
-
-    if (false && manualGear == 0) {
-        // The gearbox is in native-neutral. Disable only the raw accelerator
-        // for this frame, then feed the same control value back so GTA revs
-        // the engine without applying wheel torque.
+    // Reverse doang yang perlu tuker axis. Clutch tetap ngurus torque sendiri.
+    if (manualGear == -1) {
         PAD::DISABLE_CONTROL_ACTION(0, 71, true);
-        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalThrottle);
-    } else if (manualGear == -1) {
-        // Reverse gear — swap throttle/brake controls
-        const float coupledThrottle = finalThrottle;
-        PAD::DISABLE_CONTROL_ACTION(0, 71, true);
-        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, coupledThrottle);
+        PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, finalThrottle);
         if (finalBrake > 0.02f) {
             PAD::SET_CONTROL_VALUE_NEXT_FRAME(0,
                 forwardSpeed > 0.1f ? 72 : 76, finalBrake);
-        }
-    } else {
-        // A pressed clutch neutralizes the gearbox in GearLogic. During that
-        // window use GTA's disabled-control path solely to free-rev the engine.
-        // Once engaged, write no throttle/brake/steer control at all: the game
-        // receives the player's original W/S/A/D input and owns wheel torque.
-        if (false && (hardDisconnect || clutch > 0.45f)) {
-            PAD::DISABLE_CONTROL_ACTION(0, 71, true);
-            PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalThrottle);
         }
     }
 }
@@ -276,18 +213,16 @@ float GetRawSteer()        { return s_rawSteerTarget; }
 float GetDriveCoupling()   { return s_driveCoupling; }
 
 float GetSmoothedThrottle() {
-    return ApplyExpo(s_smoothedThrottle, Config::ThrottleExpo);
+    return s_smoothedThrottle;
 }
 float GetSmoothedBrake() {
-    return ApplyExpo(s_smoothedBrake, Config::BrakeExpo);
+    return s_smoothedBrake;
 }
 float GetSmoothedClutch() {
     return ApplyExpo(s_smoothedClutch, Config::ClutchExpo);
 }
 float GetSmoothedSteer() {
-    float s = ApplyDeadzone(s_smoothedSteer, Config::SteerDeadzonePct);
-    s = ApplyExpo(s, Config::SteerExpo);
-    return ClampSym(s);
+    return s_smoothedSteer;
 }
 
 } // namespace InputHandler
