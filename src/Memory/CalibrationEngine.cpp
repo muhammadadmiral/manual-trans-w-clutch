@@ -240,6 +240,24 @@ static bool SearchGearLayout(uintptr_t vehicleBase,
     return false;
 }
 
+// ── SEH-safe wrapper for SearchGearLayout ────────────────────────────────────
+// MSVC C2712: __try cannot appear in a function that requires object unwinding.
+// This wrapper has ONLY POD locals (GearCluster = 4x uint32_t, no destructor),
+// so __try is valid here.  Never call LOG_ inside this function — std::string
+// internally used by ModLogger would violate the same rule.
+static bool SafeCallSearchGearLayout(uintptr_t vehicleBase, uint32_t rpmOffset,
+                                     GearCluster* pOut)
+{
+    bool result = false;
+    __try {
+        result = SearchGearLayout(vehicleBase, rpmOffset, *pOut);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        OutputDebugStringA("[CalibrationEngine] SEH exception in SearchGearLayout\n");
+        return false;
+    }
+    return result;
+}
+
 } // anonymous namespace
 
 // ============================================================================
@@ -464,18 +482,10 @@ bool Update(int vehicleHandle, bool isEngineOn, bool isRevving,
         for (uint32_t rpmOff : s_rpmCandidates) {
             LOG_DEBUG(Calib, "  Testing RPM=0x%X CLT=0x%X", rpmOff, rpmOff + 12);
 
-            GearCluster cluster;
-            bool found = false;
-
-            __try {
-                found = SearchGearLayout(vehicleBase, rpmOff, cluster);
-            } __except (EXCEPTION_EXECUTE_HANDLER) {
-                LOG_ERROR(Calib, "  SEH exception in SearchGearLayout for RPM=0x%X", rpmOff);
-                continue;
-            }
-
+            GearCluster cluster{};
+            bool found = SafeCallSearchGearLayout(vehicleBase, rpmOff, &cluster);
             if (!found) {
-                LOG_DEBUG(Calib, "  RPM=0x%X: SearchGearLayout returned false", rpmOff);
+                LOG_DEBUG(Calib, "  RPM=0x%X: no layout found (SEH or search failed)", rpmOff);
                 continue;
             }
 
