@@ -20,14 +20,20 @@ static bool IsDriveSelector(Selector selector) {
          selector == Selector::Low2 || selector == Selector::Low1;
 }
 
-static bool CanSelect(Selector from, Selector target, float brake,
-                      float signedSpeedMps) {
+static bool CanSelect(Vehicle vehicle, Selector from, Selector target,
+                      float brake, float signedSpeedMps) {
   const float absSpeed = std::fabs(signedSpeedMps);
   if (target == Selector::Park && absSpeed > 0.8f)
     return false;
   if (target == Selector::Reverse && signedSpeedMps > 0.8f)
     return false;
   if (IsDriveSelector(target) && signedSpeedMps < -0.8f)
+    return false;
+  const float estimatedTop =
+      (std::max)(8.0f, VEHICLE::GET_VEHICLE_ESTIMATED_MAX_SPEED(vehicle));
+  if (target == Selector::Low2 && absSpeed > estimatedTop * 0.48f)
+    return false;
+  if (target == Selector::Low1 && absSpeed > estimatedTop * 0.25f)
     return false;
 
   if (!Config::AutomaticBrakeInterlock)
@@ -40,7 +46,9 @@ static bool CanSelect(Selector from, Selector target, float brake,
   return (!leavingPark && !selectingDirection) || brake >= 0.25f;
 }
 
-static bool DownshiftIsSafe(VehicleData &data, int fromGear, int toGear) {
+static bool DownshiftIsSafe(Vehicle vehicle, VehicleData &data,
+                            int vehicleMaxGear, int fromGear, int toGear,
+                            float signedSpeedMps) {
   if (toGear < 1 || fromGear <= toGear)
     return false;
   const float fromRatio =
@@ -49,7 +57,19 @@ static bool DownshiftIsSafe(VehicleData &data, int fromGear, int toGear) {
       std::fabs(data.GetGearRatio(static_cast<uint8_t>(toGear)));
   if (fromRatio <= 0.01f || toRatio <= 0.01f)
     return true;
-  return data.GetRPM() * toRatio / fromRatio < 0.98f;
+  if (data.GetRPM() * toRatio / fromRatio >= 0.98f)
+    return false;
+
+  const float topRatio = std::fabs(
+      data.GetGearRatio(static_cast<uint8_t>((std::max)(1, vehicleMaxGear))));
+  if (topRatio > 0.01f) {
+    const float estimatedTop =
+        (std::max)(8.0f, VEHICLE::GET_VEHICLE_ESTIMATED_MAX_SPEED(vehicle));
+    const float targetGearLimit = estimatedTop * topRatio / toRatio;
+    if (std::fabs(signedSpeedMps) > targetGearLimit * 0.97f)
+      return false;
+  }
+  return true;
 }
 
 void Reset(Selector initialSelector) {
@@ -72,7 +92,7 @@ void UpdateSelector(Vehicle vehicle, bool selectorUp, bool selectorDown,
     return;
 
   const Selector target = static_cast<Selector>(requested);
-  if (!CanSelect(s_state.selector, target, brake, signedSpeedMps)) {
+  if (!CanSelect(vehicle, s_state.selector, target, brake, signedSpeedMps)) {
     s_state.selectorRejected = true;
     HUD::BEGIN_TEXT_COMMAND_THEFEED_POST("STRING");
     HUD::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME(
@@ -114,7 +134,8 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
     return -1;
   }
 
-  maxGear = (std::max)(1, maxGear);
+  const int vehicleMaxGear = (std::max)(1, maxGear);
+  maxGear = vehicleMaxGear;
   if (s_state.selector == Selector::Low2)
     maxGear = (std::min)(2, maxGear);
   else if (s_state.selector == Selector::Low1)
@@ -152,14 +173,13 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
   const float estimatedTopSpeed =
       (std::max)(8.0f, VEHICLE::GET_VEHICLE_ESTIMATED_MAX_SPEED(vehicle));
   const float upshiftMinSpeed =
-      estimatedTopSpeed *
-      (static_cast<float>(s_state.currentGear) /
-       static_cast<float>((std::max)(1, maxGear))) *
-      (sport ? 0.76f : 0.68f);
+      estimatedTopSpeed * static_cast<float>(s_state.currentGear) *
+      (sport ? 0.060f : 0.050f);
 
   int targetGear = s_state.currentGear;
   if (kickdownRequest &&
-      DownshiftIsSafe(data, s_state.currentGear, s_state.currentGear - 1)) {
+      DownshiftIsSafe(vehicle, data, vehicleMaxGear, s_state.currentGear,
+                      s_state.currentGear - 1, signedSpeedMps)) {
     targetGear = s_state.currentGear - 1;
     s_state.kickdown = true;
   } else if (rpm > upThreshold && s_state.currentGear < maxGear &&
@@ -168,8 +188,9 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
     targetGear = s_state.currentGear + 1;
   } else if ((rpm < downThreshold || (brake > 0.35f && rpm < upThreshold)) &&
              s_state.currentGear > 1 &&
-             DownshiftIsSafe(data, s_state.currentGear,
-                             s_state.currentGear - 1)) {
+             DownshiftIsSafe(vehicle, data, vehicleMaxGear,
+                             s_state.currentGear,
+                             s_state.currentGear - 1, signedSpeedMps)) {
     targetGear = s_state.currentGear - 1;
   }
 
