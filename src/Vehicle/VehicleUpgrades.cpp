@@ -1,10 +1,13 @@
 #include "VehicleUpgrades.h"
 #include "../../sdk/inc/natives.h"
 #include <algorithm>
+#include <Windows.h>
 
 namespace VehicleUpgrades {
 
 static State s_state;
+static Vehicle s_vehicle = 0;
+static ULONGLONG s_lastRefresh = 0;
 
 static float ResolveStage(Vehicle vehicle, int modType, int &level,
                           int &maxLevel) {
@@ -21,6 +24,8 @@ static float ResolveStage(Vehicle vehicle, int modType, int &level,
 
 void Reset() {
   s_state = State{};
+  s_vehicle = 0;
+  s_lastRefresh = 0;
 }
 
 void Initialize(Vehicle vehicle) {
@@ -54,6 +59,14 @@ void Initialize(Vehicle vehicle) {
       s_state.motorcycle && s_state.transmissionStage >= 0.34f;
   s_state.powershifter =
       !s_state.motorcycle && s_state.raceTransmission;
+  s_vehicle = vehicle;
+  s_lastRefresh = GetTickCount64();
+}
+
+void Refresh(Vehicle vehicle) {
+  const ULONGLONG now = GetTickCount64();
+  if (vehicle != s_vehicle || now - s_lastRefresh >= 1000)
+    Initialize(vehicle);
 }
 
 const State &GetState() {

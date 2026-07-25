@@ -630,6 +630,7 @@ void ScriptMain() {
     const float rawThrottle = InputHandler::GetSmoothedThrottle();
     const float rawBrake = InputHandler::GetSmoothedBrake();
     const float rpm = data.GetRPM();
+    VehicleUpgrades::Refresh(vehicle);
 
     // ── Subsystem updates ─────────────────────────────────────────────────
     float simulatedClutch =

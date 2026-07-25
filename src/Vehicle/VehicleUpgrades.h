@@ -23,6 +23,7 @@ struct State {
 
 void Reset();
 void Initialize(Vehicle vehicle);
+void Refresh(Vehicle vehicle);
 const State &GetState();
 
 } // namespace VehicleUpgrades
