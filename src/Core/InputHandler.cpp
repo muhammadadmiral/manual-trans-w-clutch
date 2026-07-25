@@ -133,16 +133,17 @@ void Update() {
     s_signalHazardWasDown = isHazard;
 
     // ── Throttle: W or UP ──────────────────────────────────────────────────────
+    const bool keyboardThrottle = keyDown(0x57) || keyDown(VK_UP);
     const float nativeThrottle = Clamp01(PAD::GET_CONTROL_NORMAL(0, 71));
-    s_throttleDown = nativeThrottle > 0.001f ||
-                     keyDown(0x57) || keyDown(VK_UP);
-    s_smoothedThrottle = nativeThrottle;
+    s_throttleDown = nativeThrottle > 0.001f || keyboardThrottle;
+    s_smoothedThrottle =
+        keyboardThrottle ? 1.0f : nativeThrottle;
 
     // ── Brake: S or DOWN ──────────────────────────────────────────────────────
+    const bool keyboardBrake = keyDown(0x53) || keyDown(VK_DOWN);
     const float nativeBrake = Clamp01(PAD::GET_CONTROL_NORMAL(0, 72));
-    s_brakeDown = nativeBrake > 0.001f ||
-                  keyDown(0x53) || keyDown(VK_DOWN);
-    s_smoothedBrake = nativeBrake;
+    s_brakeDown = nativeBrake > 0.001f || keyboardBrake;
+    s_smoothedBrake = keyboardBrake ? 1.0f : nativeBrake;
 
     // ── Clutch ────────────────────────────────────────────────────────────────
     s_clutchDown = keyDown(Config::KeyClutch);
@@ -176,10 +177,11 @@ void ApplyGameControls(int manualGear, float clutch, float driveThrottle,
     // Reverse doang yang perlu tuker axis. Clutch tetap ngurus torque sendiri.
     if (manualGear == -1) {
         PAD::DISABLE_CONTROL_ACTION(0, 71, true);
+        PAD::DISABLE_CONTROL_ACTION(0, 72, true);
         PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, finalThrottle);
         if (finalBrake > 0.02f) {
-            PAD::SET_CONTROL_VALUE_NEXT_FRAME(0,
-                forwardSpeed > 0.1f ? 72 : 76, finalBrake);
+            // Di reverse, axis accelerate GTA jadi rem lawan arah.
+            PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalBrake);
         }
     }
 }

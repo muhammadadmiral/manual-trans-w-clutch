@@ -11,6 +11,9 @@ struct State {
   float load = 0.0f;
   float stallProgress = 0.0f;
   float engineBrake = 0.0f;
+  float expectedRPM = 0.2f;
+  float creepThrottle = 0.0f;
+  float torqueReserve = 0.0f;
   float previousRPM = 0.2f;
   bool freeRevActive = false;
   bool handlingBacked = false;
@@ -27,6 +30,9 @@ float GetLoad();
 float GetStallProgress();
 float GetEngineBrake();
 float GetInertia();
+float GetExpectedRPM();
+float GetCreepThrottle();
+float GetTorqueReserve();
 const State &GetState();
 
 } // namespace EngineModel

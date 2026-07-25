@@ -430,16 +430,22 @@ void ScriptMain() {
                "PedalClutch=%.3f ClutchKey=%d Coupling=%.3f "
                "NativeClutch=%.3f Actuator=%.3f Throttle=%.3f Brake=%.3f "
                "RPM=%.3f SpeedKmH=%.1f SignedMps=%.2f "
-               "Inertia=%.3f Load=%.3f Stall=%.3f Wheels=%d "
-               "| TCS=%.2f ABS=%.2f | Sig=%d Rev=%d",
+               "Inertia=%.3f ExpectedRPM=%.3f Load=%.3f Creep=%.3f "
+               "TorqueReserve=%.3f Stall=%.3f Wheels=%d "
+               "Clash=%.3f Shock=%.3f | TCS=%.2f ABS=%.2f | Sig=%d Rev=%d",
                manualGear, static_cast<unsigned>(data.GetGear()),
                static_cast<unsigned>(data.GetNextGear()), simulatedClutch,
                InputHandler::IsClutchDown() ? 1 : 0,
                InputHandler::GetDriveCoupling(), data.GetClutch(),
                ClutchSystem::GetNativeActuator(), tcsThrottle, absBrake, rpm,
                speedKmH, forwardSpeed, EngineModel::GetInertia(),
-               EngineModel::GetLoad(), EngineModel::GetStallProgress(),
+               EngineModel::GetExpectedRPM(), EngineModel::GetLoad(),
+               EngineModel::GetCreepThrottle(),
+               EngineModel::GetTorqueReserve(),
+               EngineModel::GetStallProgress(),
                static_cast<int>(data.GetWheelCount()),
+               GearboxSystem::GetState().clashSeverity,
+               GearboxSystem::GetState().shockRemaining,
                TractionControl::IsTCSActive() ? 1.0f : 0.0f, BrakeSystem::IsABSActive() ? 1.0f : 0.0f,
                activeSignal, (manualGear == -1) ? 1 : 0);
       s_lastStatusLog = GetTickCount();
@@ -530,6 +536,8 @@ void ScriptMain() {
           (std::string("TCS: ") +
            (TractionControl::IsTCSActive() ? "~y~ON" : "~g~OK") +
            " | ABS: " + (BrakeSystem::IsABSActive() ? "~y~ON" : "~g~OK") +
+           (LaunchControl::IsActive() ? " | LC: ~b~HOLD" : "") +
+           (GearboxSystem::GetState().clashActive ? " | GEAR: ~r~CLASH" : "") +
            (TurboSystem::HasTurbo()
                 ? (" | BOOST: " +
                    std::to_string(TurboSystem::GetBoostPressure()).substr(0, 4))

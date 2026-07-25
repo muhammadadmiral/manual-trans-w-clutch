@@ -1,5 +1,6 @@
 #include "BrakeSystem.h"
 #include "../VehicleData.h"
+#include "../../Core/Config.h"
 #include "../../../sdk/inc/natives.h"
 #include <algorithm>
 #include <cmath>
@@ -20,6 +21,7 @@ void Reset() {
 
 float UpdateABS(Vehicle vehicle, VehicleData &data, float brakeInput,
                 float speedMps) {
+  s_state.absEnabled = Config::AbsEnabled;
   const uint8_t count = data.GetWheelCount();
   float weightedOmega = 0.0f;
   float totalLoad = 0.0f;
@@ -56,11 +58,15 @@ float UpdateABS(Vehicle vehicle, VehicleData &data, float brakeInput,
   s_state.wheelSlip =
       roadSpeed > 1.0f ? Clamp01((roadSpeed - wheelSpeed) / roadSpeed) : 0.0f;
 
+  const float target = std::clamp(Config::AbsSlipTarget, 0.05f, 0.60f);
   if (s_state.absEnabled && brakeInput > 0.25f && roadSpeed > 3.0f &&
-      s_state.wheelSlip > 0.16f) {
-    s_state.absLevel = Clamp01((s_state.wheelSlip - 0.16f) / 0.24f);
+      s_state.wheelSlip > target) {
+    s_state.absLevel =
+        Clamp01((s_state.wheelSlip - target) / std::max(0.10f, 0.50f - target));
     s_state.absActive = true;
-    const float pressure = brakeInput * (1.0f - 0.70f * s_state.absLevel);
+    const float pressure =
+        brakeInput *
+        (1.0f - Clamp01(Config::AbsMaxRelease) * s_state.absLevel);
     PAD::DISABLE_CONTROL_ACTION(0, 72, true);
     PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, pressure);
     return pressure;
@@ -72,7 +78,10 @@ float UpdateABS(Vehicle vehicle, VehicleData &data, float brakeInput,
   return Clamp01(brakeInput);
 }
 
-void ToggleABS() { s_state.absEnabled = !s_state.absEnabled; }
+void ToggleABS() {
+  Config::AbsEnabled = !Config::AbsEnabled;
+  s_state.absEnabled = Config::AbsEnabled;
+}
 bool IsABSActive() { return s_state.absActive; }
 const State &GetState() { return s_state; }
 

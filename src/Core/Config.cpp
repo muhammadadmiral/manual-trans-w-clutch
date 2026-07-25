@@ -35,6 +35,32 @@ bool RequireColdStart = true;
 bool ForceRecalibrate = false;
 bool LaunchControl = false;
 float LaunchControlRPM = 0.72f;
+bool TcsEnabled = true;
+float TcsSlipTarget = 0.12f;
+float TcsMaxCut = 0.65f;
+bool AbsEnabled = true;
+float AbsSlipTarget = 0.16f;
+float AbsMaxRelease = 0.70f;
+
+bool IdleCreep = true;
+float IdleCreepThrottle = 0.14f;
+bool StallEnabled = true;
+float StallRate = 1.20f;
+float StallClutchThreshold = 0.65f;
+float IdleTorqueFraction = 0.18f;
+
+float ClutchBiteStart = 0.18f;
+float ClutchBiteEnd = 0.43f;
+float ClutchHeatRate = 0.08f;
+float ClutchCoolRate = 0.035f;
+float ClutchFadeStart = 0.85f;
+float ClutchFadeStrength = 0.45f;
+
+bool GearClash = true;
+float GearGrindDamage = 0.04f;
+float ShiftShockStrength = 0.65f;
+float NoLiftShiftPenalty = 0.35f;
+float ConnectedRPMSync = 0.25f;
 
 // ── Analog smoothing — τ in seconds ──────────────────────────────────────────
 // Recommended defaults for keyboard play:
@@ -47,7 +73,7 @@ float ThrottleRelease = 0.60f;
 float BrakeAttack     = 0.30f;
 float BrakeRelease    = 0.50f;
 float ClutchAttack    = 0.20f;
-float ClutchRelease   = 0.35f;
+float ClutchRelease   = 0.06f;
 
 // Steering
 float SteerAttack      = 0.15f;
@@ -145,6 +171,38 @@ void ReadConfig(HMODULE module) {
     RequireColdStart = GetPrivateProfileIntA("Vehicles", "RequireColdStart",1, ini) != 0;
     LaunchControl = GetPrivateProfileIntA("Engine", "LaunchControl", 0, ini) != 0;
     LaunchControlRPM = ReadFloat("Engine", "LaunchControlRPM", 0.72f, ini);
+    IdleCreep = GetPrivateProfileIntA("Engine", "IdleCreep", 1, ini) != 0;
+    IdleCreepThrottle = ReadFloat("Engine", "IdleCreepThrottle", 0.14f, ini);
+    StallEnabled = GetPrivateProfileIntA("Engine", "StallEnabled", 1, ini) != 0;
+    StallRate = ReadFloat("Engine", "StallRate", 1.20f, ini);
+    StallClutchThreshold =
+        ReadFloat("Engine", "StallClutchThreshold", 0.65f, ini);
+    IdleTorqueFraction =
+        ReadFloat("Engine", "IdleTorqueFraction", 0.18f, ini);
+    ConnectedRPMSync =
+        ReadFloat("Engine", "ConnectedRPMSync", 0.25f, ini);
+
+    TcsEnabled = GetPrivateProfileIntA("Assists", "TCS", 1, ini) != 0;
+    TcsSlipTarget = ReadFloat("Assists", "TCSSlipTarget", 0.12f, ini);
+    TcsMaxCut = ReadFloat("Assists", "TCSMaxCut", 0.65f, ini);
+    AbsEnabled = GetPrivateProfileIntA("Assists", "ABS", 1, ini) != 0;
+    AbsSlipTarget = ReadFloat("Assists", "ABSSlipTarget", 0.16f, ini);
+    AbsMaxRelease = ReadFloat("Assists", "ABSMaxRelease", 0.70f, ini);
+
+    GearClash = GetPrivateProfileIntA("Gearbox", "ClashEnabled", 1, ini) != 0;
+    GearGrindDamage = ReadFloat("Gearbox", "GrindDamage", 0.04f, ini);
+    ShiftShockStrength =
+        ReadFloat("Gearbox", "ShiftShockStrength", 0.65f, ini);
+    NoLiftShiftPenalty =
+        ReadFloat("Gearbox", "NoLiftShiftPenalty", 0.35f, ini);
+
+    ClutchBiteStart = ReadFloat("Clutch", "BiteStart", 0.18f, ini);
+    ClutchBiteEnd = ReadFloat("Clutch", "BiteEnd", 0.43f, ini);
+    ClutchHeatRate = ReadFloat("Clutch", "HeatRate", 0.08f, ini);
+    ClutchCoolRate = ReadFloat("Clutch", "CoolRate", 0.035f, ini);
+    ClutchFadeStart = ReadFloat("Clutch", "FadeStart", 0.85f, ini);
+    ClutchFadeStrength =
+        ReadFloat("Clutch", "FadeStrength", 0.45f, ini);
 
     // Analog smoothing τ (seconds)
     ThrottleAttack   = ReadFloat("Analog", "ThrottleAttack",   0.08f,  ini);
@@ -203,6 +261,32 @@ void SaveConfig(HMODULE module) {
     WriteInt("Vehicles", "RequireColdStart", RequireColdStart ? 1 : 0, ini);
     WriteInt("Engine", "LaunchControl", LaunchControl ? 1 : 0, ini);
     WriteFloat("Engine", "LaunchControlRPM", LaunchControlRPM, ini);
+    WriteInt("Engine", "IdleCreep", IdleCreep ? 1 : 0, ini);
+    WriteFloat("Engine", "IdleCreepThrottle", IdleCreepThrottle, ini);
+    WriteInt("Engine", "StallEnabled", StallEnabled ? 1 : 0, ini);
+    WriteFloat("Engine", "StallRate", StallRate, ini);
+    WriteFloat("Engine", "StallClutchThreshold", StallClutchThreshold, ini);
+    WriteFloat("Engine", "IdleTorqueFraction", IdleTorqueFraction, ini);
+    WriteFloat("Engine", "ConnectedRPMSync", ConnectedRPMSync, ini);
+
+    WriteInt("Assists", "TCS", TcsEnabled ? 1 : 0, ini);
+    WriteFloat("Assists", "TCSSlipTarget", TcsSlipTarget, ini);
+    WriteFloat("Assists", "TCSMaxCut", TcsMaxCut, ini);
+    WriteInt("Assists", "ABS", AbsEnabled ? 1 : 0, ini);
+    WriteFloat("Assists", "ABSSlipTarget", AbsSlipTarget, ini);
+    WriteFloat("Assists", "ABSMaxRelease", AbsMaxRelease, ini);
+
+    WriteInt("Gearbox", "ClashEnabled", GearClash ? 1 : 0, ini);
+    WriteFloat("Gearbox", "GrindDamage", GearGrindDamage, ini);
+    WriteFloat("Gearbox", "ShiftShockStrength", ShiftShockStrength, ini);
+    WriteFloat("Gearbox", "NoLiftShiftPenalty", NoLiftShiftPenalty, ini);
+
+    WriteFloat("Clutch", "BiteStart", ClutchBiteStart, ini);
+    WriteFloat("Clutch", "BiteEnd", ClutchBiteEnd, ini);
+    WriteFloat("Clutch", "HeatRate", ClutchHeatRate, ini);
+    WriteFloat("Clutch", "CoolRate", ClutchCoolRate, ini);
+    WriteFloat("Clutch", "FadeStart", ClutchFadeStart, ini);
+    WriteFloat("Clutch", "FadeStrength", ClutchFadeStrength, ini);
 
     WriteFloat("Analog", "ThrottleAttack",   ThrottleAttack,  ini);
     WriteFloat("Analog", "ThrottleRelease",  ThrottleRelease, ini);

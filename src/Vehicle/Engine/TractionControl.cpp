@@ -1,5 +1,6 @@
 #include "TractionControl.h"
 #include "../VehicleData.h"
+#include "../../Core/Config.h"
 #include "../../../sdk/inc/natives.h"
 #include <algorithm>
 #include <cmath>
@@ -20,6 +21,7 @@ void Reset() {
 
 void Update(Vehicle vehicle, VehicleData &data, float speedMps,
             int gear, float clutchDisengagement, float &throttle) {
+  s_state.enabled = Config::TcsEnabled;
   const uint8_t count = data.GetWheelCount();
   float drivenOmega = 0.0f;
   float drivenWeight = 0.0f;
@@ -65,11 +67,15 @@ void Update(Vehicle vehicle, VehicleData &data, float speedMps,
   s_state.slipRatio =
       (wheelSpeed - roadSpeed) / std::max(roadSpeed, 3.0f);
 
+  const float target = std::clamp(Config::TcsSlipTarget, 0.02f, 0.60f);
   if (s_state.enabled && gear > 0 && clutchDisengagement < 0.40f &&
-      throttle > 0.10f && roadSpeed > 3.0f && s_state.slipRatio > 0.12f) {
-    s_state.cutLevel = Clamp01((s_state.slipRatio - 0.12f) / 0.35f);
+      throttle > 0.10f && roadSpeed > 3.0f &&
+      s_state.slipRatio > target) {
+    s_state.cutLevel =
+        Clamp01((s_state.slipRatio - target) / std::max(0.10f, 0.50f - target));
     s_state.active = true;
-    throttle *= 1.0f - 0.75f * s_state.cutLevel;
+    throttle *=
+        1.0f - Clamp01(Config::TcsMaxCut) * s_state.cutLevel;
     PAD::DISABLE_CONTROL_ACTION(0, 71, true);
     PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, throttle);
   } else {
@@ -80,7 +86,10 @@ void Update(Vehicle vehicle, VehicleData &data, float speedMps,
   (void)vehicle;
 }
 
-void ToggleTCS() { s_state.enabled = !s_state.enabled; }
+void ToggleTCS() {
+  Config::TcsEnabled = !Config::TcsEnabled;
+  s_state.enabled = Config::TcsEnabled;
+}
 bool IsTCSActive() { return s_state.active; }
 const State &GetState() { return s_state; }
 

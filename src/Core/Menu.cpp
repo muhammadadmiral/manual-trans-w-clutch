@@ -67,8 +67,11 @@ void Menu::Initialize() {
   main.title = "MANUAL TRANS";
   main.items.push_back(MenuItem("Main Settings", MenuItem::Submenu, 1));
   main.items.push_back(MenuItem("Controls / Keybinds", MenuItem::Submenu, 4));
-  main.items.push_back(MenuItem("Analog Tuning", MenuItem::Submenu, 2));
   main.items.push_back(MenuItem("HUD Settings", MenuItem::Submenu, 3));
+  main.items.push_back(MenuItem("Engine / Stall", MenuItem::Submenu, 5));
+  main.items.push_back(MenuItem("Clutch", MenuItem::Submenu, 6));
+  main.items.push_back(MenuItem("ABS / TCS", MenuItem::Submenu, 7));
+  main.items.push_back(MenuItem("Gearbox Penalty", MenuItem::Submenu, 8));
   menus.push_back(main);
 
   // 1: Main Settings
@@ -82,11 +85,6 @@ void Menu::Initialize() {
       MenuItem("Allow Quadbikes", MenuItem::Bool, &Config::AllowQuadbikes));
   settings.items.push_back(
       MenuItem("Use Real Clutch", MenuItem::Bool, &Config::UseRealClutch));
-  settings.items.push_back(
-      MenuItem("Launch Control", MenuItem::Bool, &Config::LaunchControl));
-  settings.items.push_back(MenuItem("Launch RPM", MenuItem::Float,
-                                    &Config::LaunchControlRPM,
-                                    0.01f, 0.40f, 0.95f));
   menus.push_back(settings);
 
   // 2: Analog Tuning
@@ -123,7 +121,103 @@ void Menu::Initialize() {
       MenuItem("Turn Signal Left", MenuItem::KeyBind, &Config::KeySignalLeft));
   keys.items.push_back(MenuItem("Turn Signal Right", MenuItem::KeyBind,
                                 &Config::KeySignalRight));
+  keys.items.push_back(MenuItem("Parking Brake", MenuItem::KeyBind,
+                                &Config::KeyParkingBrake));
   menus.push_back(keys);
+
+  Submenu engine;
+  engine.title = "ENGINE / STALL";
+  engine.items.push_back(
+      MenuItem("Idle Creep", MenuItem::Bool, &Config::IdleCreep));
+  engine.items.push_back(MenuItem("Creep Throttle", MenuItem::Float,
+                                  &Config::IdleCreepThrottle,
+                                  0.01f, 0.00f, 0.40f));
+  engine.items.push_back(
+      MenuItem("Engine Stall", MenuItem::Bool, &Config::StallEnabled));
+  engine.items.push_back(MenuItem("Stall Rate", MenuItem::Float,
+                                  &Config::StallRate,
+                                  0.05f, 0.10f, 4.00f));
+  engine.items.push_back(MenuItem("Stall Clutch", MenuItem::Float,
+                                  &Config::StallClutchThreshold,
+                                  0.01f, 0.30f, 0.95f));
+  engine.items.push_back(MenuItem("Idle Torque", MenuItem::Float,
+                                  &Config::IdleTorqueFraction,
+                                  0.01f, 0.02f, 0.60f));
+  engine.items.push_back(MenuItem("RPM Sync", MenuItem::Float,
+                                  &Config::ConnectedRPMSync,
+                                  0.01f, 0.00f, 1.00f));
+  engine.items.push_back(
+      MenuItem("Launch Control", MenuItem::Bool, &Config::LaunchControl));
+  engine.items.push_back(MenuItem("Launch RPM", MenuItem::Float,
+                                  &Config::LaunchControlRPM,
+                                  0.01f, 0.40f, 0.95f));
+  menus.push_back(engine);
+
+  Submenu clutchMenu;
+  clutchMenu.title = "CLUTCH";
+  clutchMenu.items.push_back(MenuItem("Pedal Attack", MenuItem::Float,
+                                      &Config::ClutchAttack,
+                                      0.005f, 0.005f, 0.50f));
+  clutchMenu.items.push_back(MenuItem("Pedal Release", MenuItem::Float,
+                                      &Config::ClutchRelease,
+                                      0.005f, 0.005f, 0.50f));
+  clutchMenu.items.push_back(MenuItem("Pedal Expo", MenuItem::Float,
+                                      &Config::ClutchExpo,
+                                      0.01f, 0.00f, 1.00f));
+  clutchMenu.items.push_back(MenuItem("Bite Start", MenuItem::Float,
+                                      &Config::ClutchBiteStart,
+                                      0.01f, 0.02f, 0.80f));
+  clutchMenu.items.push_back(MenuItem("Bite End", MenuItem::Float,
+                                      &Config::ClutchBiteEnd,
+                                      0.01f, 0.10f, 0.98f));
+  clutchMenu.items.push_back(MenuItem("Heat Rate", MenuItem::Float,
+                                      &Config::ClutchHeatRate,
+                                      0.01f, 0.00f, 0.50f));
+  clutchMenu.items.push_back(MenuItem("Cool Rate", MenuItem::Float,
+                                      &Config::ClutchCoolRate,
+                                      0.005f, 0.00f, 0.30f));
+  clutchMenu.items.push_back(MenuItem("Fade Start", MenuItem::Float,
+                                      &Config::ClutchFadeStart,
+                                      0.01f, 0.50f, 0.99f));
+  clutchMenu.items.push_back(MenuItem("Fade Strength", MenuItem::Float,
+                                      &Config::ClutchFadeStrength,
+                                      0.01f, 0.00f, 1.00f));
+  menus.push_back(clutchMenu);
+
+  Submenu assists;
+  assists.title = "ABS / TCS";
+  assists.items.push_back(
+      MenuItem("TCS", MenuItem::Bool, &Config::TcsEnabled));
+  assists.items.push_back(MenuItem("TCS Slip Target", MenuItem::Float,
+                                   &Config::TcsSlipTarget,
+                                   0.01f, 0.02f, 0.60f));
+  assists.items.push_back(MenuItem("TCS Max Cut", MenuItem::Float,
+                                   &Config::TcsMaxCut,
+                                   0.01f, 0.00f, 1.00f));
+  assists.items.push_back(
+      MenuItem("ABS", MenuItem::Bool, &Config::AbsEnabled));
+  assists.items.push_back(MenuItem("ABS Slip Target", MenuItem::Float,
+                                   &Config::AbsSlipTarget,
+                                   0.01f, 0.05f, 0.60f));
+  assists.items.push_back(MenuItem("ABS Max Release", MenuItem::Float,
+                                   &Config::AbsMaxRelease,
+                                   0.01f, 0.00f, 1.00f));
+  menus.push_back(assists);
+
+  Submenu gearbox;
+  gearbox.title = "GEARBOX PENALTY";
+  gearbox.items.push_back(
+      MenuItem("Gear Clash", MenuItem::Bool, &Config::GearClash));
+  gearbox.items.push_back(MenuItem("Grind Damage", MenuItem::Float,
+                                   &Config::GearGrindDamage,
+                                   0.005f, 0.00f, 0.20f));
+  gearbox.items.push_back(MenuItem("Shift Shock", MenuItem::Float,
+                                   &Config::ShiftShockStrength,
+                                   0.01f, 0.00f, 1.00f));
+  gearbox.items.push_back(MenuItem("No-lift Penalty", MenuItem::Float,
+                                   &Config::NoLiftShiftPenalty,
+                                   0.01f, 0.00f, 1.00f));
+  menus.push_back(gearbox);
 
   menuStack.push_back(0); // Push Main Menu
 }

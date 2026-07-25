@@ -1,5 +1,6 @@
 #include "ClutchSystem.h"
 #include "../VehicleData.h"
+#include "../../Core/Config.h"
 #include "../../../sdk/inc/natives.h"
 #include <algorithm>
 #include <cmath>
@@ -22,11 +23,13 @@ void Reset() {
 }
 
 float UpdatePedal(float rawPedal, float throttle, bool engineOn) {
-  constexpr float kFreePlayEnd = 0.18f;
-  constexpr float kFullyOpenAt = 0.43f;
+  const float freePlayEnd =
+      std::clamp(Config::ClutchBiteStart, 0.02f, 0.80f);
+  const float fullyOpenAt =
+      std::clamp(Config::ClutchBiteEnd, freePlayEnd + 0.05f, 0.98f);
 
   const float travel =
-      (Clamp01(rawPedal) - kFreePlayEnd) / (kFullyOpenAt - kFreePlayEnd);
+      (Clamp01(rawPedal) - freePlayEnd) / (fullyOpenAt - freePlayEnd);
   float disengagement = SmoothStep(travel);
   float engagement = 1.0f - disengagement;
 
@@ -35,15 +38,18 @@ float UpdatePedal(float rawPedal, float throttle, bool engineOn) {
   if (s_state.slipping) {
     const float slipEnergy =
         (1.0f - engagement) * (0.25f + Clamp01(throttle) * 0.75f);
-    s_state.heat += slipEnergy * 0.08f * dt;
+    s_state.heat += slipEnergy * std::max(0.0f, Config::ClutchHeatRate) * dt;
   } else {
-    s_state.heat -= 0.035f * dt;
+    s_state.heat -= std::max(0.0f, Config::ClutchCoolRate) * dt;
   }
   s_state.heat = Clamp01(s_state.heat);
 
-  if (s_state.heat > 0.85f) {
-    const float fade = (s_state.heat - 0.85f) / 0.15f;
-    engagement *= 1.0f - 0.45f * Clamp01(fade);
+  const float fadeStart =
+      std::clamp(Config::ClutchFadeStart, 0.50f, 0.99f);
+  if (s_state.heat > fadeStart) {
+    const float fade = (s_state.heat - fadeStart) / (1.0f - fadeStart);
+    engagement *=
+        1.0f - Clamp01(Config::ClutchFadeStrength) * Clamp01(fade);
     disengagement = 1.0f - engagement;
   }
 

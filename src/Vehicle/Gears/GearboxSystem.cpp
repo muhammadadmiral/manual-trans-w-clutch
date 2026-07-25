@@ -1,5 +1,6 @@
 #include "GearboxSystem.h"
 #include "../VehicleData.h"
+#include "../../Core/Config.h"
 #include "../../../sdk/inc/natives.h"
 #include <algorithm>
 #include <cmath>
@@ -27,10 +28,84 @@ void Update(VehicleData &data, int gear, int maxGear,
   } else {
     s_state.overRev = std::max(0.0f, s_state.overRev - dt * 2.0f);
   }
+
+  if (s_state.pendingEngagement && clutchDisengagement >= 0.35f) {
+    s_state.torqueCut = 0.0f;
+  } else if (s_state.shockRemaining > 0.0f) {
+    s_state.pendingEngagement = false;
+    s_state.shockRemaining =
+        std::max(0.0f, s_state.shockRemaining - dt);
+    const float envelope =
+        std::clamp(s_state.shockRemaining / 0.20f, 0.0f, 1.0f);
+    s_state.torqueCut =
+        std::clamp(Config::ShiftShockStrength, 0.0f, 1.0f) *
+        s_state.clashSeverity * envelope;
+
+    const float rpm = data.GetRPM();
+    const float corrected =
+        rpm + (s_state.shiftTargetRPM - rpm) *
+                  std::clamp(dt * (4.0f + s_state.clashSeverity * 8.0f),
+                             0.0f, 1.0f);
+    data.SetRPM(std::clamp(corrected, 0.0f, 1.0f));
+
+    if (gear > 0 && throttle > 0.01f && s_state.torqueCut > 0.01f) {
+      PAD::DISABLE_CONTROL_ACTION(0, 71, true);
+      PAD::SET_CONTROL_VALUE_NEXT_FRAME(
+          0, 71, throttle * (1.0f - std::min(0.80f, s_state.torqueCut)));
+    }
+    if (s_state.clashSeverity > 0.15f)
+      PAD::SET_CONTROL_SHAKE(0, 90,
+          static_cast<int>(80.0f + s_state.clashSeverity * 120.0f));
+  } else {
+    s_state.torqueCut = 0.0f;
+    s_state.clashActive = false;
+  }
 }
 
 void NotifyGrind() {
-  s_state.health = std::max(0.0f, s_state.health - 0.04f);
+  s_state.health =
+      std::max(0.0f, s_state.health - std::max(0.0f, Config::GearGrindDamage));
+}
+
+void NotifyShift(VehicleData &data, int fromGear, int toGear,
+                 float clutchDisengagement, float throttle) {
+  s_state.lastFromGear = fromGear;
+  s_state.lastToGear = toGear;
+
+  const uint8_t fromIndex =
+      fromGear < 0 ? 0 : static_cast<uint8_t>(fromGear);
+  const uint8_t toIndex =
+      toGear < 0 ? 0 : static_cast<uint8_t>(toGear);
+  const float fromRatio = std::fabs(data.GetGearRatio(fromIndex));
+  const float toRatio = std::fabs(data.GetGearRatio(toIndex));
+  const float rpm = data.GetRPM();
+
+  s_state.shiftTargetRPM = rpm;
+  if (fromGear != 0 && toGear != 0 && fromRatio > 0.01f &&
+      toRatio > 0.01f) {
+    s_state.shiftTargetRPM =
+        std::clamp(rpm * toRatio / fromRatio, 0.15f, 1.0f);
+  }
+  s_state.syncError = std::fabs(s_state.shiftTargetRPM - rpm);
+
+  const bool clutchless = clutchDisengagement < 0.35f;
+  const float noLift =
+      throttle * std::clamp(Config::NoLiftShiftPenalty, 0.0f, 1.0f);
+  s_state.clashSeverity = std::clamp(
+      (clutchless ? 0.55f : 0.0f) + s_state.syncError * 1.25f + noLift,
+      0.0f, 1.0f);
+  s_state.clashActive = Config::GearClash && s_state.clashSeverity > 0.05f;
+  s_state.shockRemaining =
+      s_state.clashActive ? 0.10f + 0.14f * s_state.clashSeverity : 0.0f;
+  s_state.pendingEngagement =
+      s_state.clashActive && clutchDisengagement >= 0.35f;
+
+  if (clutchless && Config::GearClash) {
+    s_state.health = std::max(
+        0.0f, s_state.health -
+                  std::max(0.0f, Config::GearGrindDamage) *
+                      (0.5f + s_state.clashSeverity));
+  }
 }
 
 void NotifyRevMatch(float currentRPM, float targetRPM) {

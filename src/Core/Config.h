@@ -33,6 +33,33 @@ extern bool ForceRecalibrate;
 extern bool LaunchControl;
 extern float LaunchControlRPM;
 
+extern bool TcsEnabled;
+extern float TcsSlipTarget;
+extern float TcsMaxCut;
+extern bool AbsEnabled;
+extern float AbsSlipTarget;
+extern float AbsMaxRelease;
+
+extern bool IdleCreep;
+extern float IdleCreepThrottle;
+extern bool StallEnabled;
+extern float StallRate;
+extern float StallClutchThreshold;
+extern float IdleTorqueFraction;
+
+extern float ClutchBiteStart;
+extern float ClutchBiteEnd;
+extern float ClutchHeatRate;
+extern float ClutchCoolRate;
+extern float ClutchFadeStart;
+extern float ClutchFadeStrength;
+
+extern bool GearClash;
+extern float GearGrindDamage;
+extern float ShiftShockStrength;
+extern float NoLiftShiftPenalty;
+extern float ConnectedRPMSync;
+
 // ── Analog smoothing — time constants τ in seconds ────────────────────────────
 // See header comment above for interpretation.
 // Recommended starting defaults (set in Config.cpp):

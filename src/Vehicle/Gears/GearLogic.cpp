@@ -39,36 +39,37 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
   const bool canShift =
       (currentTime - s_lastShiftTime) > 80; // permit quick multi-gear selection
 
-  // --- Gear Shift Logic & Clutch Check ("Gredek" / Grind sound) ---
   if (canShift) {
     if (isUp && s_manualGear < maxGear) {
-      if (clutch < 0.35f && isEngineOn) {
+      const int fromGear = s_manualGear;
+      const int toGear = s_manualGear + 1;
+      const bool clutchless = clutch < 0.35f && isEngineOn;
+      GearboxSystem::NotifyShift(data, fromGear, toGear, clutch, throttle);
+      s_manualGear = toGear;
+      if (clutchless) {
         PlayGearGrindSound(vehicle);
-        GearboxSystem::NotifyGrind();
         grindWarningTimer = 45;
-        s_lastShiftTime = currentTime;
       } else {
-        ++s_manualGear;
         PlayGearShiftSound();
-        s_lastShiftTime = currentTime;
       }
+      s_lastShiftTime = currentTime;
     } else if (isDown && s_manualGear > -1) {
-      if (clutch < 0.35f && isEngineOn) {
+      const int fromGear = s_manualGear;
+      const int toGear = s_manualGear - 1;
+      const bool clutchless = clutch < 0.35f && isEngineOn;
+      GearboxSystem::NotifyShift(data, fromGear, toGear, clutch, throttle);
+      s_manualGear = toGear;
+      if (clutchless) {
         PlayGearGrindSound(vehicle);
-        GearboxSystem::NotifyGrind();
         grindWarningTimer = 45;
-        s_lastShiftTime = currentTime;
       } else {
-        --s_manualGear;
         PlayGearShiftSound();
-        s_lastShiftTime = currentTime;
       }
+      s_lastShiftTime = currentTime;
     }
   }
 
-  (void)data;
   (void)maxGear;
-  (void)throttle;
   (void)speedKmH;
   (void)isEngineOn;
   return s_manualGear;
