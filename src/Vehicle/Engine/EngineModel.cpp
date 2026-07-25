@@ -99,17 +99,6 @@ void Reset() {
   s_state = State{};
 }
 
-void RestoreRuntimeDriveForce(VehicleData &data) {
-  if (s_state.runtimeDriveForceOwned &&
-      s_state.runtimeDriveForceBase > 0.001f) {
-    data.SetRuntimeDriveForce(s_state.runtimeDriveForceBase);
-  }
-  s_state.runtimeDriveForceOwned = false;
-  s_state.runtimeDriveForceBase = 0.0f;
-  s_state.runtimeDriveForceApplied = 0.0f;
-  s_state.runtimeDriveForceMultiplier = 1.0f;
-}
-
 static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
                                int maxGear,
                                float engagement, float throttle,
@@ -314,8 +303,9 @@ static void UpdateDriveTorque(int gear, int maxGear, float engagement,
       positiveReserve > 0.02f && lowRpmDemand > 0.02f;
   const float recoveryTarget =
       needsRecovery
-          ? Clamp01(throttle) * lowRpmDemand * positiveReserve *
-                (0.22f + gearWeight * 0.78f) * accelerationDeficit
+          ? Clamp01(throttle) * lowRpmDemand *
+                (0.45f + positiveReserve * 0.55f) *
+                (0.65f + gearWeight * 2.10f) * accelerationDeficit
           : 0.0f;
   const float recoveryRate =
       recoveryTarget > s_state.lowRpmRecovery ? 2.8f : 7.0f;
@@ -336,70 +326,7 @@ static void UpdateDriveTorque(int gear, int maxGear, float engagement,
       SmoothStep((s_state.wheelRPM - 1.0f) / 0.08f);
   output *= 1.0f - limiter;
   s_state.redlineCut = limiter >= 0.98f;
-  s_state.driveTorqueFactor = std::clamp(output, 0.0f, 1.80f);
-}
-
-static void UpdateRuntimeDriveForce(VehicleData &data, int gear, int maxGear,
-                                    float engagement, float throttle,
-                                    float brake, bool engineOn, float dt) {
-  const float currentForce = data.GetRuntimeDriveForce();
-  const bool currentValid =
-      std::isfinite(currentForce) && currentForce > 0.001f &&
-      currentForce < 10.0f;
-  if (!currentValid) {
-    s_state.runtimeDriveForceOwned = false;
-    s_state.runtimeDriveForceMultiplier = 1.0f;
-    return;
-  }
-
-  if (!s_state.runtimeDriveForceOwned) {
-    s_state.runtimeDriveForceBase = currentForce;
-  } else {
-    const float tolerance =
-        std::max(0.002f, s_state.runtimeDriveForceBase * 0.06f);
-    if (std::fabs(currentForce - s_state.runtimeDriveForceApplied) >
-        tolerance) {
-      s_state.runtimeDriveForceBase = currentForce;
-    }
-  }
-
-  const int absoluteGear = std::abs(gear);
-  const float gearSpan =
-      static_cast<float>((std::max)(1, maxGear - 1));
-  const float gearWeight =
-      Clamp01(static_cast<float>((std::max)(0, absoluteGear - 1)) / gearSpan);
-  const float lowBand =
-      1.0f - SmoothStep((s_state.wheelRPM - s_state.idleRPM) /
-                        std::max(0.08f, 0.52f - s_state.idleRPM));
-  const float requestedAcceleration =
-      Clamp01(throttle) * (0.35f + Clamp01(s_state.torqueReserve / 0.45f));
-  const float accelerationDeficit =
-      Clamp01((requestedAcceleration - s_state.longitudinalAcceleration) /
-              2.60f);
-  const bool recoveryAllowed =
-      engineOn && gear != 0 && engagement > 0.58f && throttle > 0.05f &&
-      brake < 0.12f && !s_state.redlineCut;
-  const float targetMultiplier =
-      recoveryAllowed
-          ? 1.0f + lowBand * Clamp01(throttle) * accelerationDeficit *
-                       (0.85f + gearWeight * 1.55f)
-          : 1.0f;
-  const float rate =
-      targetMultiplier > s_state.runtimeDriveForceMultiplier ? 3.8f : 9.0f;
-  s_state.runtimeDriveForceMultiplier +=
-      (targetMultiplier - s_state.runtimeDriveForceMultiplier) *
-      Clamp01(dt * rate);
-  s_state.runtimeDriveForceMultiplier =
-      std::clamp(s_state.runtimeDriveForceMultiplier, 1.0f, 3.25f);
-
-  const float targetForce =
-      std::clamp(s_state.runtimeDriveForceBase *
-                     s_state.runtimeDriveForceMultiplier,
-                 0.001f, 9.5f);
-  if (data.SetRuntimeDriveForce(targetForce)) {
-    s_state.runtimeDriveForceApplied = targetForce;
-    s_state.runtimeDriveForceOwned = true;
-  }
+  s_state.driveTorqueFactor = std::clamp(output, 0.0f, 4.50f);
 }
 
 bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
@@ -588,8 +515,6 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
       speedMps, engineOn, dt, automaticMode);
   UpdateDriveTorque(gear, maxGear, clutchEngagement, throttle, brake,
                     engineOn, dt);
-  UpdateRuntimeDriveForce(data, gear, maxGear, clutchEngagement, throttle,
-                          brake, engineOn, dt);
   return stalled;
 }
 

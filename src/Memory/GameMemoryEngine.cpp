@@ -326,17 +326,6 @@ void CVehicle::SetThrottlePedal(float throttle) {
   }
 }
 
-void CVehicle::SetTransmissionDriveForce(float force) {
-  if (!IsValid() || m_offsets->TransmissionDriveForce == 0 ||
-      !std::isfinite(force) || force < 0.001f || force > 10.0f)
-    return;
-  __try {
-    *reinterpret_cast<float *>(
-        m_address + m_offsets->TransmissionDriveForce) = force;
-  } __except (EXCEPTION_EXECUTE_HANDLER) {
-  }
-}
-
 void CVehicle::SetLightsBroken(uint8_t state) {
   if (!IsValid() || m_offsets->LightsBroken == 0)
     return;

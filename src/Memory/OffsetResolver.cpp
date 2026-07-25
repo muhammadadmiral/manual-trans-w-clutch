@@ -186,9 +186,9 @@ void OffsetResolver::EnrichOptionalOffsets(VehicleOffsets &offsets) {
     offsets.Throttle = offsets.RPM + 0x10;
   }
   if (offsets.NextGear >= 0x68) {
-    // Runtime CTransmission satu cluster sama gear. Nilai ini sudah ikut
-    // upgrade dan rasio kendaraan yang sedang dipakai.
-    offsets.TransmissionDriveForce = offsets.NextGear - 0x68;
+    // Field -0x68 sempat terlihat seperti drive-force saat dibaca, tetapi
+    // write ke sana merusak state internal Enhanced. Jangan pernah expose.
+    offsets.TransmissionDriveForce = 0;
     offsets.TransmissionDriveMaxFlatVel = offsets.NextGear - 0x60;
   }
 

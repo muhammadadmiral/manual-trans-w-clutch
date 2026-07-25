@@ -63,7 +63,6 @@ public:
     float   GetRPM()                     const;
     float   GetThrottle()                const;
     float   GetThrottlePedal()           const;
-    float   GetRuntimeDriveForce()       const;
     float   GetDriveInertia()            const;
     float   GetDriveMaxFlatVel()         const;
     uint8_t GetWheelCount()              const;
@@ -84,7 +83,6 @@ public:
     bool SetRPM(float rpm);
     bool SetThrottle(float throttle);
     bool SetThrottlePedal(float throttle);
-    bool SetRuntimeDriveForce(float force);
     bool SetDriveForce(float force);
     bool SetLightsBroken(uint8_t state);
     bool SetLightsVisuallyBroken(uint8_t state);
