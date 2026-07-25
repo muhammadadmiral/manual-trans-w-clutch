@@ -61,6 +61,7 @@ float UpdateABS(Vehicle vehicle, VehicleData &data, float brakeInput,
     s_state.absLevel = Clamp01((s_state.wheelSlip - 0.16f) / 0.24f);
     s_state.absActive = true;
     const float pressure = brakeInput * (1.0f - 0.70f * s_state.absLevel);
+    PAD::DISABLE_CONTROL_ACTION(0, 72, true);
     PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, pressure);
     return pressure;
   }

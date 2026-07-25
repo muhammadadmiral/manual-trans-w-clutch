@@ -92,15 +92,6 @@ void Menu::Initialize() {
   // 2: Analog Tuning
   Submenu analog;
   analog.title = "ANALOG TUNING";
-  analog.items.push_back(MenuItem("Throttle Attack", MenuItem::Float,
-                                  &Config::ThrottleAttack, 0.01f, 0.01f, 1.0f));
-  analog.items.push_back(MenuItem("Throttle Release", MenuItem::Float,
-                                  &Config::ThrottleRelease, 0.01f, 0.01f,
-                                  1.0f));
-  analog.items.push_back(MenuItem("Brake Attack", MenuItem::Float,
-                                  &Config::BrakeAttack, 0.01f, 0.01f, 1.0f));
-  analog.items.push_back(MenuItem("Brake Release", MenuItem::Float,
-                                  &Config::BrakeRelease, 0.01f, 0.01f, 1.0f));
   analog.items.push_back(MenuItem("Clutch Attack", MenuItem::Float,
                                   &Config::ClutchAttack, 0.01f, 0.01f, 1.0f));
   analog.items.push_back(MenuItem("Clutch Release", MenuItem::Float,

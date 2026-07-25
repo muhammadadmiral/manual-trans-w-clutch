@@ -1,8 +1,4 @@
-// =============================================================================
-// FuelSystem
-// Simulates realistic fuel consumption, oil temperature, fuel gauge HUD,
-// and refueling mechanics. Reads and writes FuelLevel/OilLevel from memory.
-// =============================================================================
+// State fuel dan oli. Interaksi pompa nanti masuk modul terpisah.
 #pragma once
 #include <cstdint>
 #include <Windows.h>

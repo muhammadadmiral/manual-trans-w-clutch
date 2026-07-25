@@ -5,6 +5,7 @@
 #include "TurboSystem.h"
 #include "../VehicleData.h"
 #include "../../../sdk/inc/natives.h"
+#include <algorithm>
 
 namespace TurboSystem {
 
@@ -28,35 +29,28 @@ float Update(Vehicle vehicle, VehicleData &data, float rpm, float throttle, bool
     return 1.0f; // 1.0x power multiplier (no effect)
   }
 
-  // Exhaust flow is proportional to RPM * Throttle
-  float exhaustVolume = (rpm * 0.4f) + (throttle * 0.6f);
-  
-  // Target spool is determined by exhaust volume. A turbo needs enough exhaust 
-  // to spool (e.g. above 0.3 load)
-  float targetSpool = 0.0f;
-  if (exhaustVolume > 0.3f) {
-    targetSpool = Clamp01((exhaustVolume - 0.3f) / 0.7f);
-  }
-  
-  // Spool up is relatively slow (lag), spool down is fast (blow-off)
+  const float dt = std::clamp(MISC::GET_FRAME_TIME(), 0.001f, 0.05f);
+  const float exhaustFlow =
+      Clamp01((rpm - 0.22f) / 0.78f) * Clamp01(throttle);
+  const float targetSpool = exhaustFlow;
+
   if (targetSpool > s_state.spool) {
-    s_state.spool += 0.02f; // Lag
+    s_state.spool += dt * (0.55f + rpm * 0.85f);
     if (s_state.spool > targetSpool) s_state.spool = targetSpool;
+    s_state.blowOffLatched = false;
   } else {
-    // If throttle is cut quickly, we blow off pressure rapidly
     float diff = s_state.spool - targetSpool;
-    if (diff > 0.3f && throttle < 0.1f) {
-      // Sudden throttle lift = blow off valve triggers
+    if (diff > 0.3f && throttle < 0.1f && !s_state.blowOffLatched) {
       AUDIO::PLAY_SOUND_FROM_ENTITY(-1, "TURBO_BLOW_OFF", vehicle, "0", 0, 0);
-      s_state.spool *= 0.5f; // lose 50% pressure instantly
+      s_state.blowOffLatched = true;
     }
-    s_state.spool -= 0.05f;
+    s_state.spool -= dt * (throttle < 0.1f ? 2.8f : 1.2f);
     if (s_state.spool < targetSpool) s_state.spool = targetSpool;
   }
   
   s_state.boostPressure = s_state.spool;
   
-  // Map boost pressure to a power multiplier (up to 1.35x power at max boost)
+  (void)data;
   return 1.0f + (s_state.boostPressure * 0.35f);
 }
 

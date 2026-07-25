@@ -1,29 +1,4 @@
-// =============================================================================
-// VehicleData.h
-// Owns the resolved CVehicle memory offsets (one set per GTA V session) and
-// provides per-vehicle instance accessors for reading / writing those fields.
-//
-// ── Responsibility split ──────────────────────────────────────────────────────
-//   VehicleData (this file)
-//     • Initialize()        — try AOB → INI → start calibration
-//     • IsInitialized()     — whether offsets are ready to use
-//     • GetResolvedOffsets()
-//     • Per-vehicle instance: GetRPM / SetGear / HasPlausibleLayout / etc.
-//
-//   CalibrationEngine (src/Memory/CalibrationEngine.h/cpp)
-//     • State machine: WaitingForEngineOff → … → Done / Failed
-//     • SearchGearLayout — two-pass robust search
-//
-//   OffsetResolver   (src/Memory/OffsetResolver.h/cpp)
-//     • AOB pattern scan (used first by Initialize)
-//
-// Call sequence (MainScript.cpp):
-//   1. VehicleData::Initialize(hmod)     — once per session
-//   2. while !IsInitialized():
-//        VehicleData::UpdateCalibration(...) — drives CalibrationEngine
-//   3. VehicleData data(vehicleHandle)   — per-frame instance
-//      data.GetRPM() / data.SetGear() / …
-// =============================================================================
+// Facade memory kendaraan. Modul domain gak boleh pegang pointer mentah.
 #pragma once
 
 #include "../Memory/CalibrationEngine.h" // CalibrationState enum

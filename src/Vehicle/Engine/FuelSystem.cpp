@@ -1,6 +1,4 @@
-// =============================================================================
-// FuelSystem.cpp  —  Realistic fuel consumption, oil temp, refueling
-// =============================================================================
+// Fuel dan temperatur. Semua rate wajib dikali delta-time.
 #include "FuelSystem.h"
 #include "../VehicleData.h"
 #include "../../../sdk/inc/natives.h"
@@ -16,7 +14,6 @@ static FuelState s_state;
 static inline float Clamp01(float v) { return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v); }
 static inline float Lerp(float a, float b, float t) { return a + (b - a) * Clamp01(t); }
 
-// Per-frame consumption based on load (throttle + RPM)
 static float ComputeConsumptionRate(float rpm, float throttle, bool isEngineOn) {
   if (!isEngineOn) return 0.0f;
   float load   = throttle * 0.6f + rpm * 0.4f;
@@ -33,6 +30,8 @@ void Reset(float savedFuelLevel) {
 
 bool Update(Vehicle vehicle, VehicleData &data, float throttle, float rpm,
             bool isEngineOn, float speedKmH) {
+  const float dt = std::fminf(MISC::GET_FRAME_TIME(), 0.05f);
+  const float frameScale = dt * 60.0f;
 
   // Sync with game's fuel if it changed externally (cheats, etc)
   float memFuel = data.GetFuelLevel();
@@ -43,13 +42,8 @@ bool Update(Vehicle vehicle, VehicleData &data, float throttle, float rpm,
     }
   }
 
-  // ── Refueling ─────────────────────────────────────────────────────────────
-  if (!isEngineOn && speedKmH < 1.0f && s_state.fuelLevel < 1.0f) {
-    s_state.isRefueling = true;
-  }
-
   if (s_state.isRefueling) {
-    s_state.fuelLevel += kRefuelRate;
+    s_state.fuelLevel += kRefuelRate * frameScale;
     if (s_state.fuelLevel >= 1.0f) {
       s_state.fuelLevel            = 1.0f;
       s_state.isRefueling          = false;
@@ -62,30 +56,21 @@ bool Update(Vehicle vehicle, VehicleData &data, float throttle, float rpm,
   // ── Consumption ───────────────────────────────────────────────────────────
   float consumption    = ComputeConsumptionRate(rpm, throttle, isEngineOn);
   float speedMult      = 1.0f + speedKmH / 200.0f;
-  consumption         *= speedMult;
+  consumption         *= speedMult * frameScale;
 
   s_state.fuelLevel   -= consumption;
   s_state.fuelLevel    = Clamp01(s_state.fuelLevel);
   s_state.fuelConsumedTotal    += consumption;
-  s_state.distanceSinceRefuel  += speedKmH / 216000.0f; // km per frame at 60fps
+  s_state.distanceSinceRefuel += speedKmH * dt / 3600.0f;
 
   // ── Oil Temperature ───────────────────────────────────────────────────────
   if (isEngineOn) {
     float heatRate = kOilWarmRate * (1.0f + rpm * 0.5f + throttle * 0.5f);
-    s_state.oilTemperature += heatRate;
+    s_state.oilTemperature += heatRate * frameScale;
   } else {
-    s_state.oilTemperature -= kOilCoolRate;
+    s_state.oilTemperature -= kOilCoolRate * frameScale;
   }
   s_state.oilTemperature = Clamp01(s_state.oilTemperature);
-
-  // Overheating visual effect: slight RPM flicker
-  if (s_state.oilTemperature > kHotOilTemp && isEngineOn) {
-    float currentRPM = data.GetRPM();
-    float flicker    = std::sin(static_cast<float>(GetTickCount()) * 0.05f) * 0.02f;
-    float newRPM     = currentRPM + flicker;
-    newRPM = newRPM < 0.0f ? 0.0f : (newRPM > 1.0f ? 1.0f : newRPM);
-    data.SetRPM(newRPM);
-  }
 
   // ── Low Fuel Warnings ─────────────────────────────────────────────────────
   if (!s_state.lowFuelNotified && s_state.fuelLevel < kLowFuelThreshold) {
@@ -106,6 +91,7 @@ bool Update(Vehicle vehicle, VehicleData &data, float throttle, float rpm,
     return true;
   }
 
+  (void)vehicle;
   return false;
 }
 

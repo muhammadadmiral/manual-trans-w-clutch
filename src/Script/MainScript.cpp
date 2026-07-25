@@ -223,9 +223,11 @@ void ScriptMain() {
                 off.Clutch);
       Renderer::ShowNotification(notify);
       LOG_INFO(
-          Init, "Mod active — src=%s build=%s G=0x%X N=0x%X RPM=0x%X CLT=0x%X",
+          Init, "Mod active — src=%s build=%s G=0x%X N=0x%X RPM=0x%X "
+                "CLT=0x%X THR=0x%X HP=0x%X WHL=0x%X",
           VehicleData::GetOffsetSourceName(), bv.empty() ? "?" : bv.c_str(),
-          off.Gear, off.NextGear, off.RPM, off.Clutch);
+          off.Gear, off.NextGear, off.RPM, off.Clutch, off.Throttle,
+          off.HandlingPtr, off.WheelsPtr);
     }
 
     const int maxGear = VEHICLE::_GET_VEHICLE_MAX_DRIVE_GEAR_COUNT(vehicle);
@@ -424,12 +426,20 @@ void ScriptMain() {
 
     static DWORD s_lastStatusLog = 0;
     if (GetTickCount() - s_lastStatusLog > 1000) {
-      LOG_INFO(Gear, "STATUS: Selected=%d MemGear=%u Next=%u PedalClutch=%.3f ClutchKey=%d DriveCoupling=%.3f ClutchCandidateRO=%.3f InputThrottle=%.3f Brake=%.3f NativeRPM=%.3f SpeedKmH=%.1f SignedMps=%.2f | TCS=%.2f ABS=%.2f | Sig=%d Rev=%d",
+      LOG_INFO(Gear, "STATUS: Selected=%d MemGear=%u Next=%u "
+               "PedalClutch=%.3f ClutchKey=%d Coupling=%.3f "
+               "NativeClutch=%.3f Actuator=%.3f Throttle=%.3f Brake=%.3f "
+               "RPM=%.3f SpeedKmH=%.1f SignedMps=%.2f "
+               "Inertia=%.3f Load=%.3f Stall=%.3f Wheels=%d "
+               "| TCS=%.2f ABS=%.2f | Sig=%d Rev=%d",
                manualGear, static_cast<unsigned>(data.GetGear()),
                static_cast<unsigned>(data.GetNextGear()), simulatedClutch,
                InputHandler::IsClutchDown() ? 1 : 0,
-               InputHandler::GetDriveCoupling(), data.GetClutch(), tcsThrottle,
-               absBrake, rpm, speedKmH, forwardSpeed,
+               InputHandler::GetDriveCoupling(), data.GetClutch(),
+               ClutchSystem::GetNativeActuator(), tcsThrottle, absBrake, rpm,
+               speedKmH, forwardSpeed, EngineModel::GetInertia(),
+               EngineModel::GetLoad(), EngineModel::GetStallProgress(),
+               static_cast<int>(data.GetWheelCount()),
                TractionControl::IsTCSActive() ? 1.0f : 0.0f, BrakeSystem::IsABSActive() ? 1.0f : 0.0f,
                activeSignal, (manualGear == -1) ? 1 : 0);
       s_lastStatusLog = GetTickCount();
@@ -437,19 +447,15 @@ void ScriptMain() {
 
     float turboMul =
         TurboSystem::Update(vehicle, data, rpm, throttle, isEngineOn);
-    if (turboMul > 1.05f) {
+    if (TurboSystem::HasTurbo())
       VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, turboMul);
+    if (turboMul > 1.05f) {
       LOG_DEBUG_T(Turbo, 1000, "Boost active: mul=%.3f press=%.3f", turboMul,
                   TurboSystem::GetBoostPressure());
     }
 
-    // Apply native controls
     InputHandler::ApplyGameControls(manualGear, simulatedClutch, tcsThrottle,
                                     maxGear, forwardSpeed);
-    // GTA owns normal brake pressure and ABS. The simulation telemetry may
-    // still observe brake input, but never overwrites the player's pedal.
-
-    const bool wasEngineOn = isEngineOn;
 
     // Gear logic
     manualGear = GearLogic::Update(
@@ -468,23 +474,14 @@ void ScriptMain() {
     GearboxSystem::Update(data, manualGear, maxGear, simulatedClutch,
                           throttle, isEngineOn);
 
-    if (wasEngineOn && !isEngineOn) {
-      LOG_WARN(Gear, "Engine stalled — gear=%d spd=%.1fkm/h clutch=%.3f",
-               manualGear, speedKmH, simulatedClutch);
-      Renderer::ShowNotification(
-          "Engine Stalled! (Press clutch or shift to N)");
-    }
-
-    // Physics post-gear
-    const bool physicsStall = engineStall;
-
-    if (physicsStall && isEngineOn) {
+    if (engineStall && isEngineOn) {
       isEngineOn = false;
       VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
       LOG_WARN(Physics,
-               "Clutch bite-point stall: gear=%d spd=%.1fkm/h heat=%.3f",
-               manualGear, speedKmH, ClutchSystem::GetHeat());
-      Renderer::ShowNotification("Engine Stalled! (Clutch bite-point)");
+               "Drivetrain stall: gear=%d spd=%.1fkm/h load=%.3f heat=%.3f",
+               manualGear, speedKmH, EngineModel::GetLoad(),
+               ClutchSystem::GetHeat());
+      Renderer::ShowNotification("Engine Stalled! (Drivetrain load)");
     }
 
     // Fuel

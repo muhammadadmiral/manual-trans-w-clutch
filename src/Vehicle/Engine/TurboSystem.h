@@ -13,8 +13,9 @@ namespace TurboSystem {
 
 struct TurboState {
   bool hasTurbo = false;
-  float spool = 0.0f;       // 0.0 to 1.0 (max boost)
-  float boostPressure = 0.0f; // Actual pressure delivered
+  bool blowOffLatched = false;
+  float spool = 0.0f;
+  float boostPressure = 0.0f;
 };
 
 void Reset();

@@ -78,9 +78,6 @@ bool Update(Vehicle vehicle, VehicleData &data, float speedKmH,
   // Inject handbrake every frame while engaged
   if (s_state.isEngaged && s_state.engageDelay == 0) {
     PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 76, kHandbrakeForce);
-    if (throttle < 0.05f) {
-      VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, 0.0f);
-    }
   }
 
   return s_state.isEngaged || s_state.hillHoldActive;

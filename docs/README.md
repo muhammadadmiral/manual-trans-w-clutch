@@ -1,5 +1,9 @@
-# Folder Dokumentasi
+# Dokumentasi
 
-Di `docs` ini, tersimpan berbagai dokumentasi dan referensi terkait pengembangan mod Transmisi Manual:
-
-* **[documentation.md](documentation.md)** - Penjelasan detail tentang struktur awal (*skeleton*) kode ASI Plugin C++ dan implementasi *Proof of Concept* (PoC) sederhana.
+- [architecture.md](architecture.md): batas modul dan urutan update.
+- [drivetrain.md](drivetrain.md): clutch, free-rev, inertia, load, dan stall.
+- [memory-offsets.md](memory-offsets.md): field memory tervalidasi dan aturan
+  akses.
+- [audio_sprint_plan.md](audio_sprint_plan.md): backlog sprint audio berikutnya.
+- [features.md](features.md): ide fitur.
+- [implementation_plan.md](implementation_plan.md): rencana sistem realism lain.
