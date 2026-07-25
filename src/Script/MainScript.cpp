@@ -251,7 +251,7 @@ void ScriptMain() {
       const VehicleOffsets &off = VehicleData::GetResolvedOffsets();
       const std::string bv = VehicleData::GetGameBuildVersion();
       char notify[256]{};
-      sprintf_s(notify, "Manual trans r18: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
+      sprintf_s(notify, "Manual trans r19: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
                 VehicleData::GetOffsetSourceName(),
                 bv.empty() ? "?" : bv.c_str(), off.Gear, off.NextGear, off.RPM,
                 off.Clutch);
@@ -838,132 +838,74 @@ void ScriptMain() {
 
     static DWORD s_lastStatusLog = 0;
     if (GetTickCount() - s_lastStatusLog > 1000) {
-      const uint8_t ratioIndex =
-          manualGear < 0 ? 0 : static_cast<uint8_t>(manualGear);
-      LOG_INFO(
-          Gear,
-          "STATUS: Mode=%d Profile=%s Selector=%s Selected=%d Mem=%u Next=%u "
-          "PedalClutch=%.3f Key=%d Coupling=%.3f PowerMul=%.3f Limiter=%d "
-          "MemClutch=%.3f Actuator=%.3f Throttle=%.3f MemThrottle=%.3f "
-          "Brake=%.3f RPM=%.3f AutoRPM=%.3f AutoPhase=%s AutoTarget=%d "
-          "AutoRecover=%d "
-          "NativePatch=%d RPMOwned=%d ControlledRPM=%.3f RPMTarget=%.3f "
-          "WheelRPM=%.3f CutFix=%d MemPedal=%.3f "
-          "SpeedKmH=%.1f SignedMps=%.2f Ratio=%.4f MaxVel=%.2f EstFlat=%.2f "
-          "Handling=%d Load=%.3f TorqueReserve=%.3f TorqueCurve=%.3f "
-          "EngineRPM=%.0f IdleRPM=%.0f RedlineRPM=%.0f Condition=%.3f "
-          "Lug=%.3f Stall=%.3f Air=%d Upside=%d Water=%.3f OilStarve=%.3f "
-          "EnvStall=%d "
-          "Accel=%.3f LowRec=%.3f "
-          "EngMod=%d/%d TransMod=%d/%d Race=%d Quick=%d PowerShift=%d "
-          "Clash=%.3f Shock=%.3f ShiftPenalty=%.3f ShiftQuick=%d "
-          "ShiftPower=%d ShiftSynchro=%d Money=%d "
-          "Engine=%d Actual=%d Start=%d "
-          "TCSEn=%d TCSReady=%d TCSWheels=%d TCSDriven=%d "
-          "TCSSlip=%.3f TCSCut=%.3f TCS=%d "
-          "ABSEn=%d ABSReady=%d ABSWheels=%d ABSSlip=%.3f ABSLevel=%.3f ABS=%d "
-          "LCEn=%d LCArmed=%d LCCut=%d "
-          "ClutchDemand=%.3f ClutchCap=%.3f OSlip=%.3f Judder=%.3f "
-          "HillRollback=%d HardStall=%d FuelCut=%d "
-          "SyncWear=%.3f ResistMs=%u ShiftReject=%d WheelLock=%.3f "
-          "TCC=%d ATF=%.3f Limp=%d KDPending=%d NeutralDrop=%d "
-          "BrakeBoost=%.2f AutoTM=%.3f IgnCut=%d",
-          transmissionMode, VehicleProfile::GetName(vehicleProfile),
-          automaticMode ? AutomaticGearbox::GetSelectorName() : "M",
-          manualGear, static_cast<unsigned>(data.GetGear()),
-          static_cast<unsigned>(data.GetNextGear()), simulatedClutch,
-          (!automaticMode && InputHandler::IsClutchDown()) ? 1 : 0,
-          InputHandler::GetDriveCoupling(), powerMultiplier,
-          EngineModel::GetState().redlineCut ? 1 : 0, data.GetClutch(),
-          automaticMode ? AutomaticGearbox::GetCoupling()
-                        : ClutchSystem::GetNativeActuator(),
-          driveThrottle, data.GetThrottle(), absBrake, data.GetRPM(),
-          automaticMode ? AutomaticGearbox::GetState().decisionRPM : -1.0f,
-          automaticMode ? AutomaticGearbox::GetShiftPhaseName() : "-",
-          automaticMode ? AutomaticGearbox::GetState().pendingGear : 0,
-          automaticMode && AutomaticGearbox::GetState().rpmRecovery ? 1 : 0,
-          GearboxPatches::IsApplied() ? 1 : 0,
-          EngineModel::GetState().rpmOwned ? 1 : 0,
-          EngineModel::GetState().controlledRPM,
-          EngineModel::GetState().connectedRPMTarget,
-          EngineModel::GetState().wheelRPM,
-          EngineModel::GetState().nativeCutRecovered ? 1 : 0,
-          data.GetThrottlePedal(),
-          speedKmH, forwardSpeed, data.GetGearRatio(ratioIndex),
-          data.GetDriveMaxFlatVel(),
-          EngineModel::GetState().estimatedFlatVelocity,
-          EngineModel::GetState().handlingBacked ? 1 : 0,
-          EngineModel::GetLoad(), EngineModel::GetTorqueReserve(),
-          EngineModel::GetState().torqueCurve,
-          EngineModel::GetState().estimatedEngineRPM,
-          EngineModel::GetState().estimatedIdlePhysicalRPM,
-          EngineModel::GetState().estimatedRedlineRPM,
-          EngineModel::GetState().engineCondition,
-          EngineModel::GetState().lugSeverity,
-          EngineModel::GetStallProgress(),
-          EngineModel::GetState().airborne ? 1 : 0,
-          EngineModel::GetState().upsideDown ? 1 : 0,
-          EngineModel::GetState().waterIngestion,
-          EngineModel::GetState().oilStarvation,
-          EngineModel::GetState().environmentStall ? 1 : 0,
-          EngineModel::GetState().longitudinalAcceleration,
-          EngineModel::GetState().lowRpmRecovery,
-          VehicleUpgrades::GetState().engineLevel,
-          VehicleUpgrades::GetState().engineMaxLevel,
-          VehicleUpgrades::GetState().transmissionLevel,
-          VehicleUpgrades::GetState().transmissionMaxLevel,
-          VehicleUpgrades::GetState().raceTransmission ? 1 : 0,
-          VehicleUpgrades::GetState().quickshifter ? 1 : 0,
-          VehicleUpgrades::GetState().powershifter ? 1 : 0,
-          GearboxSystem::GetState().clashSeverity,
-          GearboxSystem::GetState().shockRemaining,
-          GearboxSystem::GetState().penaltyMultiplier,
-          GearboxSystem::GetState().quickShift ? 1 : 0,
-          GearboxSystem::GetState().powerShift ? 1 : 0,
-          GearboxSystem::GetState().synchroShift ? 1 : 0,
-          GearboxSystem::GetState().moneyShift ? 1 : 0,
-          isEngineOn ? 1 : 0, actualEngineOn ? 1 : 0,
-          engineStarting ? 1 : 0,
-          TractionControl::GetState().enabled ? 1 : 0,
-          TractionControl::GetState().wheelDataValid ? 1 : 0,
-          TractionControl::GetState().validWheelCount,
-          TractionControl::GetState().drivenWheelCount,
-          TractionControl::GetState().slipRatio,
-          TractionControl::GetState().cutLevel,
-          TractionControl::IsTCSActive() ? 1 : 0,
-          BrakeSystem::GetState().absEnabled ? 1 : 0,
-          BrakeSystem::GetState().wheelDataValid ? 1 : 0,
-          BrakeSystem::GetState().validWheelCount,
-          BrakeSystem::GetState().wheelSlip,
-          BrakeSystem::GetState().absLevel,
-          BrakeSystem::IsABSActive() ? 1 : 0,
-          LaunchControl::GetState().enabled ? 1 : 0,
-          LaunchControl::GetState().armed ? 1 : 0,
-          LaunchControl::GetState().limiting ? 1 : 0,
-          ClutchSystem::GetState().torqueDemand,
-          ClutchSystem::GetState().torqueCapacity,
-          ClutchSystem::GetState().overloadSlip,
-          ClutchSystem::GetState().judder,
-          EngineModel::GetState().hillRollback ? 1 : 0,
-          EngineModel::GetState().hardBrakeStall ? 1 : 0,
-          FuelSystem::GetState().decelerationFuelCut ? 1 : 0,
-          GearboxSystem::GetState().selectedSynchroWear,
-          static_cast<unsigned>(
-              GearboxSystem::GetState().resistanceDelayMs),
-          GearboxSystem::GetState().shiftRejected ? 1 : 0,
-          GearboxSystem::GetWheelLockBrake(),
-          automaticMode && AutomaticGearbox::GetState().tccLocked ? 1 : 0,
-          automaticMode
-              ? AutomaticGearbox::GetState().fluidTemperature
-              : -1.0f,
-          automaticMode && AutomaticGearbox::GetState().limpMode ? 1 : 0,
-          automaticMode && AutomaticGearbox::GetState().kickdownPending ? 1 : 0,
-          automaticMode && AutomaticGearbox::GetState().neutralDrop ? 1 : 0,
-          automaticMode ? AutomaticGearbox::GetState().brakeBoostTime : 0.0f,
-          automaticMode
-              ? AutomaticGearbox::GetState().torqueManagement
-              : 0.0f,
-          automaticMode && AutomaticGearbox::GetState().ignitionCut ? 1 : 0);
+      const auto &engineState = EngineModel::GetState();
+      const auto &clutchState = ClutchSystem::GetState();
+      const auto &gearboxState = GearboxSystem::GetState();
+      const auto &tcsState = TractionControl::GetState();
+      const auto &absState = BrakeSystem::GetState();
+      const auto &autoState = AutomaticGearbox::GetState();
+
+      LOG_INFO(Gear,
+               "STATUS: Mode=%d Profile=%s Selector=%s Gear=%d Mem=%u Next=%u "
+               "Speed=%.1f Signed=%.2f RPM=%.3f Throttle=%.3f Brake=%.3f "
+               "PedalClutch=%.3f MemClutch=%.3f Engine=%d Start=%d",
+               transmissionMode, VehicleProfile::GetName(vehicleProfile),
+               automaticMode ? AutomaticGearbox::GetSelectorName() : "M",
+               manualGear, static_cast<unsigned>(data.GetGear()),
+               static_cast<unsigned>(data.GetNextGear()), speedKmH,
+               forwardSpeed, data.GetRPM(), driveThrottle, absBrake,
+               simulatedClutch, data.GetClutch(), isEngineOn ? 1 : 0,
+               engineStarting ? 1 : 0);
+      LOG_INFO(Physics,
+               "ENGINE: Owned=%d CtrlRPM=%.3f Target=%.3f WheelRPM=%.3f "
+               "Physical=%.0f Idle=%.0f Redline=%.0f Load=%.3f "
+               "Reserve=%.3f Lug=%.3f Stall=%.3f LowRec=%.3f",
+               engineState.rpmOwned ? 1 : 0, engineState.controlledRPM,
+               engineState.connectedRPMTarget, engineState.wheelRPM,
+               engineState.estimatedEngineRPM,
+               engineState.estimatedIdlePhysicalRPM,
+               engineState.estimatedRedlineRPM, engineState.load,
+               engineState.torqueReserve, engineState.lugSeverity,
+               engineState.stallProgress, engineState.lowRpmRecovery);
+      LOG_INFO(Physics,
+               "CLUTCH_GEARBOX: Engage=%.3f Demand=%.3f Cap=%.3f "
+               "OSlip=%.3f Heat=%.3f Judder=%.3f Clash=%.3f Shock=%.3f "
+               "SyncWear=%.3f ResistMs=%u Reject=%d Money=%d WheelLock=%.3f",
+               clutchState.engagement, clutchState.torqueDemand,
+               clutchState.torqueCapacity, clutchState.overloadSlip,
+               clutchState.heat, clutchState.judder,
+               gearboxState.clashSeverity, gearboxState.shockRemaining,
+               gearboxState.selectedSynchroWear,
+               static_cast<unsigned>(gearboxState.resistanceDelayMs),
+               gearboxState.shiftRejected ? 1 : 0,
+               gearboxState.moneyShift ? 1 : 0,
+               GearboxSystem::GetWheelLockBrake());
+      LOG_INFO(Physics,
+               "ASSISTS: TCSEn=%d TCSReady=%d TCSWheels=%d Slip=%.3f "
+               "Cut=%.3f Active=%d ABSEn=%d ABSReady=%d ABSWheels=%d "
+               "ABSSlip=%.3f ABSLevel=%.3f Active=%d",
+               tcsState.enabled ? 1 : 0, tcsState.wheelDataValid ? 1 : 0,
+               tcsState.validWheelCount, tcsState.slipRatio,
+               tcsState.cutLevel, TractionControl::IsTCSActive() ? 1 : 0,
+               absState.absEnabled ? 1 : 0,
+               absState.wheelDataValid ? 1 : 0, absState.validWheelCount,
+               absState.wheelSlip, absState.absLevel,
+               BrakeSystem::IsABSActive() ? 1 : 0);
+      if (automaticMode) {
+        LOG_INFO(Gear,
+                 "AUTO: Phase=%s Current=%d Pending=%d Coupling=%.3f "
+                 "DecisionRPM=%.3f TCC=%d ATF=%.3f Limp=%d KDWait=%d "
+                 "NDrop=%d Boost=%.2f TM=%.3f IgnCut=%d",
+                 AutomaticGearbox::GetShiftPhaseName(),
+                 autoState.currentGear, autoState.pendingGear,
+                 autoState.coupling, autoState.decisionRPM,
+                 autoState.tccLocked ? 1 : 0, autoState.fluidTemperature,
+                 autoState.limpMode ? 1 : 0,
+                 autoState.kickdownPending ? 1 : 0,
+                 autoState.neutralDrop ? 1 : 0, autoState.brakeBoostTime,
+                 autoState.torqueManagement,
+                 autoState.ignitionCut ? 1 : 0);
+      }
       s_lastStatusLog = GetTickCount();
     }
 
