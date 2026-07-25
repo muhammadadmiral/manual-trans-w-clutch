@@ -1,10 +1,11 @@
 #include "GearboxPatches.h"
-#include "AOBScanner.h"
 #include "../Core/ModLogger.h"
+#include "AOBScanner.h"
 
 #define NOMINMAX
 #include <Windows.h>
 #include <array>
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -14,31 +15,38 @@ namespace {
 
 constexpr size_t kMaxPatchBytes = 13;
 
+enum class PatchKind {
+  Nop,
+  LowRpmRedirect,
+};
+
 struct Patch {
   const char *name;
   const char *signature;
   size_t offset;
   size_t length;
+  bool required;
+  PatchKind kind;
   uintptr_t address = 0;
   std::array<uint8_t, kMaxPatchBytes> original{};
+  std::array<uint8_t, kMaxPatchBytes> replacement{};
   bool applied = false;
 };
 
-// Signature ini milik rutinitas transmisi GTA V Enhanced. Yang diambil cuma
-// bentuk instruksinya; patch/rollback dan ownership state tetap punya kita.
-std::array<Patch, 5> s_patches{{
+// Jalur utama Enhanced wajib utuh. Writer low-RPM lawas boleh hilang di build
+// baru tanpa menggagalkan takeover yang lain.
+std::array<Patch, 4> s_patches{{
     {"shift-up + clutch",
      "75 0D 66 41 FF 45 ? 41 C7 45 54 CD CC CC 3D 41 C7 85 ? 00 00 00 "
      "00 00 00 00",
-     2, 13},
+     2, 13, true, PatchKind::Nop},
     {"shift-down + clutch",
      "75 0D 66 41 FF 4D ? 41 C7 45 54 CD CC CC 3D 66 41 C7 45 04 06 00",
-     0, 2},
-    {"clutch low RPM", "C7 43 ? CD CC CC 3D 66", 0, 7},
-    {"clutch rev limit",
-     "C7 43 ? CD CC CC 3D 44 89 ? ? ? ? ? 44 89 ? ? ? ? ?",
-     0, 7},
-    {"throttle lift", "89 4F 58 F3 44 0F 11", 0, 3},
+     0, 2, true, PatchKind::Nop},
+    {"clutch low RPM", "C7 43 ? CD CC CC 3D 66", 0, 7, false,
+     PatchKind::LowRpmRedirect},
+    {"throttle lift", "89 4F 58 F3 44 0F 11", 0, 3, false,
+     PatchKind::Nop},
 }};
 
 bool s_resolveAttempted = false;
@@ -113,28 +121,52 @@ bool WriteNops(uintptr_t address, size_t length) {
   return length <= nops.size() && WriteBytes(address, nops.data(), length);
 }
 
+void PrepareReplacement(Patch &patch) {
+  patch.replacement.fill(0x90);
+  if (patch.kind != PatchKind::LowRpmRedirect)
+    return;
+
+  constexpr std::array<uint8_t, 7> redirect{
+      0xC7, 0x43, 0x4C, 0xCD, 0xCC, 0xCC, 0x3D};
+  std::copy(redirect.begin(), redirect.end(), patch.replacement.begin());
+}
+
 bool ResolveAll() {
   if (s_resolveAttempted)
     return s_resolved;
   s_resolveAttempted = true;
 
+  size_t requiredResolved = 0;
+  size_t optionalResolved = 0;
   for (auto &patch : s_patches) {
     const auto matches = AOBScanner::FindAll(patch.signature, 2);
     if (matches.size() != 1) {
-      s_failure = std::string(patch.name) +
-                  (matches.empty() ? " signature tidak ditemukan"
-                                   : " signature tidak unik");
-      LOG_ERROR(Memory, "Gearbox patch resolve gagal: %s",
-                s_failure.c_str());
+      if (!patch.required) {
+        LOG_WARN(Memory, "Gearbox patch opsional dilewati: %s (%s)",
+                 patch.name,
+                 matches.empty() ? "signature tidak ditemukan"
+                                 : "signature tidak unik");
+        continue;
+      }
+      s_failure = std::string(patch.name) + (matches.empty()
+                                                 ? " signature tidak ditemukan"
+                                                 : " signature tidak unik");
+      LOG_ERROR(Memory, "Gearbox patch resolve gagal: %s", s_failure.c_str());
       return false;
     }
 
     patch.address = matches.front() + patch.offset;
+    PrepareReplacement(patch);
     if (patch.length == 0 || patch.length > patch.original.size() ||
         !AOBScanner::IsReadable(patch.address, patch.length)) {
+      if (!patch.required) {
+        LOG_WARN(Memory, "Gearbox patch opsional dilewati: %s target tidak aman",
+                 patch.name);
+        patch.address = 0;
+        continue;
+      }
       s_failure = std::string(patch.name) + " target tidak aman dibaca";
-      LOG_ERROR(Memory, "Gearbox patch resolve gagal: %s",
-                s_failure.c_str());
+      LOG_ERROR(Memory, "Gearbox patch resolve gagal: %s", s_failure.c_str());
       return false;
     }
 
@@ -142,24 +174,34 @@ bool ResolveAll() {
              patch.name, reinterpret_cast<void *>(patch.address), patch.offset,
              patch.length);
 
-    if (!CopyFromAddress(patch.address, patch.original.data(),
-                         patch.length)) {
+    if (!CopyFromAddress(patch.address, patch.original.data(), patch.length)) {
+      if (!patch.required) {
+        LOG_WARN(Memory,
+                 "Gearbox patch opsional dilewati: %s byte asli gagal dibaca",
+                 patch.name);
+        patch.address = 0;
+        continue;
+      }
       s_failure = std::string(patch.name) + " gagal menyimpan byte asli";
-      LOG_ERROR(Memory, "Gearbox patch resolve gagal: %s",
-                s_failure.c_str());
+      LOG_ERROR(Memory, "Gearbox patch resolve gagal: %s", s_failure.c_str());
       return false;
     }
+
+    if (patch.required)
+      ++requiredResolved;
+    else
+      ++optionalResolved;
   }
 
   s_resolved = true;
   LOG_INFO(Memory,
-           "Gearbox native Enhanced resolved: up=%p down=%p low=%p "
-           "rev=%p lift=%p",
+           "Gearbox native Enhanced resolved: critical=%zu/2 optional=%zu/2 "
+           "up=%p down=%p low=%p lift=%p",
+           requiredResolved, optionalResolved,
            reinterpret_cast<void *>(s_patches[0].address),
            reinterpret_cast<void *>(s_patches[1].address),
            reinterpret_cast<void *>(s_patches[2].address),
-           reinterpret_cast<void *>(s_patches[3].address),
-           reinterpret_cast<void *>(s_patches[4].address));
+           reinterpret_cast<void *>(s_patches[3].address));
   return true;
 }
 
@@ -171,7 +213,8 @@ bool RestoreApplied() {
     if (!patch.applied)
       continue;
 
-    if (!IsNopped(patch.address, patch.length)) {
+    if (!IsExactBytes(patch.address, patch.replacement.data(),
+                      patch.length)) {
       LOG_ERROR(Memory,
                 "Gearbox patch '%s' berubah setelah dipasang; rollback "
                 "dibatalkan supaya tidak menimpa mod lain",
@@ -199,18 +242,42 @@ bool ApplyAll() {
     return false;
 
   for (auto &patch : s_patches) {
+    if (patch.address == 0)
+      continue;
+
     if (!IsExactBytes(patch.address, patch.original.data(), patch.length)) {
-      s_failure = std::string(patch.name) +
-                  " byte target berubah sebelum aktivasi";
+      if (!patch.required) {
+        LOG_WARN(Memory,
+                 "Gearbox patch opsional '%s' berubah sebelum aktivasi; "
+                 "dilewati",
+                 patch.name);
+        continue;
+      }
+      s_failure =
+          std::string(patch.name) + " byte target berubah sebelum aktivasi";
       LOG_ERROR(Memory, "Gearbox patch batal: %s", s_failure.c_str());
       RestoreApplied();
       return false;
     }
     const bool writeReportedSuccess =
-        WriteNops(patch.address, patch.length);
-    const bool targetIsNopped = IsNopped(patch.address, patch.length);
-    patch.applied = targetIsNopped;
-    if (!writeReportedSuccess || !targetIsNopped) {
+        patch.kind == PatchKind::Nop
+            ? WriteNops(patch.address, patch.length)
+            : WriteBytes(patch.address, patch.replacement.data(),
+                         patch.length);
+    const bool targetMatches =
+        IsExactBytes(patch.address, patch.replacement.data(), patch.length);
+    patch.applied = targetMatches;
+    if (!writeReportedSuccess || !targetMatches) {
+      if (!patch.required) {
+        LOG_WARN(Memory,
+                 "Gearbox patch opsional '%s' gagal ditulis; takeover "
+                 "kritikal tetap lanjut",
+                 patch.name);
+        if (WriteBytes(patch.address, patch.original.data(), patch.length)) {
+          patch.applied = false;
+        }
+        continue;
+      }
       s_failure = std::string(patch.name) + " gagal ditulis";
       LOG_ERROR(Memory, "Gearbox patch batal: %s", s_failure.c_str());
       RestoreApplied();
@@ -221,7 +288,9 @@ bool ApplyAll() {
   s_applied = true;
   s_failure.clear();
   LOG_INFO(Memory,
-           "Gearbox native override aktif (5/5, atomic, velocity untouched)");
+           "Gearbox native override aktif (critical=2/2, optionalLow=%d, "
+           "optionalLift=%d, velocity untouched)",
+           s_patches[2].applied ? 1 : 0, s_patches[3].applied ? 1 : 0);
   return true;
 }
 
@@ -235,7 +304,7 @@ bool SetActive(bool active) {
 
   const bool restored = RestoreApplied();
   if (restored)
-    LOG_INFO(Memory, "Gearbox native override direstore (5/5)");
+    LOG_INFO(Memory, "Gearbox native override direstore");
   return restored;
 }
 

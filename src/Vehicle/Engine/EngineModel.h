@@ -19,9 +19,11 @@ struct State {
   float wheelRPM = 0.2f;
   float connectedRPMTarget = 0.2f;
   float estimatedFlatVelocity = 0.0f;
+  float driveTorqueFactor = 1.0f;
   bool freeRevActive = false;
   bool rpmOwned = false;
   bool nativeCutRecovered = false;
+  bool redlineCut = false;
   bool handlingBacked = false;
 };
 
@@ -40,6 +42,7 @@ float GetInertia();
 float GetExpectedRPM();
 float GetCreepThrottle();
 float GetTorqueReserve();
+float GetDriveTorqueFactor();
 const State &GetState();
 
 } // namespace EngineModel

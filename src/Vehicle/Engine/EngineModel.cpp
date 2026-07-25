@@ -14,6 +14,11 @@ static float Clamp01(float value) {
   return std::clamp(value, 0.0f, 1.0f);
 }
 
+static float SmoothStep(float value) {
+  const float t = Clamp01(value);
+  return t * t * (3.0f - 2.0f * t);
+}
+
 static float ResolveFlatVelocity(Vehicle vehicle, VehicleData &data,
                                  int maxGear) {
   const float memoryValue = std::fabs(data.GetDriveMaxFlatVel());
@@ -156,6 +161,45 @@ static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
     return true;
   }
   return false;
+}
+
+static void UpdateDriveTorque(int gear, int maxGear, float engagement,
+                              float throttle, bool engineOn) {
+  s_state.driveTorqueFactor = 1.0f;
+  s_state.redlineCut = false;
+  if (!engineOn || gear == 0 || engagement < 0.08f)
+    return;
+
+  const int absoluteGear = std::abs(gear);
+  const float gearSpan =
+      static_cast<float>((std::max)(1, maxGear - 1));
+  const float gearWeight =
+      Clamp01(static_cast<float>((std::max)(0, absoluteGear - 1)) / gearSpan);
+  const float rpmBand =
+      Clamp01((s_state.wheelRPM - s_state.idleRPM) /
+              std::max(0.05f, 0.52f - s_state.idleRPM));
+  const float lowRpmDemand = 1.0f - SmoothStep(rpmBand);
+  const float positiveReserve =
+      Clamp01(s_state.torqueReserve / 0.55f);
+  const float torqueDeficit =
+      Clamp01(-s_state.torqueReserve / 0.65f);
+
+  // Native GTA terlalu gampang kehilangan drive di gigi tinggi bawah.
+  // Tambahan ini tetap lewat torque multiplier kendaraan dan rasio native;
+  // velocity kendaraan sama sekali nggak disentuh.
+  const float lowRpmAssist =
+      Clamp01(throttle) * lowRpmDemand * positiveReserve *
+      (0.18f + gearWeight * 0.62f);
+  const float lugFactor = 1.0f - torqueDeficit * 0.78f;
+  float output = (1.0f + lowRpmAssist) * lugFactor;
+
+  // RPM boleh mentok limiter, tapi gaya roda wajib habis setelah rasio gigi
+  // mencapai redline. Ini yang mencegah gigi 1 narik tanpa batas.
+  const float limiter =
+      SmoothStep((s_state.wheelRPM - 1.0f) / 0.08f);
+  output *= 1.0f - limiter;
+  s_state.redlineCut = limiter >= 0.98f;
+  s_state.driveTorqueFactor = std::clamp(output, 0.0f, 1.65f);
 }
 
 bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
@@ -321,9 +365,11 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
         (0.0f - s_state.engineBrake) * Clamp01(dt * 8.0f);
   }
 
-  return UpdateLoadAndStall(
+  const bool stalled = UpdateLoadAndStall(
       vehicle, data, gear, maxGear, clutchEngagement, throttle, brake,
       speedMps, engineOn, dt, automaticMode);
+  UpdateDriveTorque(gear, maxGear, clutchEngagement, throttle, engineOn);
+  return stalled;
 }
 
 float GetLoad() { return s_state.load; }
@@ -333,6 +379,7 @@ float GetInertia() { return s_state.inertia; }
 float GetExpectedRPM() { return s_state.expectedRPM; }
 float GetCreepThrottle() { return s_state.creepThrottle; }
 float GetTorqueReserve() { return s_state.torqueReserve; }
+float GetDriveTorqueFactor() { return s_state.driveTorqueFactor; }
 const State &GetState() { return s_state; }
 
 } // namespace EngineModel

@@ -279,6 +279,8 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
   const bool postUpshiftHold =
       s_state.lastShiftDirection > 0 &&
       elapsedSinceShift < kickdownHoldMs;
+  const bool settlingAfterUpshift =
+      postUpshiftHold && throttle > 0.15f && brake < 0.35f && rpm > 0.22f;
   const float estimatedTopSpeed =
       (std::max)(8.0f, VEHICLE::GET_VEHICLE_ESTIMATED_MAX_SPEED(vehicle));
   const float upshiftMinSpeed =
@@ -301,6 +303,7 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
              std::fabs(signedSpeedMps) >= upshiftMinSpeed) {
     targetGear = s_state.currentGear + 1;
   } else if ((rpm < downThreshold || (brake > 0.35f && rpm < upThreshold)) &&
+             !settlingAfterUpshift &&
              s_state.currentGear > 1 &&
              DownshiftIsSafe(vehicle, data, vehicleMaxGear,
                              s_state.currentGear,
@@ -311,10 +314,11 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
   if (targetGear != s_state.currentGear) {
     const int direction = targetGear > s_state.currentGear ? 1 : -1;
     const DWORD reversalHoldMs =
-        (std::max<DWORD>)(900, delayMs * 3);
+        sport ? (std::max<DWORD>)(850, delayMs * 2)
+              : (std::max<DWORD>)(2200, delayMs * 5);
     if (s_state.lastShiftDirection != 0 &&
         direction != s_state.lastShiftDirection &&
-        elapsedSinceShift < reversalHoldMs) {
+        elapsedSinceShift < reversalHoldMs && !nativeLimiterPressure) {
       return s_state.currentGear;
     }
 

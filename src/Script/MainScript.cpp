@@ -667,13 +667,6 @@ void ScriptMain() {
     const float clutchEngagement =
         automaticMode ? AutomaticGearbox::GetCoupling()
                       : ClutchSystem::GetEngagement();
-    float powerMultiplier = 1.0f;
-    if (automaticMode && AutomaticGearbox::IsSport()) {
-      powerMultiplier +=
-          std::clamp(Config::AutomaticSTorqueBoost, 0.0f, 0.50f);
-    }
-    VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(
-        vehicle, powerMultiplier);
 
     if (automaticMode) {
       AutomaticGearbox::ApplyToMemory(vehicle, data, manualGear,
@@ -687,6 +680,15 @@ void ScriptMain() {
         vehicle, data, manualGear, maxGear, simulatedClutch,
         clutchEngagement, driveThrottle, absBrake, forwardSpeed, isEngineOn,
         automaticMode);
+    const float sportTorque =
+        automaticMode && AutomaticGearbox::IsSport()
+            ? 1.0f + std::clamp(Config::AutomaticSTorqueBoost, 0.0f, 0.50f)
+            : 1.0f;
+    const float powerMultiplier =
+        std::clamp(EngineModel::GetDriveTorqueFactor() * sportTorque,
+                   0.0f, 1.80f);
+    VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, powerMultiplier);
+
     LaunchControl::Update(data, manualGear, simulatedClutch, throttle,
                           absBrake, forwardSpeed, isEngineOn, automaticMode);
     GearboxSystem::Update(vehicle, data, manualGear, maxGear, simulatedClutch,
@@ -695,6 +697,7 @@ void ScriptMain() {
     const bool shiftStall = GearboxSystem::ConsumeStallRequest();
     if ((engineStall || shiftStall) && isEngineOn) {
       isEngineOn = false;
+      VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, 0.0f);
       VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
       LOG_WARN(Physics,
                "Drivetrain stall: gear=%d spd=%.1fkm/h load=%.3f heat=%.3f",
@@ -734,7 +737,7 @@ void ScriptMain() {
       LOG_INFO(
           Gear,
           "STATUS: Mode=%d Profile=%s Selector=%s Selected=%d Mem=%u Next=%u "
-          "PedalClutch=%.3f Key=%d Coupling=%.3f PowerMul=%.3f "
+          "PedalClutch=%.3f Key=%d Coupling=%.3f PowerMul=%.3f Limiter=%d "
           "MemClutch=%.3f Actuator=%.3f Throttle=%.3f MemThrottle=%.3f "
           "Brake=%.3f RPM=%.3f AutoRPM=%.3f AutoPhase=%s AutoTarget=%d "
           "AutoRecover=%d "
@@ -749,7 +752,8 @@ void ScriptMain() {
           manualGear, static_cast<unsigned>(data.GetGear()),
           static_cast<unsigned>(data.GetNextGear()), simulatedClutch,
           (!automaticMode && InputHandler::IsClutchDown()) ? 1 : 0,
-          InputHandler::GetDriveCoupling(), powerMultiplier, data.GetClutch(),
+          InputHandler::GetDriveCoupling(), powerMultiplier,
+          EngineModel::GetState().redlineCut ? 1 : 0, data.GetClutch(),
           automaticMode ? AutomaticGearbox::GetCoupling()
                         : ClutchSystem::GetNativeActuator(),
           driveThrottle, data.GetThrottle(), absBrake, data.GetRPM(),

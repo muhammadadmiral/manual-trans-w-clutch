@@ -35,11 +35,16 @@ Field baru harus punya signature, relasi struct yang konsisten, range check, dan
 jalur no-op ketika resolver gagal.
 
 Runtime menulis clutch dengan semantik signed GTA: `1` terhubung, nilai negatif
-hard-open. Lima code signature Enhanced menonaktifkan auto-shift, pelepasan
-clutch pada RPM rendah/redline, dan throttle-lift native. Resolver wajib
-menemukan masing-masing tepat satu kali. Patch dipasang sekaligus, menyimpan
-byte asli, rollback bila satu write gagal, dan direstore ketika mode Off/keluar
-kendaraan/unload.
+hard-open. Jalur Enhanced punya dua patch kritis: shift-up + clutch dan
+shift-down + clutch. Keduanya wajib unik dan dipasang atomik; kalau satu gagal,
+takeover batal dan byte yang sempat ditulis direstore.
+
+Writer `clutch low RPM` dan `throttle-lift` dipasang independen seperti jalur
+Enhanced referensi. Keduanya opsional karena opcode lama dapat hilang di build
+baru. Kalau low-RPM ditemukan unik, writer itu diarahkan dengan payload native
+`C7 43 4C CD CC CC 3D`, bukan di-NOP. Kegagalan patch opsional tidak boleh
+membatalkan dua patch kritis. Semua patch tetap menyimpan byte asli dan
+direstore ketika mode Off, keluar kendaraan, atau unload.
 
 RPM saat clutch tersambung dihitung dari road speed, runtime flat velocity, dan
 rasio kendaraan aktif. RPM ini bukan pengganti kecepatan: wheel angular
