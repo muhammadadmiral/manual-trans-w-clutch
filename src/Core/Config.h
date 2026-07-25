@@ -1,39 +1,58 @@
+// =============================================================================
+// Config.h
+//
+// ── Smoothing time constants (ThrottleAttack, ThrottleRelease, etc.) ─────────
+// These are exponential-decay time constants τ in SECONDS, NOT per-frame steps.
+// Meaning: the smoothed value travels 63 % of the remaining distance to the
+// target in τ seconds, independent of frame rate.
+//
+// Examples:
+//   τ = 0.05  → very fast  (≈50 ms to reach ~63 %) — good for clutch attack
+//   τ = 0.10  → fast       (≈100 ms) — throttle attack feeling
+//   τ = 0.25  → medium     (≈250 ms) — brake ramp-up
+//   τ = 0.50  → slow       (≈500 ms) — coasting throttle release
+//
+// A τ of 0 is treated as "instant" (no smoothing).
+// =============================================================================
 #pragma once
 #include <string>
 #include <vector>
-#include <windows.h>
+#include <Windows.h>
 
 namespace Config {
+
+// ── Digital keys (virtual-key codes) ─────────────────────────────────────────
 extern int KeyShiftUp;
 extern int KeyShiftDown;
 extern int KeyClutch;
 extern int KeyEngine;
 extern int KeyMenu;
 
-// Turn signal (sein) keys. Change these here or in the ini
-// ([Controls] SignalLeft= / SignalRight=) - whichever is easier for you.
-// Tapping either one toggles that signal on/off; tapping the opposite side
-// switches to it directly.
+// Turn signal keys. Tapping left/right toggles; tapping opposite side switches.
+// KeySignalHazard activates BOTH signals simultaneously (hazard lights).
 extern int KeySignalLeft;
 extern int KeySignalRight;
-extern int KeyParkingBrake;   // P by default
+extern int KeySignalHazard;    // H by default (0x48)
+extern int KeyParkingBrake;    // P by default
 
+// Automatically cancel the active turn signal when the steering wheel returns
+// through centre (raw steer crosses 0 in the opposite direction of the signal).
+extern bool SignalAutoCancelSteer;
+
+// ── Feature flags ─────────────────────────────────────────────────────────────
 extern bool DebugOverlay;
-
-// Set false to disable manual shifting on quadbikes even if they report
-// more than one drive gear.
 extern bool AllowQuadbikes;
-
-// Prefer writing the real Clutch offset (smoother, revs/wheelspin behave
-// like an actual disengaged clutch). Falls back automatically to the
-// SET_VEHICLE_CHEAT_POWER_INCREASE trick if the offset isn't writable.
-// Set false to always use the cheat-power trick.
 extern bool UseRealClutch;
-
-// Require turning on the engine (via KeyEngine) when entering a vehicle.
 extern bool RequireColdStart;
 extern bool ForceRecalibrate;
 
+// ── Analog smoothing — time constants τ in seconds ────────────────────────────
+// See header comment above for interpretation.
+// Recommended starting defaults (set in Config.cpp):
+//   Throttle: attack=0.10  release=0.25
+//   Brake:    attack=0.08  release=0.20
+//   Clutch:   attack=0.05  release=0.07
+//   Steer:    attack=0.06  release=0.12
 extern float ThrottleAttack;
 extern float ThrottleRelease;
 extern float BrakeAttack;
@@ -41,35 +60,32 @@ extern float BrakeRelease;
 extern float ClutchAttack;
 extern float ClutchRelease;
 
-// Steering smoothing and expo. SteerExpo 0.0 = linear, 1.0 = full cubic expo.
+// Steering
 extern float SteerAttack;
 extern float SteerRelease;
-extern float SteerExpo;          // 0.0-1.0
+extern float SteerExpo;          // 0.0-1.0 (0=linear, 1=full cubic)
 extern float SteerDeadzonePct;   // 0.0-0.15 recommended
 
-// Throttle/Brake expo curve (0.0 = linear, 1.0 = full cubic)
+// Expo curves on throttle/brake/clutch output (0=linear, 1=cubic)
 extern float ThrottleExpo;
 extern float BrakeExpo;
 extern float ClutchExpo;
 
-void WriteFloat(const char *section, const char *key, float value,
-                const char *iniPath);
-void SaveConfig(HMODULE module);
-
-// Extra VEHICLE::GET_VEHICLE_CLASS() ids to treat as automatic-only, on
-// top of the hard-coded plane/heli/boat/jetski/train/bicycle checks in
-// IsValidVehicle(). Empty by default (no extra exclusions).
-// ini value example: "14,15,16,21" (Boats, Helicopters, Planes, Trains).
+// ── Excluded vehicle classes ──────────────────────────────────────────────────
+// VEHICLE::GET_VEHICLE_CLASS() ids to treat as automatic-only.
+// Example ini value: "14,15,16,21" (Boats, Helicopters, Planes, Trains)
 extern std::vector<int> ExcludedVehicleClasses;
 
-// --- On-screen bar overlay (RPM / clutch / throttle / brake) ---
-// This is separate from DebugOverlay (the text line) so you can run
-// either, both, or neither.
-extern bool OverlayBars;
+// ── HUD Overlay ───────────────────────────────────────────────────────────────
+extern bool  OverlayBars;
 extern float OverlayPosX;
 extern float OverlayPosY;
 extern float OverlayBarWidth;
 extern float OverlayBarHeight;
 
+// ── Functions ─────────────────────────────────────────────────────────────────
 void ReadConfig(HMODULE module);
+void SaveConfig(HMODULE module);
+void WriteFloat(const char* section, const char* key, float value, const char* iniPath);
+
 } // namespace Config
