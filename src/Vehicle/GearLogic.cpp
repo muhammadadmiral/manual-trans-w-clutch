@@ -35,7 +35,7 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
            bool &isEngineOn, int &grindWarningTimer) {
   const DWORD currentTime = GetTickCount();
   const bool canShift =
-      (currentTime - s_lastShiftTime) > 150; // 150ms cooldown for rapid shifts
+      (currentTime - s_lastShiftTime) > 80; // permit quick multi-gear selection
 
   // --- Gear Shift Logic & Clutch Check ("Gredek" / Grind sound) ---
   if (canShift) {
@@ -118,13 +118,48 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
 void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
                    float clutch, float throttle) {
   // We do not override engine torque here. 
+  // Keep the native gearbox in memory-neutral through the upper half of the
+  // pedal travel. Below this bite point the selected gear reconnects and the
+  // control-layer engagement ramp transfers torque progressively.
+  const bool clutchOpen = clutch > 0.45f;
+  static int selectedLastFrame = 0;
+  static int shiftFromGear = 0;
+  static int shiftToGear = 0;
+  static bool shiftArmed = false;
+  static bool clutchWasOpen = false;
+  static DWORD nativeShiftUntil = 0;
 
-  if (manualGear == 0) {
+  if (manualGear != selectedLastFrame) {
+    shiftFromGear = selectedLastFrame;
+    shiftToGear = manualGear;
+    shiftArmed = true;
+    selectedLastFrame = manualGear;
+  }
+
+  // Releasing the pedal through the bite point commits the preselected gear.
+  // Request it as Current != Next for a short window so GTA's own transmission
+  // code performs its torque cut, RPM transition and stock shift audio.
+  if (clutchWasOpen && !clutchOpen && shiftArmed) {
+    nativeShiftUntil = GetTickCount() + 240;
+    shiftArmed = false;
+  }
+  clutchWasOpen = clutchOpen;
+
+  if (manualGear == 0 || clutchOpen) {
     // 0xFF is GTA V's neutral sentinel.  Do not emulate neutral by selecting
-    // first gear: when DriveForce is unavailable that lets the stock automatic
-    // transmission pull away and shift normally.
+    // first gear. A fully depressed clutch also uses temporary memory-neutral:
+    // the selected manual gear is retained and re-engaged on pedal release.
     data.SetGear(0xFF);
     data.SetNextGear(0xFF);
+  } else if (GetTickCount() < nativeShiftUntil && shiftToGear != 0) {
+    const uint8_t nativeFrom = shiftFromGear < 0
+        ? 0
+        : (shiftFromGear == 0 ? 0xFF
+                              : static_cast<uint8_t>(shiftFromGear));
+    const uint8_t nativeTo =
+        shiftToGear < 0 ? 0 : static_cast<uint8_t>(shiftToGear);
+    data.SetGear(nativeFrom);
+    data.SetNextGear(nativeTo);
   } else if (manualGear == -1) {
     // Reverse: GTA V uses Gear 0 for reverse.
     data.SetGear(0);
@@ -140,14 +175,18 @@ void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
   // clutch field on this build.  For neutral or a fully depressed clutch,
   // synthesize a free-revving engine while ApplyGameControls removes wheel
   // torque. This also avoids fighting GTA's native hard-cut limiter.
-  const bool disconnected = manualGear == 0 || clutch > 0.90f;
+  const bool disconnected = manualGear == 0 || clutchOpen;
   if (disconnected) {
     static float freeRevRPM = 0.20f;
-    const float targetRPM = 0.20f + std::clamp(throttle, 0.0f, 1.0f) * 0.78f;
+    const float targetRPM =
+        0.20f + std::clamp(throttle, 0.0f, 1.0f) * 0.78f;
     const float response = targetRPM > freeRevRPM ? 0.16f : 0.08f;
     freeRevRPM += (targetRPM - freeRevRPM) * response;
     data.SetRPM(std::clamp(freeRevRPM, 0.20f, 0.98f));
   } else {
+    // Once the clutch reconnects, stop writing RPM entirely. Native GTA
+    // already derives the correct RPM and audio pitch from road speed and the
+    // selected gear; forcing an estimated ratio here caused idle lockups.
     // Once a driven gear reaches redline, hold just below GTA's native hard
     // cut instead of allowing the stock limiter to drop and rebuild RPM.
     static int heldGear = 0;
@@ -156,9 +195,11 @@ void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
       heldGear = manualGear;
       holdingRedline = false;
     }
-    if (manualGear > 0 && throttle >= 0.85f && data.GetRPM() >= 0.94f)
+    const bool nativeShiftActive = GetTickCount() < nativeShiftUntil;
+    if (!nativeShiftActive && manualGear > 0 && throttle >= 0.85f &&
+        data.GetRPM() >= 0.94f)
       holdingRedline = true;
-    if (holdingRedline)
+    if (holdingRedline && !nativeShiftActive)
       data.SetRPM(0.98f);
   }
 }

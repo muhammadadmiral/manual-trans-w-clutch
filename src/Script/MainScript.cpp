@@ -424,8 +424,11 @@ void ScriptMain() {
 
     static DWORD s_lastStatusLog = 0;
     if (GetTickCount() - s_lastStatusLog > 1000) {
-      LOG_INFO(Gear, "STATUS: Gear=%d SimClutch=%.3f MemClutch=%.3f Throttle=%.3f Brake=%.3f RPM=%.3f SpeedKmH=%.1f | TCS=%.2f ABS=%.2f | Sig=%d Rev=%d",
-               manualGear, simulatedClutch, data.GetClutch(), tcsThrottle, absBrake, rpm, speedKmH, 
+      LOG_INFO(Gear, "STATUS: Selected=%d MemGear=%u Next=%u PedalClutch=%.3f ClutchCandidateRO=%.3f InputThrottle=%.3f Brake=%.3f NativeRPM=%.3f SpeedKmH=%.1f SignedMps=%.2f | TCS=%.2f ABS=%.2f | Sig=%d Rev=%d",
+               manualGear, static_cast<unsigned>(data.GetGear()),
+               static_cast<unsigned>(data.GetNextGear()), simulatedClutch,
+               data.GetClutch(), tcsThrottle, absBrake, rpm, speedKmH,
+               forwardSpeed,
                TractionControl::IsTCSActive() ? 1.0f : 0.0f, TractionControl::IsABSActive() ? 1.0f : 0.0f,
                activeSignal, (manualGear == -1) ? 1 : 0);
       s_lastStatusLog = GetTickCount();

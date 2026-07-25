@@ -190,7 +190,7 @@ void Update() {
     s_smoothedClutch = ExpSmooth(
         clutchTarget, s_smoothedClutch,
         Config::ClutchAttack,
-        Config::ClutchRelease,
+        std::fmaxf(Config::ClutchRelease, 0.14f),
         dtSec);
 
     // ── Steering: A/D or LEFT/RIGHT ───────────────────────────────────────────
@@ -238,7 +238,11 @@ void ApplyGameControls(int manualGear, float clutch, float rpm, int /*maxGear*/,
                 forwardSpeed > 0.1f ? 72 : 76, finalBrake);
     } else if (manualGear == -1) {
         // Reverse gear — swap throttle/brake controls
-        const float coupledThrottle = finalThrottle * (1.0f - Clamp01(clutch));
+        static float reverseEngagement = 1.0f;
+        if (clutch > 0.45f) reverseEngagement = 0.0f;
+        else reverseEngagement = std::fminf(1.0f, reverseEngagement + 0.035f);
+        const float coupledThrottle =
+            finalThrottle * (1.0f - Clamp01(clutch)) * reverseEngagement;
         PAD::DISABLE_CONTROL_ACTION(0, 71, true);
         PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, coupledThrottle);
         if (finalBrake > 0.02f) {
@@ -250,7 +254,11 @@ void ApplyGameControls(int manualGear, float clutch, float rpm, int /*maxGear*/,
         // Disconnect torque at the input layer instead: pedal down (1.0)
         // progressively removes all drive throttle while still allowing the
         // engine RPM to be simulated independently.
-        const float coupledThrottle = finalThrottle * (1.0f - Clamp01(clutch));
+        static float forwardEngagement = 1.0f;
+        if (clutch > 0.45f) forwardEngagement = 0.0f;
+        else forwardEngagement = std::fminf(1.0f, forwardEngagement + 0.035f);
+        const float coupledThrottle =
+            finalThrottle * (1.0f - Clamp01(clutch)) * forwardEngagement;
         if (forwardSpeed <= 0.1f)
             PAD::DISABLE_CONTROL_ACTION(0, 72, true);
         PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, coupledThrottle);
