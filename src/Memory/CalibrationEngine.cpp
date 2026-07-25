@@ -331,7 +331,8 @@ bool Update(int vehicleHandle, bool isEngineOn, bool isRevving,
             ++scanned;
             float val = *reinterpret_cast<const float*>(vehicleBase + off);
             // Accept slightly negative values too — floating-point noise.
-            if (val > -0.01f && val < 0.10f)
+            // Also accept up to 0.90 because some vehicles idle high and we don't want to exclude them.
+            if (val > -0.01f && val < 0.90f)
                 s_rpmCandidates.push_back(off);
         }
         LOG_INFO(Calib,

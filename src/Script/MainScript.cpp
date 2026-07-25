@@ -279,7 +279,23 @@ void ScriptMain() {
         }
 
         // ── Turn signals ──────────────────────────────────────────────────────
-        if (InputHandler::IsSignalLeftJustPressed()) {
+        if (Config::SignalAutoCancelSteer && (activeSignal == 1 || activeSignal == 2)) {
+            const float rawSteer = InputHandler::GetRawSteer();
+            if ((activeSignal == 1 && rawSteer > 0.01f) ||
+                (activeSignal == 2 && rawSteer < -0.01f)) {
+                activeSignal = 0;
+                VEHICLE::SET_VEHICLE_INDICATOR_LIGHTS(vehicle, 0, FALSE);
+                VEHICLE::SET_VEHICLE_INDICATOR_LIGHTS(vehicle, 1, FALSE);
+                LOG_DEBUG(Sig, "Signal auto-cancelled via steering");
+            }
+        }
+
+        if (InputHandler::IsSignalHazardJustPressed()) {
+            activeSignal = (activeSignal == 3) ? 0 : 3;
+            VEHICLE::SET_VEHICLE_INDICATOR_LIGHTS(vehicle, 0, activeSignal == 3);
+            VEHICLE::SET_VEHICLE_INDICATOR_LIGHTS(vehicle, 1, activeSignal == 3);
+            LOG_DEBUG(Sig, "Signal HAZARD → %d", activeSignal);
+        } else if (InputHandler::IsSignalLeftJustPressed()) {
             activeSignal = (activeSignal == 1) ? 0 : 1;
             VEHICLE::SET_VEHICLE_INDICATOR_LIGHTS(vehicle, 0, FALSE);
             VEHICLE::SET_VEHICLE_INDICATOR_LIGHTS(vehicle, 1, activeSignal == 1);
@@ -305,6 +321,13 @@ void ScriptMain() {
                          static_cast<int>(lastCalibState),
                          static_cast<int>(state),
                          VehicleData::GetCalibrationCandidateCount());
+
+                if (state == CalibrationState::Failed) {
+                    const std::string& reason = VehicleData::GetLastFailureReason();
+                    LOG_ERROR(Calib, "Calibration FAILED: %s", reason.c_str());
+                    Renderer::ShowNotification(("~r~Calibration Failed:~w~ " + reason).c_str());
+                }
+
                 lastCalibState = state;
             }
 
@@ -316,12 +339,6 @@ void ScriptMain() {
                 activeLayoutValid = data.HasPlausibleLayout(maxGear > 0 ? maxGear : 6);
                 Renderer::ShowNotification("~g~Calibration complete! Manual transmission active.");
             } else {
-                if (state == CalibrationState::Failed &&
-                    lastCalibState == CalibrationState::Failed) {
-                    const std::string& reason = VehicleData::GetLastFailureReason();
-                    LOG_ERROR(Calib, "Calibration FAILED: %s", reason.c_str());
-                    Renderer::ShowNotification(("~r~Calibration Failed:~w~ " + reason).c_str());
-                }
                 DrawCalibrationHUD(state, smoothThrottle);
                 LOG_DEBUG_T(Calib, 1000,
                             "Calib in progress: state=%d candidates=%zu throttle=%.2f revving=%d",
@@ -459,7 +476,7 @@ void ScriptMain() {
                             InputHandler::GetSmoothedBrake(), throttle);
 
         // ── HUD ───────────────────────────────────────────────────────────────
-        Renderer::DrawGearHUD(manualGear, maxGear);
+        Renderer::DrawGearHUD(manualGear, maxGear, activeSignal, isEngineOn);
 
         if (grindWarningTimer > 0) {
             --grindWarningTimer;

@@ -5,12 +5,13 @@ namespace Renderer {
 void ShowNotification(const char *message);
 
 void DrawTextOverlay(const char *text, float x, float y, float scale = 0.42f,
-                     int r = 255, int g = 255, int b = 255, int a = 255);
+                     int r = 255, int g = 255, int b = 255, int a = 255,
+                     int font = 0, bool outline = true, bool center = false);
 
 void DrawBar(float x, float y, float width, float height, float fraction, int r,
              int g, int b, const char *label);
 
-void DrawGearHUD(int manualGear, int maxGear);
+void DrawGearHUD(int manualGear, int maxGear, int activeSignal, bool isEngineOn);
 
 void DrawGrindWarning();
 
