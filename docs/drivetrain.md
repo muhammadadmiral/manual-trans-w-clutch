@@ -52,6 +52,14 @@ Kendaraan kuat bisa menarik lebih cepat; gear tinggi, tanjakan, atau rem yang
 ditahan mempercepat bog/stall. Memasukkan gear dari netral tanpa clutch dan
 tanpa throttle yang cukup menghasilkan stall request langsung.
 
+Cadangan torsi juga membentuk multiplier torsi native per frame. Gigi tinggi
+di bawah power band tetap mendapat gaya roda kecil selama cadangan torsinya
+positif; torque deficit mengurangi output dan tetap menaikkan stall progress.
+Saat road RPM melewati redline, output turun halus lalu menjadi nol. RPM boleh
+meraung di limiter, tetapi gigi 1 tidak bisa terus mempercepat kendaraan tanpa
+batas. Jalur ini memakai `SET_VEHICLE_CHEAT_POWER_INCREASE`; velocity dan
+angular velocity roda tidak ditulis.
+
 Idle creep hanya diinjeksikan pada gear 1/reverse ketika brake dan throttle
 dilepas. Pada tanjakan tidak ada hill-hold manual di gear: bila torque idle
 kalah oleh beban, kendaraan boleh rollback dan mesin dapat stall.
@@ -69,9 +77,10 @@ kalah oleh beban, kendaraan boleh rollback dan mesin dapat stall.
 - Netral ke gear 2 atau upshift di RPM rendah tidak mematikan throttle. Rasio
   gear hanya menurunkan torque reserve sehingga mobil terasa berat atau stall
   bila torsi benar-benar tidak cukup.
-- Native auto-shift, auto-clutch low-RPM, dan throttle-lift Enhanced dipatch
-  fail-closed. Karena itu logical gear 2-akhir tidak lagi ditolak hanya karena
-  berada di bawah band RPM bawaan GTA.
+- Patch shift-up/clutch dan shift-down/clutch Enhanced bersifat fail-closed.
+  Writer low-RPM dan throttle-lift lama dipasang independen bila signature
+  build masih tersedia. Karena itu logical gear 2-akhir tetap dipertahankan
+  oleh RPM dan torque controller kita ketika opcode opsional sudah hilang.
 
 ## Automatic P-R-N-D-S-L2-L1
 
@@ -96,7 +105,8 @@ Clutch input user diabaikan dan bar clutch disembunyikan.
 Perpindahan D/S tidak mengganti gear saat coupling penuh. Controller melewati
 fase torque cut, membuka clutch, memasang target gear sambil menyamakan RPM
 dengan kecepatan roda, lalu menggigit kembali bertahap. Kickdown ditahan sesaat
-setelah upshift agar gearbox tidak hunting 2-3. Throttle internal Enhanced
+setelah upshift dan pembalikan arah shift D diberi hysteresis lebih panjang
+agar gearbox tidak hunting 2-3. Throttle internal Enhanced
 ditulis ulang dari pedal GTA yang sudah melewati TCS ketika gear maju aktif;
 ini memulihkan kasus RPM valid tetapi GTA membuang throttle karena gear dipaksa.
 
