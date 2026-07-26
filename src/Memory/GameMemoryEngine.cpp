@@ -88,7 +88,10 @@ float CVehicle::GetGearRatio(uint8_t gearIndex) const {
     return 0.0f;
   __try {
     const uintptr_t ratios =
-        *reinterpret_cast<uintptr_t *>(m_address + m_offsets->GearRatios);
+        m_offsets->GearRatiosInline != 0
+            ? m_address + m_offsets->GearRatios
+            : *reinterpret_cast<uintptr_t *>(m_address +
+                                             m_offsets->GearRatios);
     if (!AOBScanner::IsReadable(ratios + gearIndex * sizeof(float),
                                 sizeof(float)))
       return 0.0f;
@@ -99,7 +102,7 @@ float CVehicle::GetGearRatio(uint8_t gearIndex) const {
 }
 
 float CVehicle::GetClutch() const {
-  if (!IsValid())
+  if (!IsValid() || m_offsets->Clutch == 0)
     return 0.0f;
   __try {
     return *reinterpret_cast<float *>(m_address + m_offsets->Clutch);
@@ -123,6 +126,28 @@ float CVehicle::GetThrottlePedal() const {
     return 0.0f;
   __try {
     return *reinterpret_cast<float *>(m_address + m_offsets->ThrottlePedal);
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return 0.0f;
+  }
+}
+
+float CVehicle::GetTransmissionDriveForce() const {
+  if (!IsValid() || m_offsets->TransmissionDriveForce == 0)
+    return 0.0f;
+  __try {
+    return *reinterpret_cast<float *>(
+        m_address + m_offsets->TransmissionDriveForce);
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return 0.0f;
+  }
+}
+
+float CVehicle::GetTransmissionDriveMaxFlatVel() const {
+  if (!IsValid() || m_offsets->TransmissionDriveMaxFlatVel == 0)
+    return 0.0f;
+  __try {
+    return *reinterpret_cast<float *>(
+        m_address + m_offsets->TransmissionDriveMaxFlatVel);
   } __except (EXCEPTION_EXECUTE_HANDLER) {
     return 0.0f;
   }
@@ -197,7 +222,7 @@ float CVehicle::GetFuelLevel() const {
 }
 
 float CVehicle::GetHoverTransformRatioLerp() const {
-  if (!IsValid())
+  if (!IsValid() || m_offsets->HoverTransformRatioLerp == 0)
     return 0.0f;
   __try {
     return *reinterpret_cast<float *>(m_address +
@@ -208,7 +233,7 @@ float CVehicle::GetHoverTransformRatioLerp() const {
 }
 
 uint8_t CVehicle::GetLightsBroken() const {
-  if (!IsValid())
+  if (!IsValid() || m_offsets->LightsBroken == 0)
     return 0;
   __try {
     return *reinterpret_cast<uint8_t *>(m_address + m_offsets->LightsBroken);
@@ -227,7 +252,7 @@ void CHandlingData::SetDriveForce(float force) {
 }
 
 uint8_t CVehicle::GetLightsVisuallyBroken() const {
-  if (!IsValid())
+  if (!IsValid() || m_offsets->LightsVisuallyBroken == 0)
     return 0;
   __try {
     return *reinterpret_cast<uint8_t *>(m_address +

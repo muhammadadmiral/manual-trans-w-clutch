@@ -21,12 +21,18 @@ Motor non-scooter tetap sequential dan memakai auto-clutch.
 - `Engine Stall`, `Stall Rate`, `Stall Clutch`: waktu dan bite minimum sebelum
   stall.
 - `Idle Torque`: cadangan torsi kendaraan saat throttle nol.
+- `Lug Stall RPM`: batas zona lugging dalam RPM fisik estimasi. Default 1500
+  RPM; mesin masih boleh menarik di bawah angka ini.
+- `Lug Stall Delay`: waktu dasar sebelum lugging yang tidak pulih menjadi
+  stall. Timer melambat saat defisit kecil dan dipercepat brake, tanjakan,
+  clutch lock, serta gear tinggi.
 - `Starter Interlock`: manual wajib netral/clutch; automatic wajib P/N.
 - `Auto Start Needs Brake`: menambah syarat brake pada starter automatic.
 - `Launch Control` dan `Launch RPM`: limiter launch manual atau automatic.
 
-`ConnectedRPMSync` tetap dibaca dari INI lama untuk kompatibilitas, tetapi tidak
-lagi menulis RPM.
+`ConnectedRPMSync` tetap dibaca dari INI lama untuk kompatibilitas. Sinkronisasi
+baru memakai inertia, rasio aktual, road speed, dan coupling sehingga nilainya
+tidak lagi menjadi faktor tunggal.
 
 ## Clutch
 
@@ -42,6 +48,8 @@ lagi menulis RPM.
 - `Shift Delay`: dwell minimum untuk mencegah hunting.
 - `D/S Upshift RPM` dan `D/S Downshift RPM`: dasar shift map; throttle
   menggeser threshold secara dinamis.
+- Baseline D adalah `0.50/0.22`, supaya throttle ringan cepat memilih gear
+  tinggi dan bertahan di RPM rendah. Baseline S `0.84/0.34`.
 - `Kickdown Pedal`: bukaan throttle minimum untuk downshift paksa yang masih
   aman terhadap over-rev.
 - `S Torque Boost`: nama legacy untuk agresivitas sport pedal map; tidak
@@ -59,7 +67,10 @@ lagi menulis RPM.
 
 ## ABS / TCS dan brake fade
 
-TCS dan ABS hanya mengintervensi bila minimal dua sample roda valid.
+TCS dan ABS hanya mengintervensi bila minimal dua sample roda valid. Angka
+`TCS=0` atau `ABS=0` di log berarti sistem sedang tidak memotong input, bukan
+fiturnya mati. Cek `TCSEn`/`ABSEn` untuk konfigurasi dan
+`TCSReady`/`ABSReady` untuk kesiapan telemetry roda.
 
 - `Slip Target`: slip yang masih diizinkan.
 - `Max Cut/Release`: batas intervensi throttle atau pressure.
@@ -72,7 +83,9 @@ TCS dan ABS hanya mengintervensi bila minimal dua sample roda valid.
 2. Manual gear 1 + clutch + W: RPM naik; release pelan creep/berangkat, release
    cepat memberi dump; throttle kecil dapat stall.
 3. Manual N ke gear 2 dan low-RPM upshift: gear tetap masuk dan throttle tetap
-   aktif, tetapi acceleration berat sesuai torque reserve.
+   aktif, tetapi acceleration berat sesuai torque reserve. Di bawah 1500 RPM,
+   `Lug` boleh naik; `Stall` harus turun lagi kalau kendaraan berhasil
+   berakselerasi atau clutch diinjak.
 4. Manual R: W mundur, S mengerem dan tidak menaikkan RPM.
 5. Automatic: tahan brake, tekan LShift dari P sampai D, lepas brake untuk
    creep. L2 hanya memakai gear 1-2 dan L1 mengunci gear 1.
@@ -83,4 +96,9 @@ TCS dan ABS hanya mengintervensi bila minimal dua sample roda valid.
 Baris `STATUS` di `manual-trans.log` dicatat setelah final drivetrain write dan
 memuat profile kendaraan, selector, logical/physical gear, clutch, RPM native,
 ratio, max velocity, status handling pointer, torque reserve, stall, clash,
-money shift, starter, TCS, dan ABS.
+money shift, starter, TCS, ABS, dan launch control. `Accel` adalah respons
+longitudinal terfilter dan `LowRec` adalah kompensasi torque native yang sedang
+dipakai ketika GTA menahan forced gear di low RPM. Untuk assist, suffix `En`
+berarti enabled, `Ready` berarti telemetry tersedia, dan nilai tanpa suffix
+berarti sedang mengintervensi. Launch control memang mati jika `LCEn=0`;
+aktifkan `LaunchControl=1` lewat menu atau bagian `[Engine]`.

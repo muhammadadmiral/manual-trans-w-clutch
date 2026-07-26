@@ -91,16 +91,16 @@ float UpdatePedal(float rawPedal, float throttle, bool engineOn) {
 }
 
 void ApplyToVehicle(VehicleData &data, int gear, float speedMps) {
-  const bool fullyOpen = s_state.disengagement >= 0.995f;
+  const bool drivelineOpen = s_state.disengagement >= 0.88f;
 
-  if (gear == 0 || fullyOpen) {
-    s_state.nativeActuator = 0.0f;
+  if (gear == 0 || drivelineOpen) {
+    s_state.nativeActuator =
+        std::fabs(speedMps) < 1.0f ? -5.0f : -0.5f;
   } else {
     s_state.nativeActuator = s_state.engagement;
   }
 
   data.SetClutch(s_state.nativeActuator);
-  (void)speedMps;
 }
 
 float GetEngagement() { return s_state.engagement; }
@@ -109,7 +109,7 @@ float GetNativeActuator() { return s_state.nativeActuator; }
 float GetDumpSeverity() { return s_state.dumpSeverity; }
 bool IsDumpActive() { return s_state.dumpRemaining > 0.0f; }
 bool IsDrivelineOpen(int gear) {
-  return gear == 0 || s_state.disengagement > 0.40f;
+  return gear == 0 || s_state.disengagement > 0.35f;
 }
 const State &GetState() { return s_state; }
 

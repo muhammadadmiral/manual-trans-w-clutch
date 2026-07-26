@@ -159,6 +159,12 @@ void Menu::Initialize() {
   engine.items.push_back(MenuItem("Idle Torque", MenuItem::Float,
                                   &Config::IdleTorqueFraction,
                                   0.01f, 0.02f, 0.60f));
+  engine.items.push_back(MenuItem("Lug Stall RPM", MenuItem::Float,
+                                  &Config::LugStallRPM,
+                                  50.0f, 800.0f, 2500.0f));
+  engine.items.push_back(MenuItem("Lug Stall Delay", MenuItem::Float,
+                                  &Config::LugStallDelay,
+                                  0.10f, 0.40f, 8.00f));
   engine.items.push_back(MenuItem(
       "Starter Interlock", MenuItem::Bool, &Config::StarterInterlock));
   engine.items.push_back(MenuItem(
@@ -272,7 +278,7 @@ void Menu::Initialize() {
       0.01f, 0.10f, 1.20f));
   automatic.items.push_back(MenuItem(
       "D Upshift RPM", MenuItem::Float, &Config::AutomaticDUpRPM,
-      0.01f, 0.40f, 0.95f));
+      0.01f, 0.35f, 0.80f));
   automatic.items.push_back(MenuItem(
       "D Downshift RPM", MenuItem::Float, &Config::AutomaticDDownRPM,
       0.01f, 0.10f, 0.70f));

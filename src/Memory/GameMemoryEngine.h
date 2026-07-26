@@ -92,6 +92,8 @@ public:
   float GetRPM() const;
   float GetThrottle() const;
   float GetThrottlePedal() const;
+  float GetTransmissionDriveForce() const;
+  float GetTransmissionDriveMaxFlatVel() const;
   uint8_t GetWheelCount() const;
   WheelTelemetry GetWheelTelemetry(uint8_t index) const;
   float GetFuelLevel() const;

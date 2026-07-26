@@ -11,9 +11,11 @@ struct State {
   float absLevel = 0.0f;
   float rollingRadius = 0.34f;
   float wheelSlip = 0.0f;
+  float rawWheelSlip = 0.0f;
   float temperature = 0.0f;
   float fadeLevel = 0.0f;
   bool wheelDataValid = false;
+  int validWheelCount = 0;
 };
 
 void Reset();

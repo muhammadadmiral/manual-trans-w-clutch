@@ -8,7 +8,7 @@ using Vehicle = int;
 namespace InputHandler {
 
 // ── Frame update ─────────────────────────────────────────────────────────────
-void Update();
+void Update(int selectedGear);
 
 // Apply computed control values to the GTA V input system.
 void ApplyGameControls(Vehicle vehicle, int manualGear, float clutch,

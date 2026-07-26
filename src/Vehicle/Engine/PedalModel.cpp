@@ -31,12 +31,15 @@ void Update(float rawThrottle, float rawBrake, float clutchDisengagement,
     s_state.overlapTime =
         (std::max)(0.0f, s_state.overlapTime - dt * 4.0f);
 
+  const bool powerBrakeWindow =
+      !automaticMode && std::fabs(signedSpeedMps) < 2.0f &&
+      gear == 1 && s_state.throttle > 0.50f;
   const bool launchWindow =
       Config::LaunchControl && std::fabs(signedSpeedMps) < 1.0f &&
       gear > 0 && s_state.throttle > 0.50f;
   const bool shouldOverride =
       Config::BrakeThrottleOverride && pedalsOverlap &&
-      !s_state.heelToeWindow && !launchWindow &&
+      !s_state.heelToeWindow && !powerBrakeWindow && !launchWindow &&
       s_state.overlapTime >=
           (std::max)(0.0f, Config::BrakeOverrideDelay);
 

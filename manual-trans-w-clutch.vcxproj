@@ -25,6 +25,7 @@
     <ClCompile Include="src\Memory\AOBScanner.cpp" />
     <ClCompile Include="src\Memory\CalibrationEngine.cpp" />
     <ClCompile Include="src\Memory\GameMemoryEngine.cpp" />
+    <ClCompile Include="src\Memory\GearboxPatches.cpp" />
     <ClCompile Include="src\Memory\OffsetResolver.cpp" />
     <ClCompile Include="src\Vehicle\VehicleData.cpp" />
     <ClCompile Include="src\Vehicle\VehicleProfile.cpp" />
@@ -57,6 +58,7 @@
     <ClInclude Include="src\Memory\AOBScanner.h" />
     <ClInclude Include="src\Memory\CalibrationEngine.h" />
     <ClInclude Include="src\Memory\GameMemoryEngine.h" />
+    <ClInclude Include="src\Memory\GearboxPatches.h" />
     <ClInclude Include="src\Memory\OffsetResolver.h" />
     <ClInclude Include="src\Vehicle\VehicleData.h" />
     <ClInclude Include="src\Vehicle\VehicleProfile.h" />

@@ -15,6 +15,7 @@
 
 #include "../../sdk/inc/main.h"
 #include "../Core/ModLogger.h"
+#include "../Memory/GearboxPatches.h"
 #include "../Script/MainScript.h"
 
 HMODULE g_pluginModule = nullptr;
@@ -26,12 +27,21 @@ BOOL APIENTRY DllMain(HMODULE instance, DWORD reason, LPVOID) {
         g_pluginModule = instance;
         DisableThreadLibraryCalls(instance);
         ModLogger::Initialize(instance);
+        {
+            char modulePath[MAX_PATH]{};
+            GetModuleFileNameA(instance, modulePath, MAX_PATH);
+            LOG_INFO(Init,
+                     "Runtime=driveline-r12 built=%s %s module=%s",
+                     __DATE__, __TIME__,
+                     modulePath[0] ? modulePath : "?");
+        }
         LOG_INFO(Init, "DLL_PROCESS_ATTACH — registering ScriptMain with ScriptHookV");
         scriptRegister(instance, ScriptMain);
         break;
 
     case DLL_PROCESS_DETACH:
         LOG_INFO(Init, "DLL_PROCESS_DETACH — unregistering script, flushing logs");
+        GearboxPatches::Shutdown();
         scriptUnregister(instance);
         ModLogger::Shutdown();
         break;

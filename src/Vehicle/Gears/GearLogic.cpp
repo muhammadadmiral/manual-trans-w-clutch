@@ -97,12 +97,12 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
 
 void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
                    int maxGear, float clutch, float throttle, float speedKmH) {
-  // Saat pedal benar-benar mentok, physical gear dibuat netral. Logical gear
-  // tetap tersimpan di s_manualGear dan langsung masuk lagi di bite point.
-  // Ini jadi hard disconnect kalau GTA menimpa fClutch di akhir frame.
-  if (manualGear == 0 || clutch >= 0.995f) {
-    data.SetGear(0xFF);
-    data.SetNextGear(0xFF);
+  // Gear 1 dipakai sebagai carrier saat drivetrain terbuka karena GTA bisa
+  // menganggap 0xFF sebagai permintaan auto-forward. Clutch signed yang
+  // benar-benar memutus roda; logical gear tetap tidak berubah.
+  if (manualGear == 0 || clutch >= 0.88f) {
+    data.SetGear(1);
+    data.SetNextGear(1);
   } else if (manualGear == -1) {
     data.SetGear(0);
     data.SetNextGear(0);

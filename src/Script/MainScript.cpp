@@ -10,6 +10,7 @@
 #include "../Core/Menu.h"
 #include "../Core/ModLogger.h"
 #include "../Core/Renderer.h"
+#include "../Memory/GearboxPatches.h"
 #include "../Vehicle/Brakes/BrakeSystem.h"
 #include "../Vehicle/Brakes/ParkingBrake.h"
 #include "../Vehicle/Clutch/ClutchSystem.h"
@@ -167,8 +168,10 @@ void ScriptMain() {
 
   // ── Per-session state ─────────────────────────────────────────────────────
   bool notificationShown = false;
+  bool patchFailureShown = false;
   Vehicle activeVehicle = 0;
   bool activeLayoutValid = false;
+  bool activeLayoutChecked = false;
   bool isEngineOn = true;
   bool engineStarting = false;
   ULONGLONG engineStartTick = 0;
@@ -191,6 +194,7 @@ void ScriptMain() {
       LOG_INFO(Calib, "ForceRecalibrate flag set — resetting calibration");
       VehicleData::ResetCalibration();
       lastCalibState = CalibrationState::None;
+      activeLayoutChecked = false;
     }
 
     Menu::Update();
@@ -198,12 +202,19 @@ void ScriptMain() {
 
     // ── Not in a vehicle ──────────────────────────────────────────────────
     if (!PED::IS_PED_IN_ANY_VEHICLE(playerPed, FALSE)) {
+      GearboxPatches::SetActive(false);
       if (activeVehicle) {
+        if (ENTITY::DOES_ENTITY_EXIST(activeVehicle)) {
+          VehicleData previousData(activeVehicle);
+          previousData.SetClutch(1.0f);
+          VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(activeVehicle, 1.0f);
+        }
         LOG_INFO(Script, "Player exited vehicle %d — resetting session state",
                  activeVehicle);
       }
       activeVehicle = 0;
       activeLayoutValid = false;
+      activeLayoutChecked = false;
       activeSignal = 0;
       InputHandler::ResetEdges();
       Menu::Draw();
@@ -212,8 +223,15 @@ void ScriptMain() {
 
     const Vehicle vehicle = PED::GET_VEHICLE_PED_IS_IN(playerPed, FALSE);
     if (!IsValidVehicle(vehicle) || !IsPlayerDriving(playerPed, vehicle)) {
+      GearboxPatches::SetActive(false);
+      if (activeVehicle && ENTITY::DOES_ENTITY_EXIST(activeVehicle)) {
+        VehicleData previousData(activeVehicle);
+        previousData.SetClutch(1.0f);
+        VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(activeVehicle, 1.0f);
+      }
       activeVehicle = 0;
       activeLayoutValid = false;
+      activeLayoutChecked = false;
       activeSignal = 0;
       InputHandler::ResetEdges();
       Menu::Draw();
@@ -226,7 +244,7 @@ void ScriptMain() {
       const VehicleOffsets &off = VehicleData::GetResolvedOffsets();
       const std::string bv = VehicleData::GetGameBuildVersion();
       char notify[256]{};
-      sprintf_s(notify, "Manual trans: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
+      sprintf_s(notify, "Manual trans r5: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
                 VehicleData::GetOffsetSourceName(),
                 bv.empty() ? "?" : bv.c_str(), off.Gear, off.NextGear, off.RPM,
                 off.Clutch);
@@ -248,10 +266,16 @@ void ScriptMain() {
 
     // ── Vehicle change ────────────────────────────────────────────────────
     if (vehicle != activeVehicle) {
+      if (activeVehicle && ENTITY::DOES_ENTITY_EXIST(activeVehicle)) {
+        VehicleData previousData(activeVehicle);
+        previousData.SetClutch(1.0f);
+        VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(activeVehicle, 1.0f);
+      }
       LOG_INFO(Script, "Entered vehicle handle=%d maxGear=%d", vehicle,
                maxGear);
       activeVehicle = vehicle;
-      activeLayoutValid = true;
+      activeLayoutValid = false;
+      activeLayoutChecked = false;
 
       isEngineOn = Config::RequireColdStart ? false : actualEngineOn;
       engineStarting = false;
@@ -297,7 +321,27 @@ void ScriptMain() {
       continue;
     }
 
-    InputHandler::Update();
+    if (VehicleData::IsInitialized() && !activeLayoutChecked) {
+      activeLayoutValid =
+          data.HasPlausibleLayout(maxGear > 0 ? maxGear : 6);
+      activeLayoutChecked = true;
+      if (!activeLayoutValid) {
+        LOG_ERROR(Memory,
+                  "Resolved layout rejected on live vehicle: src=%s "
+                  "G=0x%X N=0x%X TG=0x%X RPM=0x%X",
+                  VehicleData::GetOffsetSourceName(),
+                  VehicleData::GetResolvedOffsets().Gear,
+                  VehicleData::GetResolvedOffsets().NextGear,
+                  VehicleData::GetResolvedOffsets().TopGear,
+                  VehicleData::GetResolvedOffsets().RPM);
+        Renderer::ShowNotification(
+            "~r~Offset invalid:~w~ calibration aman dimulai ulang");
+        VehicleData::ResetCalibration();
+        lastCalibState = CalibrationState::None;
+      }
+    }
+
+    InputHandler::Update(manualGear);
 
     // ── Engine toggle key ─────────────────────────────────────────────────
     if (InputHandler::IsEngineJustPressed()) {
@@ -436,6 +480,7 @@ void ScriptMain() {
                  "Calibration done — RPM=0x%X CLT=0x%X G=0x%X N=0x%X TG=0x%X",
                  off.RPM, off.Clutch, off.Gear, off.NextGear, off.TopGear);
         activeLayoutValid = data.HasPlausibleLayout(maxGear > 0 ? maxGear : 6);
+        activeLayoutChecked = true;
         Renderer::ShowNotification(
             "~g~Calibration complete! Manual transmission active.");
       } else {
@@ -453,6 +498,7 @@ void ScriptMain() {
 
     // ── Layout validation ─────────────────────────────────────────────────
     if (!activeLayoutValid || !data.IsValid()) {
+      GearboxPatches::SetActive(false);
       LOG_WARN_T(Memory, 2000,
                  "Layout invalid — skipping frame (valid=%d dataValid=%d)",
                  static_cast<int>(activeLayoutValid),
@@ -464,6 +510,7 @@ void ScriptMain() {
     // Removed mid-session plausibility check to prevent false positives when spawning new vehicles
     // Deluxo hover-mode: skip manual trans logic when hovering
     if (data.GetHoverTransformRatioLerp() > 0.0f) {
+      GearboxPatches::SetActive(false);
       LOG_DEBUG_T(Script, 3000, "Deluxo hover active — skipping");
       Menu::Draw();
       continue;
@@ -476,6 +523,17 @@ void ScriptMain() {
         vehicleProfile == VehicleProfile::Drivetrain::ScooterCVT;
     const int transmissionMode =
         VehicleProfile::ForcesAutomatic(vehicleProfile) ? 1 : requestedMode;
+    const bool nativePatchReady =
+        GearboxPatches::SetActive(transmissionMode != 0);
+    if (transmissionMode != 0 && !nativePatchReady && !patchFailureShown) {
+      patchFailureShown = true;
+      const std::string reason = GearboxPatches::GetFailureReason();
+      Renderer::ShowNotification(
+          ("~r~Native gearbox patch gagal:~w~ " +
+           (reason.empty() ? std::string("signature Enhanced tidak cocok")
+                           : reason))
+              .c_str());
+    }
     if (transmissionMode != activeTransmissionMode) {
       if (activeTransmissionMode == 1)
         VEHICLE::SET_VEHICLE_HANDBRAKE(vehicle, FALSE);
@@ -490,6 +548,7 @@ void ScriptMain() {
       manualGear = 0;
       automaticClutchUntil = 0;
       data.SetClutch(1.0f);
+      VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, 1.0f);
       activeTransmissionMode = transmissionMode;
 
       if (electricVehicle && requestedMode == 2) {
@@ -512,7 +571,9 @@ void ScriptMain() {
     }
 
     if (transmissionMode == 0) {
+      GearboxPatches::SetActive(false);
       data.SetClutch(1.0f);
+      VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, 1.0f);
       Menu::Draw();
       continue;
     }
@@ -603,20 +664,31 @@ void ScriptMain() {
                                     driveThrottle, absBrake, maxGear,
                                     forwardSpeed);
 
+    const float clutchEngagement =
+        automaticMode ? AutomaticGearbox::GetCoupling()
+                      : ClutchSystem::GetEngagement();
+
     if (automaticMode) {
-      AutomaticGearbox::ApplyToMemory(vehicle, data, manualGear);
+      AutomaticGearbox::ApplyToMemory(vehicle, data, manualGear,
+                                      driveThrottle);
     } else {
       GearLogic::ApplyToMemory(vehicle, data, manualGear, maxGear,
                                simulatedClutch, throttle, speedKmH);
       ClutchSystem::ApplyToVehicle(data, manualGear, forwardSpeed);
     }
-    const float clutchEngagement =
-        automaticMode ? AutomaticGearbox::GetCoupling()
-                      : ClutchSystem::GetEngagement();
     const bool engineStall = EngineModel::Update(
         vehicle, data, manualGear, maxGear, simulatedClutch,
-        clutchEngagement, throttle, absBrake, forwardSpeed, isEngineOn,
+        clutchEngagement, driveThrottle, absBrake, forwardSpeed, isEngineOn,
         automaticMode);
+    const float sportTorque =
+        automaticMode && AutomaticGearbox::IsSport()
+            ? 1.0f + std::clamp(Config::AutomaticSTorqueBoost, 0.0f, 0.50f)
+            : 1.0f;
+    const float powerMultiplier =
+        std::clamp(EngineModel::GetDriveTorqueFactor() * sportTorque,
+                   0.0f, 1.80f);
+    VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, powerMultiplier);
+
     LaunchControl::Update(data, manualGear, simulatedClutch, throttle,
                           absBrake, forwardSpeed, isEngineOn, automaticMode);
     GearboxSystem::Update(vehicle, data, manualGear, maxGear, simulatedClutch,
@@ -625,6 +697,7 @@ void ScriptMain() {
     const bool shiftStall = GearboxSystem::ConsumeStallRequest();
     if ((engineStall || shiftStall) && isEngineOn) {
       isEngineOn = false;
+      VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, 0.0f);
       VEHICLE::SET_VEHICLE_ENGINE_ON(vehicle, FALSE, TRUE, TRUE);
       LOG_WARN(Physics,
                "Drivetrain stall: gear=%d spd=%.1fkm/h load=%.3f heat=%.3f",
@@ -649,7 +722,8 @@ void ScriptMain() {
     LightsLogic::Update(vehicle, data, manualGear,
                         InputHandler::GetSmoothedBrake(), throttle);
     if (automaticMode) {
-      AutomaticGearbox::ApplyToMemory(vehicle, data, manualGear);
+      AutomaticGearbox::ApplyToMemory(vehicle, data, manualGear,
+                                      driveThrottle);
     } else {
       GearLogic::ApplyToMemory(vehicle, data, manualGear, maxGear,
                                simulatedClutch, throttle, speedKmH);
@@ -663,32 +737,76 @@ void ScriptMain() {
       LOG_INFO(
           Gear,
           "STATUS: Mode=%d Profile=%s Selector=%s Selected=%d Mem=%u Next=%u "
-          "PedalClutch=%.3f Key=%d Coupling=%.3f NativeClutch=%.3f "
-          "Actuator=%.3f Throttle=%.3f Brake=%.3f RPM=%.3f "
-          "SpeedKmH=%.1f SignedMps=%.2f Ratio=%.4f MaxVel=%.2f "
-          "Handling=%d Load=%.3f TorqueReserve=%.3f Stall=%.3f "
+          "PedalClutch=%.3f Key=%d Coupling=%.3f PowerMul=%.3f Limiter=%d "
+          "MemClutch=%.3f Actuator=%.3f Throttle=%.3f MemThrottle=%.3f "
+          "Brake=%.3f RPM=%.3f AutoRPM=%.3f AutoPhase=%s AutoTarget=%d "
+          "AutoRecover=%d "
+          "NativePatch=%d RPMOwned=%d ControlledRPM=%.3f RPMTarget=%.3f "
+          "WheelRPM=%.3f CutFix=%d MemPedal=%.3f "
+          "SpeedKmH=%.1f SignedMps=%.2f Ratio=%.4f MaxVel=%.2f EstFlat=%.2f "
+          "Handling=%d Load=%.3f TorqueReserve=%.3f TorqueCurve=%.3f "
+          "EngineRPM=%.0f IdleRPM=%.0f RedlineRPM=%.0f Lug=%.3f Stall=%.3f "
+          "Accel=%.3f LowRec=%.3f "
           "Clash=%.3f Shock=%.3f Money=%d Engine=%d Actual=%d Start=%d "
-          "TCS=%d ABS=%d",
+          "TCSEn=%d TCSReady=%d TCSWheels=%d TCSDriven=%d "
+          "TCSSlip=%.3f TCSCut=%.3f TCS=%d "
+          "ABSEn=%d ABSReady=%d ABSWheels=%d ABSSlip=%.3f ABSLevel=%.3f ABS=%d "
+          "LCEn=%d LCArmed=%d LCCut=%d",
           transmissionMode, VehicleProfile::GetName(vehicleProfile),
           automaticMode ? AutomaticGearbox::GetSelectorName() : "M",
           manualGear, static_cast<unsigned>(data.GetGear()),
           static_cast<unsigned>(data.GetNextGear()), simulatedClutch,
           (!automaticMode && InputHandler::IsClutchDown()) ? 1 : 0,
-          InputHandler::GetDriveCoupling(), data.GetClutch(),
+          InputHandler::GetDriveCoupling(), powerMultiplier,
+          EngineModel::GetState().redlineCut ? 1 : 0, data.GetClutch(),
           automaticMode ? AutomaticGearbox::GetCoupling()
                         : ClutchSystem::GetNativeActuator(),
-          driveThrottle, absBrake, data.GetRPM(), speedKmH, forwardSpeed,
-          data.GetGearRatio(ratioIndex), data.GetDriveMaxFlatVel(),
+          driveThrottle, data.GetThrottle(), absBrake, data.GetRPM(),
+          automaticMode ? AutomaticGearbox::GetState().decisionRPM : -1.0f,
+          automaticMode ? AutomaticGearbox::GetShiftPhaseName() : "-",
+          automaticMode ? AutomaticGearbox::GetState().pendingGear : 0,
+          automaticMode && AutomaticGearbox::GetState().rpmRecovery ? 1 : 0,
+          GearboxPatches::IsApplied() ? 1 : 0,
+          EngineModel::GetState().rpmOwned ? 1 : 0,
+          EngineModel::GetState().controlledRPM,
+          EngineModel::GetState().connectedRPMTarget,
+          EngineModel::GetState().wheelRPM,
+          EngineModel::GetState().nativeCutRecovered ? 1 : 0,
+          data.GetThrottlePedal(),
+          speedKmH, forwardSpeed, data.GetGearRatio(ratioIndex),
+          data.GetDriveMaxFlatVel(),
+          EngineModel::GetState().estimatedFlatVelocity,
           EngineModel::GetState().handlingBacked ? 1 : 0,
           EngineModel::GetLoad(), EngineModel::GetTorqueReserve(),
+          EngineModel::GetState().torqueCurve,
+          EngineModel::GetState().estimatedEngineRPM,
+          EngineModel::GetState().estimatedIdlePhysicalRPM,
+          EngineModel::GetState().estimatedRedlineRPM,
+          EngineModel::GetState().lugSeverity,
           EngineModel::GetStallProgress(),
+          EngineModel::GetState().longitudinalAcceleration,
+          EngineModel::GetState().lowRpmRecovery,
           GearboxSystem::GetState().clashSeverity,
           GearboxSystem::GetState().shockRemaining,
           GearboxSystem::GetState().moneyShift ? 1 : 0,
           isEngineOn ? 1 : 0, actualEngineOn ? 1 : 0,
           engineStarting ? 1 : 0,
+          TractionControl::GetState().enabled ? 1 : 0,
+          TractionControl::GetState().wheelDataValid ? 1 : 0,
+          TractionControl::GetState().validWheelCount,
+          TractionControl::GetState().drivenWheelCount,
+          TractionControl::GetState().slipRatio,
+          TractionControl::GetState().cutLevel,
           TractionControl::IsTCSActive() ? 1 : 0,
-          BrakeSystem::IsABSActive() ? 1 : 0);
+          BrakeSystem::GetState().absEnabled ? 1 : 0,
+          BrakeSystem::GetState().wheelDataValid ? 1 : 0,
+          BrakeSystem::GetState().validWheelCount,
+          BrakeSystem::GetState().wheelSlip,
+          BrakeSystem::GetState().absLevel,
+          BrakeSystem::IsABSActive() ? 1 : 0,
+          LaunchControl::GetState().enabled ? 1 : 0,
+          LaunchControl::GetState().armed ? 1 : 0,
+          LaunchControl::GetState().limiting ? 1 : 0);
       s_lastStatusLog = GetTickCount();
     }
 

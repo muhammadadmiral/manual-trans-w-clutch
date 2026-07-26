@@ -10,6 +10,7 @@ struct VehicleOffsets {
   uint32_t NextGear = 0;
   uint32_t TopGear = 0;
   uint32_t GearRatios = 0;
+  uint32_t GearRatiosInline = 0;
   uint32_t Clutch = 0;
   uint32_t RPM = 0;
   uint32_t Throttle = 0;
@@ -18,6 +19,8 @@ struct VehicleOffsets {
   uint32_t DriveInertia = 0;
   uint32_t DriveMaxFlatVel = 0;
   uint32_t DriveForce = 0;
+  uint32_t TransmissionDriveMaxFlatVel = 0;
+  uint32_t TransmissionDriveForce = 0;
   uint32_t WheelsPtr = 0;
   uint32_t WheelCount = 0;
   uint32_t WheelAngularVelocity = 0;
