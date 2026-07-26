@@ -10,6 +10,7 @@
 #include "../Core/Menu.h"
 #include "../Core/ModLogger.h"
 #include "../Core/Renderer.h"
+#include "../Audio/AudioEngine.h"
 #include "../Memory/GearboxPatches.h"
 #include "../Vehicle/Brakes/BrakeSystem.h"
 #include "../Vehicle/Brakes/ParkingBrake.h"
@@ -24,6 +25,9 @@
 #include "../Vehicle/Gears/AutomaticGearbox.h"
 #include "../Vehicle/Gears/GearLogic.h"
 #include "../Vehicle/LightsLogic.h"
+#include "../Vehicle/Maintenance/RefuelInteraction.h"
+#include "../Vehicle/Maintenance/MaintenanceSystem.h"
+#include "../Vehicle/Maintenance/ServiceInteraction.h"
 #include "../Vehicle/TelemetryLogger.h"
 #include "../Vehicle/VehicleData.h"
 #include "../Vehicle/VehicleProfile.h"
@@ -162,6 +166,7 @@ void ScriptMain() {
   LOG_INFO(Script, "VehicleData::Initialize OK. Reading config...");
 
   Config::ReadConfig(g_pluginModule);
+  AudioEngine::Initialize(g_pluginModule);
   ModLogger::SetMinLevel(Config::DebugOverlay ? ModLogger::Level::Verbose
                                               : ModLogger::Level::Info);
   LOG_INFO(Script, "Config loaded. Verbose logging: %s",
@@ -203,7 +208,11 @@ void ScriptMain() {
     }
 
     Menu::Update();
+    AudioEngine::Update();
     const Ped playerPed = PLAYER::PLAYER_PED_ID();
+    RefuelInteraction::Update(playerPed);
+    if (!RefuelInteraction::IsActive())
+      ServiceInteraction::Update(playerPed);
 
     // ── Not in a vehicle ──────────────────────────────────────────────────
     if (!PED::IS_PED_IN_ANY_VEHICLE(playerPed, FALSE)) {
@@ -251,7 +260,7 @@ void ScriptMain() {
       const VehicleOffsets &off = VehicleData::GetResolvedOffsets();
       const std::string bv = VehicleData::GetGameBuildVersion();
       char notify[256]{};
-      sprintf_s(notify, "Manual trans r22 RC: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
+      sprintf_s(notify, "Manual trans r23 Sprint 2: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
                 VehicleData::GetOffsetSourceName(),
                 bv.empty() ? "?" : bv.c_str(), off.Gear, off.NextGear, off.RPM,
                 off.Clutch);
@@ -309,7 +318,10 @@ void ScriptMain() {
       PedalModel::Reset();
       BrakeSystem::Reset();
       ParkingBrake::Reset();
-      FuelSystem::Reset();
+      FuelSystem::SelectVehicle(vehicle);
+      RefuelInteraction::TrackVehicle(vehicle);
+      MaintenanceSystem::SelectVehicle(vehicle);
+      ServiceInteraction::TrackVehicle(vehicle);
       TractionControl::Reset();
       TurboSystem::Reset();
       TurboSystem::InitializeForVehicle(vehicle);
@@ -793,8 +805,11 @@ void ScriptMain() {
         automaticMode && AutomaticGearbox::IsSport()
             ? 1.0f + std::clamp(Config::AutomaticSTorqueBoost, 0.0f, 0.50f)
             : 1.0f;
+    MaintenanceSystem::Update(
+        rpm, throttle, speedKmH, FuelSystem::GetOilTemperature(), isEngineOn);
     const float powerMultiplier =
-        std::clamp(EngineModel::GetDriveTorqueFactor() * sportTorque,
+        std::clamp(EngineModel::GetDriveTorqueFactor() * sportTorque *
+                       MaintenanceSystem::GetPowerFactor(),
                    0.0f, 4.50f);
     VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, powerMultiplier);
 
@@ -935,7 +950,7 @@ void ScriptMain() {
     }
 
     // ── HUD ───────────────────────────────────────────────────────────────
-    if (!Menu::IsOpen()) {
+    if (Config::GearHudEnabled && !Menu::IsOpen()) {
       Renderer::DrawGearHUD(
           manualGear, maxGear, activeSignal, isEngineOn, engineStarting,
           transmissionMode,
@@ -963,6 +978,7 @@ void ScriptMain() {
                                   InputHandler::GetSmoothedBrake());
       Renderer::DrawSimulationOverlay(
           FuelSystem::GetFuelLevel(), FuelSystem::GetOilTemperature(),
+          MaintenanceSystem::GetState().oilLife,
           GearboxSystem::GetHealth(), ClutchSystem::GetHeat(),
           ParkingBrake::IsEngaged(), BrakeSystem::IsABSActive(),
           EngineModel::GetEngineBrake());

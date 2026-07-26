@@ -4,6 +4,7 @@
 // =============================================================================
 #include "TurboSystem.h"
 #include "../VehicleData.h"
+#include "../../Core/Config.h"
 #include "../../../sdk/inc/natives.h"
 #include <algorithm>
 
@@ -41,6 +42,7 @@ float Update(Vehicle vehicle, VehicleData &data, float rpm, float throttle, bool
   } else {
     float diff = s_state.spool - targetSpool;
     if (diff > 0.3f && throttle < 0.1f && !s_state.blowOffLatched) {
+      if (Config::AudioNativeLayers)
       AUDIO::PLAY_SOUND_FROM_ENTITY(-1, "TURBO_BLOW_OFF", vehicle, "0", 0, 0);
       s_state.blowOffLatched = true;
     }

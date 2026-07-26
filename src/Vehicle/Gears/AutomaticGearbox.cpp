@@ -3,6 +3,7 @@
 #include "../VehicleData.h"
 #include "../../Core/Config.h"
 #include "../../Core/ModLogger.h"
+#include "../../Audio/AudioEngine.h"
 #include "../../../sdk/inc/natives.h"
 #include <algorithm>
 #include <cmath>
@@ -138,6 +139,8 @@ void UpdateSelector(Vehicle vehicle, bool selectorUp, bool selectorDown,
 
   const Selector previous = s_state.selector;
   s_state.selector = target;
+  AudioEngine::PlayAutomaticShift(
+      vehicle, previous == Selector::Park || target == Selector::Park);
   s_state.neutralDrop = false;
   if (Config::AutomaticNeutralDropDamage &&
       previous == Selector::Neutral && IsDriveSelector(target) &&
@@ -463,6 +466,8 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
     s_state.phaseStartedAt = now;
     s_state.lastShiftDirection = direction;
     GearboxSystem::NotifyAutomaticShift(data, previous, targetGear, sport);
+    AudioEngine::PlayManualShift(vehicle, targetGear > previous, sport,
+                                 !sport && throttle < 0.45f);
     LOG_INFO(Gear,
              "Automatic %s shift start: %d -> %d roadRPM=%.3f "
              "targetRPM=%.3f nativeRPM=%.3f throttle=%.3f",

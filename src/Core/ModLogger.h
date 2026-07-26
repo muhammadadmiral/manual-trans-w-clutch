@@ -55,6 +55,7 @@ enum class Category : int {
     Sig     = 8,  // Turn signals (sein / indicator)
     Script  = 9,  // Main script loop lifecycle
     General = 10, // Catch-all
+    Audio   = 11, // XAudio2 dan event audio mekanikal
 };
 
 // ── Public API ────────────────────────────────────────────────────────────────

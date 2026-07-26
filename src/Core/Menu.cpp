@@ -74,6 +74,8 @@ void Menu::Initialize() {
   main.items.push_back(MenuItem("ABS / TCS", MenuItem::Submenu, 7));
   main.items.push_back(MenuItem("Gearbox Penalty", MenuItem::Submenu, 8));
   main.items.push_back(MenuItem("Automatic D / S", MenuItem::Submenu, 9));
+  main.items.push_back(MenuItem("Audio", MenuItem::Submenu, 10));
+  main.items.push_back(MenuItem("Fuel / Maintenance", MenuItem::Submenu, 11));
   menus.push_back(main);
 
   // 1: Main Settings
@@ -129,6 +131,8 @@ void Menu::Initialize() {
       MenuItem("Verbose Logging", MenuItem::Bool, &Config::DebugOverlay));
   hud.items.push_back(
       MenuItem("Overlay Pedal Bars", MenuItem::Bool, &Config::OverlayBars));
+  hud.items.push_back(
+      MenuItem("Gear HUD", MenuItem::Bool, &Config::GearHudEnabled));
   hud.items.push_back(MenuItem("Overlay X", MenuItem::Float,
                                &Config::OverlayPosX,
                                0.01f, 0.00f, 0.85f));
@@ -141,6 +145,24 @@ void Menu::Initialize() {
   hud.items.push_back(MenuItem("Bar Height", MenuItem::Float,
                                &Config::OverlayBarHeight,
                                0.002f, 0.008f, 0.030f));
+  hud.items.push_back(MenuItem("Gear HUD X", MenuItem::Float,
+                               &Config::GearHudPosX,
+                               0.005f, 0.05f, 0.95f));
+  hud.items.push_back(MenuItem("Gear HUD Y", MenuItem::Float,
+                               &Config::GearHudPosY,
+                               0.005f, 0.08f, 0.90f));
+  hud.items.push_back(MenuItem("Gear HUD Scale", MenuItem::Float,
+                               &Config::GearHudScale,
+                               0.05f, 0.65f, 1.50f));
+  hud.items.push_back(MenuItem("Menu X", MenuItem::Float,
+                               &Config::MenuPosX,
+                               0.005f, 0.00f, 0.78f));
+  hud.items.push_back(MenuItem("Menu Y", MenuItem::Float,
+                               &Config::MenuPosY,
+                               0.005f, 0.02f, 0.55f));
+  hud.items.push_back(MenuItem("Menu Scale", MenuItem::Float,
+                               &Config::MenuScale,
+                               0.05f, 0.70f, 1.20f));
   menus.push_back(hud);
 
   // 4: Controls / Keybinds
@@ -163,6 +185,11 @@ void Menu::Initialize() {
                                 &Config::KeySignalHazard));
   keys.items.push_back(MenuItem("Parking Brake", MenuItem::KeyBind,
                                 &Config::KeyParkingBrake));
+  keys.items.push_back(
+      MenuItem("Refuel (hold)", MenuItem::KeyBind, &Config::KeyRefuel));
+  keys.items.push_back(
+      MenuItem("Oil Service (hold)", MenuItem::KeyBind,
+               &Config::KeyOilService));
   menus.push_back(keys);
 
   Submenu engine;
@@ -383,6 +410,38 @@ void Menu::Initialize() {
       0.01f, 0.00f, 1.00f));
   menus.push_back(automatic);
 
+  Submenu audio;
+  audio.title = "AUDIO";
+  audio.items.push_back(
+      MenuItem("Mechanical Audio", MenuItem::Bool, &Config::AudioEnabled));
+  audio.items.push_back(MenuItem(
+      "Master Volume", MenuItem::Float, &Config::AudioMasterVolume,
+      0.02f, 0.00f, 1.00f));
+  audio.items.push_back(MenuItem(
+      "Random Pitch", MenuItem::Float, &Config::AudioPitchRandomness,
+      0.005f, 0.00f, 0.18f));
+  audio.items.push_back(MenuItem(
+      "Limiter Ceiling", MenuItem::Float, &Config::AudioLimiterCeiling,
+      0.02f, 0.25f, 0.95f));
+  audio.items.push_back(MenuItem(
+      "Native GTA Layers", MenuItem::Bool, &Config::AudioNativeLayers));
+  menus.push_back(audio);
+
+  Submenu maintenance;
+  maintenance.title = "FUEL / MAINTENANCE";
+  maintenance.items.push_back(
+      MenuItem("Fuel Simulation", MenuItem::Bool, &Config::FuelEnabled));
+  maintenance.items.push_back(MenuItem(
+      "Refuel Speed", MenuItem::Float, &Config::RefuelRatePerSecond,
+      0.005f, 0.005f, 0.25f));
+  maintenance.items.push_back(
+      MenuItem("Oil Maintenance", MenuItem::Bool,
+               &Config::MaintenanceEnabled));
+  maintenance.items.push_back(MenuItem(
+      "Oil Wear", MenuItem::Float, &Config::OilWearMultiplier,
+      0.10f, 0.00f, 5.00f));
+  menus.push_back(maintenance);
+
   menuStack.push_back(0); // Push Main Menu
 }
 
@@ -560,27 +619,31 @@ void Menu::Draw() {
       std::clamp(current.selectedIndex - maxVisibleItems / 2, 0,
                  (std::max)(0, itemCount - maxVisibleItems));
 
-  const float menuX = 0.695f;
-  const float menuY = 0.105f;
-  const float menuWidth = 0.275f;
-  const float itemHeight = 0.036f;
-  const float headerHeight = 0.074f;
-  const float footerHeight = 0.038f;
+  const float menuScale = Config::MenuScale;
+  const float menuX = Config::MenuPosX;
+  const float menuY = Config::MenuPosY;
+  const float menuWidth = 0.275f * menuScale;
+  const float itemHeight = 0.036f * menuScale;
+  const float headerHeight = 0.074f * menuScale;
+  const float footerHeight = 0.038f * menuScale;
   const float panelHeight =
       headerHeight + itemHeight * visibleCount + footerHeight;
 
-  DrawRect(menuX - 0.004f, menuY - 0.004f,
-           menuWidth + 0.008f, panelHeight + 0.008f,
+  DrawRect(menuX - 0.004f * menuScale, menuY - 0.004f * menuScale,
+           menuWidth + 0.008f * menuScale,
+           panelHeight + 0.008f * menuScale,
            0, 0, 0, 145);
   DrawRect(menuX, menuY, menuWidth, panelHeight, 9, 13, 19, 238);
   DrawRect(menuX, menuY, menuWidth, headerHeight, 13, 24, 36, 255);
-  DrawRect(menuX, menuY + headerHeight - 0.004f,
-           menuWidth, 0.004f, 55, 205, 255, 255);
-  DrawTextStr(current.title, menuX + 0.014f, menuY + 0.018f,
-              0.52f, 238, 246, 255, 255);
+  DrawRect(menuX, menuY + headerHeight - 0.004f * menuScale,
+           menuWidth, 0.004f * menuScale, 55, 205, 255, 255);
+  DrawTextStr(current.title, menuX + 0.014f * menuScale,
+              menuY + 0.018f * menuScale,
+              0.52f * menuScale, 238, 246, 255, 255);
   DrawTextStr("DRIVETRAIN CONTROL",
-              menuX + menuWidth - 0.075f, menuY + 0.024f,
-              0.25f, 95, 175, 205, 230, true);
+              menuX + menuWidth - 0.075f * menuScale,
+              menuY + 0.024f * menuScale,
+              0.25f * menuScale, 95, 175, 205, 230, true);
 
   float currentY = menuY + headerHeight;
 
@@ -599,9 +662,10 @@ void Menu::Draw() {
     DrawRect(menuX, currentY, menuWidth, itemHeight,
              bgR, bgG, bgB, isSelected ? 245 : 225);
     if (isSelected)
-      DrawRect(menuX, currentY, 0.004f, itemHeight,
+      DrawRect(menuX, currentY, 0.004f * menuScale, itemHeight,
                55, 205, 255, 255);
-    DrawTextStr(item.name, menuX + 0.012f, currentY + 0.006f, 0.34f, textR,
+    DrawTextStr(item.name, menuX + 0.012f * menuScale,
+                currentY + 0.006f * menuScale, 0.34f * menuScale, textR,
                 textG, textB, 255);
 
     // Draw Value
@@ -629,8 +693,8 @@ void Menu::Draw() {
     }
 
     if (valBuf[0] != '\0') {
-      DrawTextStr(valBuf, menuX + menuWidth - 0.058f,
-                  currentY + 0.006f, 0.33f,
+      DrawTextStr(valBuf, menuX + menuWidth - 0.058f * menuScale,
+                  currentY + 0.006f * menuScale, 0.33f * menuScale,
                   textR, textG, textB, 255, true);
     }
 
@@ -641,9 +705,11 @@ void Menu::Draw() {
            11, 19, 28, 255);
   char pageBuf[48]{};
   sprintf_s(pageBuf, "%d / %d", current.selectedIndex + 1, itemCount);
-  DrawTextStr(pageBuf, menuX + 0.012f, currentY + 0.009f,
-              0.27f, 105, 195, 225, 235);
+  DrawTextStr(pageBuf, menuX + 0.012f * menuScale,
+              currentY + 0.009f * menuScale,
+              0.27f * menuScale, 105, 195, 225, 235);
   DrawTextStr("ARROWS adjust   ENTER select   BACK close",
-              menuX + menuWidth - 0.115f, currentY + 0.009f,
-              0.24f, 150, 165, 180, 225, true);
+              menuX + menuWidth - 0.115f * menuScale,
+              currentY + 0.009f * menuScale,
+              0.24f * menuScale, 150, 165, 180, 225, true);
 }

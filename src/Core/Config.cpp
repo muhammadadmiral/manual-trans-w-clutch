@@ -28,6 +28,8 @@ int KeySignalLeft   = VK_NUMPAD4;
 int KeySignalRight  = VK_NUMPAD6;
 int KeySignalHazard = 0x48;       // H
 int KeyParkingBrake = 0x50;       // P
+int KeyRefuel       = 0x45;       // E
+int KeyOilService   = 0x4F;       // O
 
 bool SignalAutoCancelSteer = true;
 
@@ -110,6 +112,17 @@ float BrakeCoolRate = 0.035f;
 float BrakeFadeStart = 0.78f;
 float BrakeFadeStrength = 0.45f;
 
+bool AudioEnabled = true;
+float AudioMasterVolume = 0.72f;
+float AudioPitchRandomness = 0.045f;
+float AudioLimiterCeiling = 0.72f;
+bool AudioNativeLayers = true;
+
+bool FuelEnabled = true;
+float RefuelRatePerSecond = 0.035f;
+bool MaintenanceEnabled = true;
+float OilWearMultiplier = 1.0f;
+
 // ── Analog smoothing — τ in seconds ──────────────────────────────────────────
 // Recommended defaults for keyboard play:
 //   Throttle: attack fast (0.08), release slow (0.28) — coasting feel
@@ -139,10 +152,17 @@ std::vector<int> ExcludedVehicleClasses;
 
 // ── Overlay ───────────────────────────────────────────────────────────────────
 bool  OverlayBars      = true;
+bool  GearHudEnabled   = true;
 float OverlayPosX      = 0.02f;
 float OverlayPosY      = 0.22f;
 float OverlayBarWidth  = 0.12f;
 float OverlayBarHeight = 0.014f;
+float GearHudPosX      = 0.90f;
+float GearHudPosY      = 0.20f;
+float GearHudScale     = 1.00f;
+float MenuPosX         = 0.695f;
+float MenuPosY         = 0.105f;
+float MenuScale        = 1.00f;
 
 // =============================================================================
 namespace {
@@ -216,6 +236,8 @@ void ReadConfig(HMODULE module) {
     KeySignalRight  = GetPrivateProfileIntA("Controls", "SignalRight",  VK_NUMPAD6, ini);
     KeySignalHazard = GetPrivateProfileIntA("Controls", "SignalHazard", 0x48,        ini); // H
     KeyParkingBrake = GetPrivateProfileIntA("Controls", "ParkingBrake",0x50,        ini);
+    KeyRefuel       = GetPrivateProfileIntA("Controls", "Refuel",      0x45,        ini);
+    KeyOilService   = GetPrivateProfileIntA("Controls", "OilService",  0x4F,        ini);
 
     SignalAutoCancelSteer = GetPrivateProfileIntA("Controls","SignalAutoCancelSteer",1,ini) != 0;
 
@@ -321,6 +343,31 @@ void ReadConfig(HMODULE module) {
     BrakeFadeStrength =
         ReadFloat("Brakes", "FadeStrength", 0.45f, ini);
 
+    AudioEnabled =
+        GetPrivateProfileIntA("Audio", "Enabled", 1, ini) != 0;
+    AudioMasterVolume =
+        std::clamp(ReadFloat("Audio", "MasterVolume", 0.72f, ini), 0.0f, 1.0f);
+    AudioPitchRandomness =
+        std::clamp(ReadFloat("Audio", "PitchRandomness", 0.045f, ini),
+                   0.0f, 0.18f);
+    AudioLimiterCeiling =
+        std::clamp(ReadFloat("Audio", "LimiterCeiling", 0.72f, ini),
+                   0.25f, 0.95f);
+    AudioNativeLayers =
+        GetPrivateProfileIntA("Audio", "NativeLayers", 1, ini) != 0;
+
+    FuelEnabled =
+        GetPrivateProfileIntA("Maintenance", "FuelEnabled", 1, ini) != 0;
+    RefuelRatePerSecond =
+        std::clamp(ReadFloat("Maintenance", "RefuelRatePerSecond", 0.035f,
+                             ini),
+                   0.005f, 0.25f);
+    MaintenanceEnabled =
+        GetPrivateProfileIntA("Maintenance", "Enabled", 1, ini) != 0;
+    OilWearMultiplier =
+        std::clamp(ReadFloat("Maintenance", "OilWearMultiplier", 1.0f, ini),
+                   0.0f, 5.0f);
+
     TcsEnabled = GetPrivateProfileIntA("Assists", "TCS", 1, ini) != 0;
     TcsSlipTarget = ReadFloat("Assists", "TCSSlipTarget", 0.12f, ini);
     TcsMaxCut = ReadFloat("Assists", "TCSMaxCut", 0.65f, ini);
@@ -381,10 +428,23 @@ void ReadConfig(HMODULE module) {
 
     // Overlay
     OverlayBars      = GetPrivateProfileIntA("Overlay", "Bars",  1,   ini) != 0;
+    GearHudEnabled   = GetPrivateProfileIntA("Overlay", "GearHud", 1, ini) != 0;
     OverlayPosX      = ReadFloat("Overlay", "PosX",      0.02f,  ini);
     OverlayPosY      = ReadFloat("Overlay", "PosY",      0.22f,  ini);
     OverlayBarWidth  = ReadFloat("Overlay", "BarWidth",  0.12f,  ini);
     OverlayBarHeight = ReadFloat("Overlay", "BarHeight", 0.014f, ini);
+    GearHudPosX      = std::clamp(ReadFloat("Overlay", "GearPosX", 0.90f, ini),
+                                  0.05f, 0.95f);
+    GearHudPosY      = std::clamp(ReadFloat("Overlay", "GearPosY", 0.20f, ini),
+                                  0.08f, 0.90f);
+    GearHudScale     = std::clamp(ReadFloat("Overlay", "GearScale", 1.0f, ini),
+                                  0.65f, 1.50f);
+    MenuPosX         = std::clamp(ReadFloat("Overlay", "MenuPosX", 0.695f, ini),
+                                  0.00f, 0.78f);
+    MenuPosY         = std::clamp(ReadFloat("Overlay", "MenuPosY", 0.105f, ini),
+                                  0.02f, 0.55f);
+    MenuScale        = std::clamp(ReadFloat("Overlay", "MenuScale", 1.0f, ini),
+                                  0.70f, 1.20f);
     // Pindahkan layout default lama yang numpuk minimap/notifikasi.
     if (std::fabs(OverlayPosX - 0.02f) < 0.001f &&
         std::fabs(OverlayPosY - 0.60f) < 0.001f) {
@@ -393,9 +453,9 @@ void ReadConfig(HMODULE module) {
 
     // Auto-create if the file doesn't exist yet
     if (GetFileAttributesA(ini) == INVALID_FILE_ATTRIBUTES ||
-        drivetrainSchema < 8) {
+        drivetrainSchema < 9) {
         SaveConfig(module);
-        WriteInt("Internal", "DrivetrainSchema", 8, ini);
+        WriteInt("Internal", "DrivetrainSchema", 9, ini);
     }
 }
 
@@ -414,6 +474,8 @@ void SaveConfig(HMODULE module) {
     WriteInt("Controls", "SignalRight",          KeySignalRight,  ini);
     WriteInt("Controls", "SignalHazard",         KeySignalHazard, ini);
     WriteInt("Controls", "ParkingBrake",         KeyParkingBrake, ini);
+    WriteInt("Controls", "Refuel",               KeyRefuel,       ini);
+    WriteInt("Controls", "OilService",           KeyOilService,   ini);
     WriteInt("Controls", "SignalAutoCancelSteer",SignalAutoCancelSteer ? 1 : 0, ini);
 
     WriteInt("Debug",    "Overlay",          DebugOverlay     ? 1 : 0, ini);
@@ -484,6 +546,19 @@ void SaveConfig(HMODULE module) {
     WriteFloat("Brakes", "FadeStart", BrakeFadeStart, ini);
     WriteFloat("Brakes", "FadeStrength", BrakeFadeStrength, ini);
 
+    WriteInt("Audio", "Enabled", AudioEnabled ? 1 : 0, ini);
+    WriteFloat("Audio", "MasterVolume", AudioMasterVolume, ini);
+    WriteFloat("Audio", "PitchRandomness", AudioPitchRandomness, ini);
+    WriteFloat("Audio", "LimiterCeiling", AudioLimiterCeiling, ini);
+    WriteInt("Audio", "NativeLayers", AudioNativeLayers ? 1 : 0, ini);
+
+    WriteInt("Maintenance", "FuelEnabled", FuelEnabled ? 1 : 0, ini);
+    WriteFloat("Maintenance", "RefuelRatePerSecond",
+               RefuelRatePerSecond, ini);
+    WriteInt("Maintenance", "Enabled", MaintenanceEnabled ? 1 : 0, ini);
+    WriteFloat("Maintenance", "OilWearMultiplier",
+               OilWearMultiplier, ini);
+
     WriteInt("Assists", "TCS", TcsEnabled ? 1 : 0, ini);
     WriteFloat("Assists", "TCSSlipTarget", TcsSlipTarget, ini);
     WriteFloat("Assists", "TCSMaxCut", TcsMaxCut, ini);
@@ -526,10 +601,17 @@ void SaveConfig(HMODULE module) {
     WriteFloat("Steering", "DeadzonePct", SteerDeadzonePct, ini);
 
     WriteInt("Overlay", "Bars", OverlayBars ? 1 : 0, ini);
+    WriteInt("Overlay", "GearHud", GearHudEnabled ? 1 : 0, ini);
     WriteFloat("Overlay", "PosX",      OverlayPosX,      ini);
     WriteFloat("Overlay", "PosY",      OverlayPosY,      ini);
     WriteFloat("Overlay", "BarWidth",  OverlayBarWidth,  ini);
     WriteFloat("Overlay", "BarHeight", OverlayBarHeight, ini);
+    WriteFloat("Overlay", "GearPosX", GearHudPosX, ini);
+    WriteFloat("Overlay", "GearPosY", GearHudPosY, ini);
+    WriteFloat("Overlay", "GearScale", GearHudScale, ini);
+    WriteFloat("Overlay", "MenuPosX", MenuPosX, ini);
+    WriteFloat("Overlay", "MenuPosY", MenuPosY, ini);
+    WriteFloat("Overlay", "MenuScale", MenuScale, ini);
 }
 
 } // namespace Config

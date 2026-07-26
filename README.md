@@ -43,12 +43,14 @@ Sprint drivetrain aktif. Fokus saat ini:
 - temperatur rem, brake fade, clutch heat, dan brake-throttle override dapat
   dituning lewat GUI.
 
-Audio kustom belum menjadi bagian sprint ini.
+Sprint 2 menambahkan audio mekanikal randomized berbasis XAudio2, limiter dan
+headroom, refuel native dengan pom/jerigen, serta oil-life dan servis beranimasi.
 
 ## Struktur
 
 ```text
 src/
+├─ Audio/                loader WAV, random bank, limiter/headroom XAudio2
 ├─ Core/                 input, config, menu, renderer, logger
 ├─ Memory/               AOB scanner, resolver, wrapper memory, kalibrasi
 ├─ Script/               orkestrasi per-frame
@@ -57,6 +59,7 @@ src/
    ├─ Gears/             manual sequential, automatic PRNDS, gearbox health
    ├─ Clutch/            kurva pedal, slip/heat, actuator drivetrain
    ├─ Brakes/            ABS berbasis roda dan parking brake
+   ├─ Maintenance/       refuel, oil life, dan interaksi servis
    ├─ VehicleData.*      facade memory per kendaraan
    ├─ VehicleProfile.*   EV, utility, scooter CVT, dan motor sequential
    ├─ LightsLogic.*
@@ -74,11 +77,10 @@ dijelaskan di [docs/configuration.md](docs/configuration.md).
 2. Buka `manual-trans-w-clutch.vcxproj`.
 3. Pilih `Release | x64`.
 4. Build project.
-5. Salin `x64/Release/manual-trans-w-clutch.asi` ke folder GTA V yang sudah
-   memuat ScriptHookV.
+5. Salin seluruh isi `bundle/` ke folder GTA V yang sudah memuat ScriptHookV.
 
 Sesudah mengganti ASI, cek awal `manual-trans.log`. Build sprint ini wajib
-mencetak `Runtime=driveline-r22-final-clutch-rc` dan path file yang benar-benar dimuat. Kalau
+mencetak `Runtime=sprint2-r23-audio-maintenance` dan path file yang benar-benar dimuat. Kalau
 baris itu tidak ada, GTA masih memakai salinan ASI lama.
 
 Artefak yang sudah diverifikasi pada sprint ini:

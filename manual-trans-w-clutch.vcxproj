@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\Audio\AudioEngine.cpp" />
     <ClCompile Include="src\Mod\DllMain.cpp" />
     <ClCompile Include="src\Script\MainScript.cpp" />
     <ClCompile Include="src\Core\ModLogger.cpp" />
@@ -43,6 +44,9 @@
     <ClCompile Include="src\Vehicle\Brakes\BrakeSystem.cpp" />
     <ClCompile Include="src\Vehicle\Brakes\ParkingBrake.cpp" />
     <ClCompile Include="src\Vehicle\LightsLogic.cpp" />
+    <ClCompile Include="src\Vehicle\Maintenance\RefuelInteraction.cpp" />
+    <ClCompile Include="src\Vehicle\Maintenance\MaintenanceSystem.cpp" />
+    <ClCompile Include="src\Vehicle\Maintenance\ServiceInteraction.cpp" />
     <ClCompile Include="src\Vehicle\TelemetryLogger.cpp" />
     <ClCompile Include="src\Core\Config.cpp" />
     <ClCompile Include="src\Core\Menu.cpp" />
@@ -50,6 +54,7 @@
     <ClCompile Include="src\Core\Renderer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\Audio\AudioEngine.h" />
     <ClInclude Include="src\Script\MainScript.h" />
     <ClInclude Include="src\Core\ModLogger.h" />
     <ClInclude Include="src\Core\Config.h" />
@@ -77,6 +82,9 @@
     <ClInclude Include="src\Vehicle\Brakes\BrakeSystem.h" />
     <ClInclude Include="src\Vehicle\Brakes\ParkingBrake.h" />
     <ClInclude Include="src\Vehicle\LightsLogic.h" />
+    <ClInclude Include="src\Vehicle\Maintenance\RefuelInteraction.h" />
+    <ClInclude Include="src\Vehicle\Maintenance\MaintenanceSystem.h" />
+    <ClInclude Include="src\Vehicle\Maintenance\ServiceInteraction.h" />
     <ClInclude Include="src\Vehicle\TelemetryLogger.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -184,7 +192,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(ProjectDir)sdk\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ScriptHookV.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ScriptHookV.lib;xaudio2.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>
@@ -207,7 +215,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>$(ProjectDir)sdk\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ScriptHookV.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ScriptHookV.lib;xaudio2.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>

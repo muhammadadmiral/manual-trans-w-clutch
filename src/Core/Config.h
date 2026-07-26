@@ -22,6 +22,8 @@ extern int KeySignalLeft;
 extern int KeySignalRight;
 extern int KeySignalHazard;    // H by default (0x48)
 extern int KeyParkingBrake;    // P by default
+extern int KeyRefuel;
+extern int KeyOilService;
 
 // Automatically cancel the active turn signal when the steering wheel returns
 // through centre (raw steer crosses 0 in the opposite direction of the signal).
@@ -107,6 +109,19 @@ extern float BrakeCoolRate;
 extern float BrakeFadeStart;
 extern float BrakeFadeStrength;
 
+// Audio mekanikal. Suara mesin, ban, turbo dan angin tetap punya GTA.
+extern bool AudioEnabled;
+extern float AudioMasterVolume;
+extern float AudioPitchRandomness;
+extern float AudioLimiterCeiling;
+extern bool AudioNativeLayers;
+
+// Fuel dan maintenance.
+extern bool FuelEnabled;
+extern float RefuelRatePerSecond;
+extern bool MaintenanceEnabled;
+extern float OilWearMultiplier;
+
 // ── Analog smoothing — time constants τ in seconds ────────────────────────────
 // See header comment above for interpretation.
 // Recommended starting defaults (set in Config.cpp):
@@ -139,10 +154,17 @@ extern std::vector<int> ExcludedVehicleClasses;
 
 // ── HUD Overlay ───────────────────────────────────────────────────────────────
 extern bool  OverlayBars;
+extern bool  GearHudEnabled;
 extern float OverlayPosX;
 extern float OverlayPosY;
 extern float OverlayBarWidth;
 extern float OverlayBarHeight;
+extern float GearHudPosX;
+extern float GearHudPosY;
+extern float GearHudScale;
+extern float MenuPosX;
+extern float MenuPosY;
+extern float MenuScale;
 
 // ── Functions ─────────────────────────────────────────────────────────────────
 void ReadConfig(HMODULE module);

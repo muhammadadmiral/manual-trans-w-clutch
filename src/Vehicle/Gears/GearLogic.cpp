@@ -2,6 +2,7 @@
 #include "../../../sdk/inc/natives.h"
 #include "../../Core/ModLogger.h"
 #include "../../Core/Config.h"
+#include "../../Audio/AudioEngine.h"
 #include "../VehicleData.h"
 #include "GearboxSystem.h"
 #include <algorithm>
@@ -17,6 +18,8 @@ static int s_pendingGear = 0;
 static DWORD s_pendingAt = 0;
 
 void PlayGearGrindSound(Vehicle vehicle) {
+  if (AudioEngine::PlayGearGrind(vehicle))
+    return;
   const Hash model = ENTITY::GET_ENTITY_MODEL(vehicle);
   if (VEHICLE::IS_THIS_MODEL_A_BIKE(model) ||
       VEHICLE::IS_THIS_MODEL_A_QUADBIKE(model)) {
@@ -28,7 +31,13 @@ void PlayGearGrindSound(Vehicle vehicle) {
   }
 }
 
-void PlayGearShiftSound() {
+void PlayGearShiftSound(Vehicle vehicle, int fromGear, int toGear,
+                        float clutch, float throttle) {
+  const bool upshift = toGear > fromGear;
+  const bool powerShift = throttle > 0.78f;
+  const bool softShift = clutch > 0.70f || throttle < 0.18f;
+  if (AudioEngine::PlayManualShift(vehicle, upshift, powerShift, softShift))
+    return;
   AUDIO::PLAY_SOUND_FRONTEND(-1, "NAV_LEFT_RIGHT",
                              "HUD_FRONTEND_DEFAULT_SOUNDSET", 1);
 }
@@ -53,7 +62,7 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
     GearboxSystem::NotifyShift(vehicle, data, fromGear, toGear, clutch,
                                throttle);
     s_manualGear = toGear;
-    PlayGearShiftSound();
+    PlayGearShiftSound(vehicle, fromGear, toGear, clutch, throttle);
     s_pendingAt = 0;
     s_lastShiftTime = currentTime;
     LOG_INFO(Gear, "Delayed synchro engagement: %d -> %d", fromGear, toGear);
@@ -97,7 +106,7 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
         PlayGearGrindSound(vehicle);
         grindWarningTimer = 45;
       } else {
-        PlayGearShiftSound();
+        PlayGearShiftSound(vehicle, fromGear, toGear, clutch, throttle);
       }
       s_lastShiftTime = currentTime;
     } else if (isDown && s_manualGear > -1) {
@@ -139,7 +148,7 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
         PlayGearGrindSound(vehicle);
         grindWarningTimer = 45;
       } else {
-        PlayGearShiftSound();
+        PlayGearShiftSound(vehicle, fromGear, toGear, clutch, throttle);
       }
       s_lastShiftTime = currentTime;
     }

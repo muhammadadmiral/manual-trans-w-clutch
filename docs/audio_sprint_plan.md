@@ -1,71 +1,58 @@
-# Audio Sprint & Gear Logic Expansion
+# Audio Sprint Plan
 
-Dokumen ini berisi rencana implementasi penuh (blueprint) untuk integrasi Audio eksternal (menggunakan FMOD) beserta restrukturisasi *state* transmisi (untuk mendukung PRNDS pada mode Automatic).
+Implementasi aktif memakai XAudio2 dari Windows SDK, bukan FMOD. Keputusan ini
+menjaga bundle kecil, tidak membutuhkan DLL tambahan, dan cukup untuk sample
+PCM pendek yang dipakai mod.
 
-## 1. Arsitektur Audio & Library
-Kita akan menggunakan **FMOD Studio API** (Low-Level Core API) karena standar industri, ringan, dan mendukung Spatial 3D Audio, DSP Effects, serta low-latency mixing.
+## Lapisan suara
 
-**Direktori Asset:**
-Semua custom sound akan diletakkan di dalam folder `GTA V/manual-trans-audio/` agar tidak bercampur dengan file game bawaan. File idealnya berformat `.wav` (PCM) atau `.ogg` untuk menghindari overhead decoding CPU dari MP3.
+GTA tetap menjadi sumber suara mesin, exhaust, tyre slip, turbo spool, blow-off,
+road noise, angin, occlusion kabin, tunnel reverb, dan efek time-scale. Sistem
+eksternal tidak mencoba mengganti sound engine per kendaraan.
 
-## 2. Audio Trigger Cases (Event & Logic)
+XAudio2 menambahkan feedback mekanikal:
 
-Sistem harus membedakan *class* kendaraan dan *driving state* untuk menentukan audio mana yang diputar.
+- bank shift mobil normal/soft/power;
+- bank shift motor up/down normal/soft;
+- bank missed shift motor;
+- parking brake apply/release;
+- selector automatic.
 
-### A. Manual Transmission (Car)
-- **`car-shift-up.wav` / `car-shift-down.wav`**: Suara klik tuas mekanik. Dijalankan tiap kali perpindahan gigi sukses.
-- **`car-shift-power.wav` (Clutch Dump / Power Shift)**: Suara hentakan berat (deg/thud). 
-  - *Trigger Condition*: `Throttle > 0.8` && `RPM > 0.7` && `Clutch` dilepas (dari >0.8 ke <0.2) dalam waktu sangat singkat (< 100ms).
-- **`car-shift-neutral.wav`**: Suara ditarik ke netral.
-- **`car-clutch-grind.wav`**: Miss-shift (gear grind). Sudah ada logic di script, tinggal menambahkan *trigger* audionya.
+Bank dengan beberapa file memakai random non-repeat. Pitch dan volume diberi
+variasi kecil per event. Cooldown per bank mencegah spam; pool 16 voice
+membatasi concurrency. Peak limiter bekerja saat load dan master voice
+menyediakan headroom pasca-mix.
 
-### B. Automatic Transmission (PRNDS)
-Kita perlu menambahkan *State Machine* baru untuk transmisi otomatis.
-- **State `[P] Park`**: Memainkan `matic-park.wav`. Mengunci rem mekanik (Handbrake on, throttle off).
-- **State `[R] Reverse`**: Memainkan `matic-shift.wav`.
-- **State `[N] Neutral`**: Memainkan `matic-shift.wav`.
-- **State `[D] Drive`**: Memainkan `matic-shift.wav`.
-- **State `[S] Sport`**: Memainkan `matic-sport-click.wav`. Logic: Auto-upshift ditahan sampai RPM lebih tinggi (misal > 0.95 vs > 0.85 di mode D).
+## Kontrak asset
 
-### C. Motorcycles (Bike)
-Motor menggunakan sekuensial (diinjak/dicongkel), suara mekaniknya jauh lebih keras dan berbentuk *clunk* ketimbang *click* tuas mobil.
-- *Check Condition*: `VEHICLE::IS_THIS_MODEL_A_BIKE(ENTITY::GET_ENTITY_MODEL(vehicle))`
-- **`bike-shift-up.wav`**: Suara congkelan/injekan gigi naik.
-- **`bike-shift-down.wav`**: Suara injekan gigi turun.
+Semua WAV harus PCM, stereo, 44.1 kHz, 16-bit dan berada di:
 
----
+```text
+manual-trans/audio/
+```
 
-## 3. EDGE CASES & PENANGANAN (Advanced Implementations)
+Nama file menggunakan `snake_case` dan suffix dua digit, misalnya
+`bike_shift_up_01.wav`. Daftar lengkap ada di bundle.
 
-Berikut adalah *edge cases* yang sering luput dari mod audio standar, namun wajib kita implementasikan agar terasa *AAA/Native*.
+## Integrasi event
 
-### Edge Case 1: Audio Spam / Overlapping
-- **Masalah**: Jika ban spin dan gigi otomatis naik-turun dengan cepat (atau user spam tombol), suara `shift.wav` akan tertumpuk puluhan kali dan menjadi sangat bising.
-- **Solusi**: Terapkan **Audio Channel Cooldown** (misal 150ms). Jika sebuah channel masih memutar suara shift, *fade out* suara lama dalam 20ms sebelum memutar suara baru, atau abaikan input baru sampai yang lama selesai.
+- Manual successful shift memilih bank berdasarkan vehicle type, arah,
+  throttle, dan clutch.
+- Automatic internal shift memakai bank yang sama dengan profil soft pada D
+  atau lebih berat pada S.
+- Selector P-R-N-D-S-L memakai selector event jika sample tersedia.
+- Grind tanpa sample custom tetap fallback ke native GTA sound.
+- Parking brake punya bank apply dan release terpisah.
+- Native `TURBO_BLOW_OFF` tetap dipicu oleh perubahan boost di `TurboSystem`.
 
-### Edge Case 2: First-Person (Cabin) vs Third-Person View
-- **Masalah**: Suara mekanik oper gigi terdengar sama kencangnya dari luar mobil maupun dari dalam mobil.
-- **Solusi**: Gunakan native `CAM::GET_CAM_VIEW_MODE_FOR_CONTEXT(0)`. Jika *view* adalah First-Person (di dalam kabin), kita nyalakan **Low-Pass Filter (LPF) DSP** di FMOD (memotong frekuensi tinggi / *muffle*) dan menurunkan volumenya 30%, sehingga terdengar redam dari dalam dashboard.
+## Lanjutan
 
-### Edge Case 3: Pintu / Kaca Jendela Pecah
-- **Masalah**: Melanjutkan poin #2, jika pemain berada di First-Person tapi kaca depan pecah atau pintu hilang, suara tidak boleh teredam.
-- **Solusi**: Cek status jendela menggunakan native `VEHICLE::ARE_ALL_VEHICLE_WINDOWS_INTACT(vehicle)`. Jika pecah, efek LPF dikurangi secara dinamis.
+Fitur berikut ditunda sampai ada sample yang memang dibuat untuknya:
 
-### Edge Case 4: 3D Spatial Audio & Jarak Kamera
-- **Masalah**: Jika audio diset sebagai 2D, suaranya akan tetap maksimal biarpun kamera GTA V sedang di-zoom jauh (Cinematic cam).
-- **Solusi**: Ikat emitter FMOD ke koordinat 3D mobil (`ENTITY::GET_ENTITY_COORDS`). Dengan begini, suara akan berpindah (panning) ke earphone kiri/kanan jika mobil berbelok relatif terhadap kamera.
+- custom turbo flutter/stututu, anti-lag, dan exhaust pop;
+- true post-mix DSP limiter/XAPO;
+- custom 3D panning/attenuation untuk sumber WAV;
+- sinkronisasi slider SFX GTA;
+- cabin low-pass khusus sample eksternal.
 
-### Edge Case 5: Slow Motion (Franklin Special Ability)
-- **Masalah**: Saat Franklin mengaktifkan special ability (waktu melambat), audio eksternal biasanya tetap diputar dalam kecepatan normal (terdengar aneh).
-- **Solusi**: Baca nilai `MISC::GET_TIME_SCALE()`. Kalikan nilai *pitch* (kecepatan play) FMOD dengan nilai time scale ini. Saat *slow-mo*, suara oper gigi akan otomatis melambat (deep pitch).
-
-### Edge Case 6: Sinkronisasi Master Volume Game
-- **Masalah**: Pemain mengecilkan volume SFX di Pause Menu GTA V, tapi suara gigi dari mod kita tetap kencang.
-- **Solusi**: Gunakan native `AUDIO::GET_PROFILE_SETTING(300)` (Index 300 adalah SFX volume GTA V). Ambil persentasenya dan kalikan ke FMOD Master Group Volume.
-
-### Edge Case 7: Tunnel Reverb (Gema Terowongan)
-- **Masalah**: Suara dari FMOD terdengar datar di dalam terowongan yang menggema.
-- **Solusi**: 
-  1. Tembakkan `SHAPE_TEST_RAY_EXTRA_CAST` dari koordinat atap mobil ke arah `Z + 20.0f`.
-  2. Jika *raycast* mendeteksi benturan (Hit), itu artinya ada atap/langit-langit di atas mobil.
-  3. Aktifkan **FMOD Reverb DSP** secara gradual. Semakin dekat langit-langit, tingkat *Wet* (gema) reverb semakin besar. Matikan saat keluar terowongan.
+Menunda fitur tersebut mencegah sample generik dipaksakan ke semua kendaraan.

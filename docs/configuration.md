@@ -160,3 +160,38 @@ kendaraan, bukan INI. `LowRec` dan `PowerMul` adalah jalur recovery low-RPM;
 tidak ada write runtime drive-force. `IDLE_DRIVE` memisahkan creep virtual,
 hill rollback, dan power multiplier supaya input pemain tidak tertukar dengan
 idle governor.
+
+## Sprint 2: audio, fuel, maintenance, dan HUD
+
+```ini
+[Audio]
+Enabled=1
+MasterVolume=0.72
+PitchRandomness=0.045
+LimiterCeiling=0.72
+NativeLayers=1
+
+[Maintenance]
+FuelEnabled=1
+RefuelRatePerSecond=0.035
+Enabled=1
+OilWearMultiplier=1.0
+
+[Overlay]
+GearHud=1
+GearPosX=0.90
+GearPosY=0.20
+GearScale=1.0
+MenuPosX=0.695
+MenuPosY=0.105
+MenuScale=1.0
+```
+
+`LimiterCeiling` diterapkan saat WAV dimuat, jadi perubahan nilai ini perlu
+restart game. Volume master dan random pitch dibaca saat runtime. Audio native
+GTA untuk mesin, ban, road/wind noise tetap menjadi layer utama.
+
+`Refuel` dan `OilService` berada di bagian `[Controls]` dan dapat diubah dari
+menu. Nilai default masing-masing adalah virtual-key `69` (E) dan `79` (O).
+Gear HUD sengaja default di kanan atas agar tidak menabrak minimap maupun
+speedometer Menyoo. Posisi dan scale dapat disetel live.

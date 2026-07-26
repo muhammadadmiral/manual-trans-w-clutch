@@ -51,10 +51,11 @@ void DrawBar(float x, float y, float width, float height, float fraction, int r,
 void DrawGearHUD(int manualGear, int maxGear, int activeSignal, bool isEngineOn,
                  bool engineStarting, int transmissionMode,
                  const char *automaticSelector) {
-    const float badgeX = 0.91f;
-    const float badgeY = 0.72f;
-    const float badgeW = 0.072f;
-    const float badgeH = 0.145f;
+    const float badgeX = Config::GearHudPosX;
+    const float badgeY = Config::GearHudPosY;
+    const float hudScale = Config::GearHudScale;
+    const float badgeW = 0.072f * hudScale;
+    const float badgeH = 0.145f * hudScale;
     const ULONGLONG tick = GetTickCount64();
 
     auto formatGear = [&](int gear) -> std::string {
@@ -116,19 +117,21 @@ void DrawGearHUD(int manualGear, int maxGear, int activeSignal, bool isEngineOn,
     GRAPHICS::DRAW_RECT(badgeX, badgeY - badgeH * 0.5f + 0.002f,
                         badgeW, 0.004f, r, g, b, 240, 0);
     DrawTextOverlay(transmissionMode == 1 ? "AUTO" : "GEAR",
-                    badgeX, badgeY - 0.068f, 0.24f,
+                    badgeX, badgeY - 0.068f * hudScale, 0.24f * hudScale,
                     145, 155, 170, 230, 0, false, true);
 
     if (!previousLabel.empty() && anim < 1.0f) {
         const int alpha = static_cast<int>((1.0f - anim) * 190.0f);
         DrawTextOverlay(previousLabel.c_str(), badgeX,
-                        badgeY - 0.014f - eased * 0.035f,
-                        0.70f - eased * 0.22f,
+                        badgeY - 0.014f * hudScale -
+                            eased * 0.035f * hudScale,
+                        (0.70f - eased * 0.22f) * hudScale,
                         r, g, b, alpha, 2, false, true);
     }
     DrawTextOverlay(currentLabel.c_str(), badgeX,
-                    badgeY - 0.014f + (1.0f - eased) * 0.032f,
-                    0.76f + eased * 0.18f,
+                    badgeY - 0.014f * hudScale +
+                        (1.0f - eased) * 0.032f * hudScale,
+                    (0.76f + eased * 0.18f) * hudScale,
                     r, g, b, static_cast<int>(120 + eased * 135),
                     2, true, true);
 
@@ -137,24 +140,30 @@ void DrawGearHUD(int manualGear, int maxGear, int activeSignal, bool isEngineOn,
         const int below = (std::max)(-1, manualGear - 1);
         if (above != manualGear) {
             const std::string text = formatGear(above);
-            DrawTextOverlay(text.c_str(), badgeX, badgeY - 0.050f,
-                            0.38f, 150, 160, 175, 75, 2, false, true);
+            DrawTextOverlay(text.c_str(), badgeX,
+                            badgeY - 0.050f * hudScale,
+                            0.38f * hudScale, 150, 160, 175, 75,
+                            2, false, true);
         }
         if (below != manualGear) {
             const std::string text = formatGear(below);
-            DrawTextOverlay(text.c_str(), badgeX, badgeY + 0.026f,
-                            0.38f, 150, 160, 175, 75, 2, false, true);
+            DrawTextOverlay(text.c_str(), badgeX,
+                            badgeY + 0.026f * hudScale,
+                            0.38f * hudScale, 150, 160, 175, 75,
+                            2, false, true);
         }
     }
 
     const bool blink = (tick % 700) < 350;
     const bool leftOn = blink && (activeSignal == 1 || activeSignal == 3);
     const bool rightOn = blink && (activeSignal == 2 || activeSignal == 3);
-    DrawTextOverlay("<", badgeX - 0.022f, badgeY + 0.049f, 0.40f,
+    DrawTextOverlay("<", badgeX - 0.022f * hudScale,
+                    badgeY + 0.049f * hudScale, 0.40f * hudScale,
                     leftOn ? 60 : 55, leftOn ? 255 : 65,
                     leftOn ? 70 : 55, leftOn ? 255 : 100,
                     0, false, true);
-    DrawTextOverlay(">", badgeX + 0.022f, badgeY + 0.049f, 0.40f,
+    DrawTextOverlay(">", badgeX + 0.022f * hudScale,
+                    badgeY + 0.049f * hudScale, 0.40f * hudScale,
                     rightOn ? 60 : 55, rightOn ? 255 : 65,
                     rightOn ? 70 : 55, rightOn ? 255 : 100,
                     0, false, true);
@@ -192,7 +201,8 @@ void DrawPedalsOverlay(float rpm, float clutch, float throttle, float brake) {
     DrawBar(barX, y, barWidth, barHeight, brake, 255, 100, 100, "BRAKE");
 }
 
-void DrawSimulationOverlay(float fuel, float oilTemp, float gearboxHealth,
+void DrawSimulationOverlay(float fuel, float oilTemp, float oilLife,
+                           float gearboxHealth,
                            float clutchHeat, bool parkingBrake,
                            bool wheelsLocked, float engineBrake) {
     const float barX = Config::OverlayPosX + Config::OverlayBarWidth + 0.015f;
@@ -209,6 +219,11 @@ void DrawSimulationOverlay(float fuel, float oilTemp, float gearboxHealth,
     int otR = static_cast<int>(oilTemp * 255);
     int otB = static_cast<int>((1.0f - oilTemp) * 200);
     DrawBar(barX, y, barWidth, barHeight, oilTemp, otR, 80, otB, "OIL TEMP");
+    y += gap;
+
+    DrawBar(barX, y, barWidth, barHeight, oilLife,
+            static_cast<int>((1.0f - oilLife) * 255),
+            static_cast<int>(oilLife * 200), 50, "OIL LIFE");
     y += gap;
 
     int ghR = static_cast<int>((1.0f - gearboxHealth) * 255);
@@ -229,6 +244,33 @@ void DrawSimulationOverlay(float fuel, float oilTemp, float gearboxHealth,
     }
     if (wheelsLocked) {
         DrawTextOverlay("~r~WHEEL LOCK!", barX, y, 0.35f, 255, 50, 50, 255, 0, true, false);
+    }
+}
+
+void DrawInteractionPanel(const char *title, const char *detail,
+                          float progress) {
+    const float x = 0.5f;
+    const float y = 0.82f;
+    const float width = 0.25f;
+    const float height = progress >= 0.0f ? 0.075f : 0.058f;
+    GRAPHICS::DRAW_RECT(x, y, width, height, 8, 12, 18, 220, 0);
+    GRAPHICS::DRAW_RECT(x, y - height * 0.5f + 0.002f,
+                        width, 0.004f, 55, 205, 255, 245, 0);
+    DrawTextOverlay(title, x, y - 0.026f, 0.36f,
+                    235, 245, 255, 255, 0, true, true);
+    DrawTextOverlay(detail, x, y - 0.002f, 0.29f,
+                    190, 205, 220, 245, 0, false, true);
+    if (progress >= 0.0f) {
+        progress = std::clamp(progress, 0.0f, 1.0f);
+        const float barW = width - 0.026f;
+        const float left = x - barW * 0.5f;
+        const float barY = y + 0.023f;
+        GRAPHICS::DRAW_RECT(x, barY, barW, 0.008f, 22, 30, 38, 245, 0);
+        if (progress > 0.0f) {
+            const float fill = barW * progress;
+            GRAPHICS::DRAW_RECT(left + fill * 0.5f, barY, fill, 0.008f,
+                                55, 205, 255, 255, 0);
+        }
     }
 }
 
