@@ -3,5 +3,5 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="manual-trans-w-clutch.vcxproj" />
+  <Project Path="melar-transmission.vcxproj" />
 </Solution>

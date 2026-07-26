@@ -4,7 +4,7 @@
 // The actual implementation has been split into:
 //   src/Mod/DllMain.cpp   — Windows DLL entry point + ModLogger init
 //   src/Script/MainScript.cpp — ScriptHookV game loop
-//   src/Core/ModLogger.h/cpp  — Structured logging (manual-trans.log)
+//   src/Core/ModLogger.h/cpp  — Structured logging (melar-transmission.log)
 //
 // This file is intentionally empty. It remains in the project only so that
 // anyone who still has an old build configuration pointing at "main.cpp"

@@ -75,7 +75,7 @@ bool TryReadU32(uintptr_t address, uint32_t& value) {
     return true;
 }
 
-// Build the absolute path to "manual-trans.ini" next to the .asi.
+// Ambil config baru, lalu fallback sekali ke nama lama buat migrasi.
 bool BuildIniPath(HMODULE pluginModule, char (&path)[MAX_PATH]) {
     DWORD len = 0;
     if (pluginModule)
@@ -92,6 +92,17 @@ bool BuildIniPath(HMODULE pluginModule, char (&path)[MAX_PATH]) {
         if (!slash) return false;
         *slash = '\0';
     }
+    if (strcat_s(path, "\\melar-transmission.ini") != 0)
+        return false;
+    if (GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES)
+        return true;
+
+    const char *newName = "\\melar-transmission.ini";
+    const size_t pathLen = std::strlen(path);
+    const size_t nameLen = std::strlen(newName);
+    if (pathLen < nameLen)
+        return false;
+    path[pathLen - nameLen] = '\0';
     return strcat_s(path, "\\manual-trans.ini") == 0;
 }
 

@@ -190,14 +190,15 @@ std::vector<int> ParseIntList(const char* text) {
     return out;
 }
 
-bool BuildIniPath(HMODULE module, char (&out)[MAX_PATH]) {
+bool BuildIniPath(HMODULE module, char (&out)[MAX_PATH],
+                  const char *fileName = "melar-transmission.ini") {
     DWORD len = GetModuleFileNameA(module, out, MAX_PATH);
     if (!len || len >= MAX_PATH) return false;
     char* slash = std::strrchr(out, '\\');
     if (!slash) slash = std::strrchr(out, '/');
     if (!slash) return false;
     *slash = '\0';
-    return strcat_s(out, "\\manual-trans.ini") == 0;
+    return strcat_s(out, "\\") == 0 && strcat_s(out, fileName) == 0;
 }
 
 void WriteInt(const char* section, const char* key, int value, const char* iniPath) {
@@ -218,6 +219,15 @@ void WriteFloat(const char* section, const char* key, float value, const char* i
 void ReadConfig(HMODULE module) {
     char ini[MAX_PATH]{};
     if (!BuildIniPath(module, ini)) return;
+    bool migratedFromLegacy = false;
+    if (GetFileAttributesA(ini) == INVALID_FILE_ATTRIBUTES) {
+        char legacyIni[MAX_PATH]{};
+        if (BuildIniPath(module, legacyIni, "manual-trans.ini") &&
+            GetFileAttributesA(legacyIni) != INVALID_FILE_ATTRIBUTES) {
+            strcpy_s(ini, legacyIni);
+            migratedFromLegacy = true;
+        }
+    }
     const int drivetrainSchema =
         GetPrivateProfileIntA("Internal", "DrivetrainSchema", 0, ini);
 
@@ -453,9 +463,11 @@ void ReadConfig(HMODULE module) {
 
     // Auto-create if the file doesn't exist yet
     if (GetFileAttributesA(ini) == INVALID_FILE_ATTRIBUTES ||
-        drivetrainSchema < 9) {
+        drivetrainSchema < 9 || migratedFromLegacy) {
         SaveConfig(module);
-        WriteInt("Internal", "DrivetrainSchema", 9, ini);
+        char currentIni[MAX_PATH]{};
+        if (BuildIniPath(module, currentIni))
+            WriteInt("Internal", "DrivetrainSchema", 9, currentIni);
     }
 }
 

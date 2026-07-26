@@ -1,7 +1,7 @@
 // =============================================================================
-// ModLogger.h  —  Centralized structured logger for manual-trans-w-clutch
+// ModLogger.h  —  Centralized structured logger for melar-transmission
 //
-// Writes categorized, severity-tagged lines to "manual-trans.log" next to
+// Writes categorized, severity-tagged lines to "melar-transmission.log" next to
 // the .asi.  Also calls OutputDebugStringA() so output appears in DebugView.
 //
 // ──────────────────────────────────────────────────────────────────────────────

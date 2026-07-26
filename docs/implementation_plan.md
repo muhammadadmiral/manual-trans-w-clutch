@@ -18,7 +18,7 @@ This plan outlines the architecture and gameplay mechanics for the requested "Re
 ### 1. Persistence & Odometer (`VehicleData.h` / `VehicleData.cpp`)
 
 We will introduce a persistent save system for individual vehicles.
-- **Save Location**: `manual-trans-vehicles.ini`
+- **Save Location**: `melar-transmission-vehicles.ini`
 - **Key**: Vehicle License Plate (e.g., `[Plate_46EDK202]`)
 - **Tracked Stats**: `Odometer` (km), `OilLife` (0.0 to 1.0)
 - **Logic**: Every few seconds of driving, update the odometer based on the distance traveled and save it to the INI file.
@@ -53,7 +53,7 @@ We will remove the "auto-refuel on engine off" placeholder and replace it with a
 ## Verification Plan
 
 ### Automated/Code Verification
-- Ensure `manual-trans-vehicles.ini` successfully creates sections for different license plates.
+- Ensure `melar-transmission-vehicles.ini` successfully creates sections for different license plates.
 - Verify that `TASK_PLAY_ANIM` successfully triggers without crashing the script thread.
 
 ### Manual Verification

@@ -240,7 +240,8 @@ bool Initialize(HMODULE module) {
     }
   }
 
-  const auto root = ModuleDirectory(module) / L"manual-trans" / L"audio";
+  const auto root =
+      ModuleDirectory(module) / L"melar-transmission" / L"audio";
   LoadBank(root, s_carShift, {L"car_shift_01.wav", L"car_shift_02.wav"});
   LoadBank(root, s_carSoft, {L"car_shift_soft_01.wav"});
   LoadBank(root, s_carPower, {L"car_shift_power_01.wav"});

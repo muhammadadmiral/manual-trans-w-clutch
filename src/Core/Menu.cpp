@@ -64,7 +64,7 @@ void Menu::Initialize() {
 
   // 0: Main Menu
   Submenu main;
-  main.title = "MANUAL TRANS";
+  main.title = "MELAR TRANSMISSION";
   main.items.push_back(MenuItem("Main Settings", MenuItem::Submenu, 1));
   main.items.push_back(MenuItem("Pedal / Keyboard", MenuItem::Submenu, 2));
   main.items.push_back(MenuItem("Controls / Keybinds", MenuItem::Submenu, 4));

@@ -1,4 +1,4 @@
-# Manual Transmission with Clutch — GTA V
+# Melar Transmission — GTA V
 
 Plugin ScriptHookV open-source untuk mengganti perilaku transmisi GTA V dengan
 mode Off, automatic P-R-N-D-S-L2-L1, atau manual sequential. Simulasi mencakup clutch,
@@ -74,19 +74,19 @@ dijelaskan di [docs/configuration.md](docs/configuration.md).
 ## Build
 
 1. Siapkan Visual Studio dengan workload Desktop development with C++.
-2. Buka `manual-trans-w-clutch.vcxproj`.
+2. Buka `melar-transmission.vcxproj`.
 3. Pilih `Release | x64`.
 4. Build project.
 5. Salin seluruh isi `bundle/` ke folder GTA V yang sudah memuat ScriptHookV.
 
-Sesudah mengganti ASI, cek awal `manual-trans.log`. Build sprint ini wajib
-mencetak `Runtime=sprint2-r23-audio-maintenance` dan path file yang benar-benar dimuat. Kalau
+Sesudah mengganti ASI, cek awal `melar-transmission.log`. Build sprint ini wajib
+mencetak `Runtime=melar-transmission-r23-sprint2` dan path file yang benar-benar dimuat. Kalau
 baris itu tidak ada, GTA masih memakai salinan ASI lama.
 
 Artefak yang sudah diverifikasi pada sprint ini:
 
 ```text
-x64/Release/manual-trans-w-clutch.asi
+x64/Release/melar-transmission.asi
 ```
 
 ## Konfigurasi penting

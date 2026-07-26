@@ -1,12 +1,12 @@
-MANUAL TRANS SPRINT 2 BUNDLE
+MELAR TRANSMISSION SPRINT 2 BUNDLE
 
 Salin seluruh isi folder bundle ini ke root Grand Theft Auto V Enhanced.
 
 Hasil akhirnya:
-  Grand Theft Auto V Enhanced\manual-trans-w-clutch.asi
-  Grand Theft Auto V Enhanced\manual-trans\audio\*.wav
+  Grand Theft Auto V Enhanced\melar-transmission.asi
+  Grand Theft Auto V Enhanced\melar-transmission\audio\*.wav
 
-Jangan hapus manual-trans.ini lama. Opsi Sprint 2 akan ditambahkan otomatis.
+Config lama manual-trans.ini dimigrasikan otomatis ke melar-transmission.ini.
 
 Default:
   E (tahan) = isi bensin di pom atau dengan jerigen

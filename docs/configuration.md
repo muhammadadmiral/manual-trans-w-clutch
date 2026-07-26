@@ -1,7 +1,9 @@
 # Konfigurasi drivetrain
 
 Semua opsi berikut tersedia dari menu dalam game dan disimpan ke
-`manual-trans.ini` saat menu ditutup atau kembali ke submenu sebelumnya.
+`melar-transmission.ini` saat menu ditutup atau kembali ke submenu sebelumnya.
+Pada boot pertama setelah rename, config lama `manual-trans.ini` dibaca lalu
+ditulis ulang ke nama baru.
 
 ## Mode transmisi
 
@@ -140,7 +142,7 @@ fiturnya mati. Cek `TCSEn`/`ABSEn` untuk konfigurasi dan
    `EngMod`, `TransMod`, `Race`, `ShiftQuick`, `ShiftPower`, dan
    `ShiftSynchro` di log.
 
-Baris `STATUS` di `manual-trans.log` dicatat setelah final drivetrain write dan
+Baris `STATUS` di `melar-transmission.log` dicatat setelah final drivetrain write dan
 memuat profile kendaraan, selector, logical/physical gear, clutch, RPM native,
 ratio, max velocity, status handling pointer, torque reserve, stall, clash,
 money shift, starter, TCS, ABS, dan launch control. `Accel` adalah respons

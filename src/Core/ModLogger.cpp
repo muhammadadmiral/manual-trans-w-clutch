@@ -114,7 +114,7 @@ void Initialize(HMODULE pluginModule) {
         if (slash) *slash = '\0';
     }
 
-    std::string logPath = std::string(dllPath) + "\\manual-trans.log";
+    std::string logPath = std::string(dllPath) + "\\melar-transmission.log";
 
     // Truncate if > 2 MB to prevent disk bloat across sessions.
     {
@@ -135,18 +135,18 @@ void Initialize(HMODULE pluginModule) {
     }
 
     if (fopen_s(&s_file, logPath.c_str(), "a") != 0 || !s_file) {
-        OutputDebugStringA("[ModLogger] ERROR: could not open manual-trans.log\n");
+        OutputDebugStringA("[ModLogger] ERROR: could not open melar-transmission.log\n");
         return;
     }
 
     WriteEntry(Level::Info, Category::Init, "ModLogger.cpp", 0, "Initialize",
-               "========== manual-trans-w-clutch session start ==========");
+               "========== melar-transmission session start ==========");
 }
 
 void Shutdown() {
     if (!s_file) return;
     WriteEntry(Level::Info, Category::Init, "ModLogger.cpp", 0, "Shutdown",
-               "========== manual-trans-w-clutch session end   ==========");
+               "========== melar-transmission session end   ==========");
     fclose(s_file);
     s_file = nullptr;
 }

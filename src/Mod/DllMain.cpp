@@ -1,6 +1,6 @@
 // =============================================================================
 // DllMain.cpp
-// Windows DLL entry point for the manual-trans-w-clutch ScriptHookV mod.
+// Windows DLL entry point for the melar-transmission ScriptHookV mod.
 //
 // Responsibilities (and ONLY these):
 //   - Initialize / shut down ModLogger
@@ -31,7 +31,7 @@ BOOL APIENTRY DllMain(HMODULE instance, DWORD reason, LPVOID) {
             char modulePath[MAX_PATH]{};
             GetModuleFileNameA(instance, modulePath, MAX_PATH);
             LOG_INFO(Init,
-        "Runtime=sprint2-r23-audio-maintenance built=%s %s module=%s",
+        "Runtime=melar-transmission-r23-sprint2 built=%s %s module=%s",
                      __DATE__, __TIME__,
                      modulePath[0] ? modulePath : "?");
         }

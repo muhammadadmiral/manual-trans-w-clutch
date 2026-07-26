@@ -1,11 +1,11 @@
-# Manual Transmission Mod - Feature Ideas
+# Melar Transmission - Feature Ideas
 
-This document tracks upcoming ideas and enhancements for the manual transmission mod.
+This document tracks upcoming ideas and enhancements for Melar Transmission.
 
 ## 1. Custom Asset Structure
 We will set up a dedicated folder in the game directory to load custom assets.
-- `manual-trans/sounds/`
-- `manual-trans/images/`
+- `melar-transmission/audio/`
+- `melar-transmission/images/`
 
 ## 2. Audio Enhancements
 - **Parking Sensors**: 

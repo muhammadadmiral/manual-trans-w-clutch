@@ -28,7 +28,7 @@ menyediakan headroom pasca-mix.
 Semua WAV harus PCM, stereo, 44.1 kHz, 16-bit dan berada di:
 
 ```text
-manual-trans/audio/
+melar-transmission/audio/
 ```
 
 Nama file menggunakan `snake_case` dan suffix dua digit, misalnya

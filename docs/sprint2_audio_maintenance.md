@@ -10,7 +10,7 @@ GTA, jadi bundle runtime cukup berisi ASI dan WAV.
 `src/Audio/AudioEngine` memuat PCM WAV stereo 44.1 kHz 16-bit dari:
 
 ```text
-manual-trans/audio/
+melar-transmission/audio/
 ```
 
 Audio mekanikal bersifat event-based. Mesin, exhaust, road noise, tyre slip,
@@ -85,11 +85,10 @@ HUD data sederhana.
 Isi `bundle/` disalin ke root GTA V:
 
 ```text
-manual-trans-w-clutch.asi
-manual-trans/
+melar-transmission.asi
+melar-transmission/
   audio/
     *.wav
 ```
 
-Jangan menaruh WAV di samping project lama `melar-transmission`; runtime hanya
-membaca struktur bundle yang seragam.
+Runtime hanya membaca struktur bundle `melar-transmission/audio` yang seragam.

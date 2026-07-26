@@ -98,7 +98,7 @@ void DrawCalibrationHUD(CalibrationState state, float smoothedThrottle) {
   std::string msg = "Calibration: ";
   switch (state) {
   case CalibrationState::Failed:
-    msg += "~r~FAILED~w~ — check manual-trans.log";
+    msg += "~r~FAILED~w~ — check melar-transmission.log";
     break;
   case CalibrationState::WaitingForEngineOff:
     msg += "Turn engine OFF (press " + std::string(1, (char)Config::KeyEngine) +
@@ -160,7 +160,7 @@ void ScriptMain() {
     const std::string reason = VehicleData::GetLastFailureReason();
     LOG_FATAL(Script, "VehicleData::Initialize returned false: %s",
               reason.c_str());
-    Renderer::ShowNotification(("~r~Manual trans disabled: " + reason).c_str());
+    Renderer::ShowNotification(("~r~Melar Transmission disabled: " + reason).c_str());
     return;
   }
   LOG_INFO(Script, "VehicleData::Initialize OK. Reading config...");
@@ -260,7 +260,7 @@ void ScriptMain() {
       const VehicleOffsets &off = VehicleData::GetResolvedOffsets();
       const std::string bv = VehicleData::GetGameBuildVersion();
       char notify[256]{};
-      sprintf_s(notify, "Manual trans r23 Sprint 2: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
+      sprintf_s(notify, "Melar Transmission r23: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
                 VehicleData::GetOffsetSourceName(),
                 bv.empty() ? "?" : bv.c_str(), off.Gear, off.NextGear, off.RPM,
                 off.Clutch);
