@@ -139,8 +139,7 @@ void UpdateSelector(Vehicle vehicle, bool selectorUp, bool selectorDown,
 
   const Selector previous = s_state.selector;
   s_state.selector = target;
-  AudioEngine::PlayAutomaticShift(
-      vehicle, previous == Selector::Park || target == Selector::Park);
+  AudioEngine::PlaySelector(vehicle);
   s_state.neutralDrop = false;
   if (Config::AutomaticNeutralDropDamage &&
       previous == Selector::Neutral && IsDriveSelector(target) &&
@@ -466,8 +465,16 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
     s_state.phaseStartedAt = now;
     s_state.lastShiftDirection = direction;
     GearboxSystem::NotifyAutomaticShift(data, previous, targetGear, sport);
-    AudioEngine::PlayManualShift(vehicle, targetGear > previous, sport,
-                                 !sport && throttle < 0.45f);
+    const bool harsh =
+        s_state.kickdown || nativeLimiterPressure ||
+        (throttle > 0.84f && rpm > 0.66f);
+    const bool slow =
+        !harsh && !sport && throttle < 0.45f && rpm < 0.54f;
+    const auto character =
+        harsh ? AudioEngine::ShiftCharacter::Harsh
+              : (slow ? AudioEngine::ShiftCharacter::Slow
+                      : AudioEngine::ShiftCharacter::Normal);
+    AudioEngine::PlayShift(vehicle, targetGear > previous, character);
     LOG_INFO(Gear,
              "Automatic %s shift start: %d -> %d roadRPM=%.3f "
              "targetRPM=%.3f nativeRPM=%.3f throttle=%.3f",

@@ -80,7 +80,7 @@ dijelaskan di [docs/configuration.md](docs/configuration.md).
 5. Salin seluruh isi `bundle/` ke folder GTA V yang sudah memuat ScriptHookV.
 
 Sesudah mengganti ASI, cek awal `melar-transmission.log`. Build sprint ini wajib
-mencetak `Runtime=melar-transmission-r23-sprint2` dan path file yang benar-benar dimuat. Kalau
+mencetak `Runtime=melar-transmission-r24-sprint2` dan path file yang benar-benar dimuat. Kalau
 baris itu tidak ada, GTA masih memakai salinan ASI lama.
 
 Artefak yang sudah diverifikasi pada sprint ini:
@@ -133,6 +133,14 @@ TCC=1
 FluidOverheat=1
 NeutralDropDamage=1
 BrakeBoostStall=1
+
+[Audio]
+Enabled=1
+NativeLayers=1
+
+[Maintenance]
+FuelEnabled=1
+FuelBlips=1
 ```
 
 `Mode=0` melepas kontrol drivetrain ke GTA, `Mode=1` mengaktifkan automatic
@@ -145,6 +153,10 @@ berasal dari rasio dan road speed; throttle hanya memengaruhi seberapa cepat
 kendaraan mencapai road RPM itu. Roda dan vehicle speed tidak pernah ditulis.
 `ClutchAttack` dan `ClutchRelease` membentuk travel clutch digital. S di gear
 maju/netral diblok dari reverse axis GTA sehingga fungsinya tetap rem.
+
+Suara tuas automatic hanya diputar ketika selector berpindah P-R-N-D-S-L.
+D1-D2-D3 memakai bank shift slow, normal, atau harsh berdasarkan load/RPM.
+Pom bensin tersedia sebagai blip short-range dan dapat dimatikan dari menu.
 
 ## Batas keselamatan memory
 

@@ -17,19 +17,30 @@ Audio mekanikal bersifat event-based. Mesin, exhaust, road noise, tyre slip,
 turbo spool, angin, tunnel, dan occlusion tetap dirender oleh GTA. Mod hanya
 menambahkan:
 
-- shift mobil normal, soft, dan power;
+- shift mobil normal, slow/soft, dan harsh/power;
 - shift motor up/down normal dan soft;
 - missed shift motor;
 - parking brake apply/release;
-- automatic selector Park.
+- bunyi tuas automatic saat selector berpindah P-R-N-D-S-L.
 
 Setiap bank memilih varian secara acak tanpa mengulang file terakhir jika ada
 lebih dari satu varian. Pitch dan level mendapat variasi kecil. Saat load,
 peak setiap WAV dibatasi ke `LimiterCeiling`; mastering voice menyisakan
 headroom tambahan agar beberapa event yang berdekatan tidak clipping.
 
-Nama file bundle adalah kontrak runtime. Tambahkan varian baru dengan suffix
-dua digit dan daftarkan pada `AudioEngine::Initialize`.
+Perpindahan internal D1-D2-D3 tidak memakai bunyi selector. Shift D yang ringan
+memilih bank slow, shift biasa memilih bank normal, sedangkan kickdown,
+limiter-pressure, power shift, dan quickshifter memilih karakter harsh.
+
+Nama file bundle adalah kontrak runtime. Bank sudah menyediakan slot varian
+berakhiran `01` sampai `04` atau `06`; file yang tidak ada dilewati tanpa
+error. Daftar lengkap dan panduan menyiapkan sampel ada di
+`docs/audio_asset_reference.md`.
+
+`NativeLayers=1` menghidupkan layer boost native sesuai spool turbo, blow-off
+native ketika throttle ditutup setelah boost, serta exhaust-pop singkat pada
+harsh shift. Tyre slip, road surface, tunnel, dan wind tetap mengikuti fisika
+dan audio engine GTA agar tidak terdengar ganda.
 
 ## Refuel
 
@@ -41,7 +52,9 @@ dua digit dan daftarkan pada `AudioEngine::Initialize`.
    `WEAPON_PETROLCAN`;
 4. tombol `Refuel` ditahan.
 
-Pom dideteksi dari model native, tanpa daftar koordinat SPBU. Jalur pom
+Pom terdekat tetap dideteksi dari model native. Daftar koordinat hanya dipakai
+untuk blip short-range di minimap dan dapat dimatikan lewat `FuelBlips`.
+Jalur pom
 memuat `prop_cs_fuel_nozle`, memasangnya ke bone tangan kanan, memutar animasi,
 dan mengisi tank berdasarkan delta-time. Jalur darurat memakai jerigen GTA.
 Masuk kendaraan, melepas tombol, mati, menjauh, atau menyalakan mesin selalu
@@ -72,13 +85,14 @@ menambah packaging, input focus, dan failure mode yang tidak dibutuhkan untuk
 HUD data sederhana.
 
 - gear HUD, pedal/simulation bars, dan menu punya posisi terpisah;
+- semua panel dijepit ke safe-zone GTA dan menyesuaikan aspect ratio;
 - gear HUD default berada di kanan atas agar tidak menabrak minimap atau
   speedometer Menyoo yang umumnya berada di bawah;
 - X/Y dan scale dapat diubah live dari `HUD Settings`;
 - setiap widget utama dapat dimatikan jika speedometer lain sudah menampilkan
   data yang sama;
-- prompt fuel/service berada di tengah bawah dan hanya tampil saat konteksnya
-  valid.
+- prompt fuel/service memakai satu slot prioritas dan animasi masuk, sehingga
+  prompt oli tidak menimpa prompt bensin.
 
 ## Bundle
 

@@ -53,6 +53,8 @@ Bank s_bikeError;
 Bank s_parkApply;
 Bank s_parkRelease;
 Bank s_autoSelector;
+Vehicle s_nativePopVehicle = 0;
+ULONGLONG s_nativePopUntil = 0;
 
 std::uint32_t ReadU32(std::ifstream &file) {
   std::uint32_t value = 0;
@@ -158,7 +160,8 @@ IXAudio2SourceVoice *AcquireVoice() {
   return nullptr;
 }
 
-bool Play(Bank &bank, float gain = 1.0f, ULONGLONG cooldownMs = 90) {
+bool Play(Bank &bank, float gain = 1.0f, ULONGLONG cooldownMs = 90,
+          float pitchBias = 1.0f) {
   if (!s_ready || !Config::AudioEnabled || bank.samples.empty())
     return false;
   const ULONGLONG now = GetTickCount64();
@@ -190,7 +193,8 @@ bool Play(Bank &bank, float gain = 1.0f, ULONGLONG cooldownMs = 90) {
 
   voice->Stop();
   voice->FlushSourceBuffers();
-  voice->SetFrequencyRatio(pitch(s_rng));
+  voice->SetFrequencyRatio(
+      std::clamp(pitch(s_rng) * pitchBias, 0.72f, 1.35f));
   voice->SetVolume(std::clamp(gain * level(s_rng), 0.0f, 1.0f));
   if (FAILED(voice->SubmitSourceBuffer(&buffer)))
     return false;
@@ -242,27 +246,44 @@ bool Initialize(HMODULE module) {
 
   const auto root =
       ModuleDirectory(module) / L"melar-transmission" / L"audio";
-  LoadBank(root, s_carShift, {L"car_shift_01.wav", L"car_shift_02.wav"});
-  LoadBank(root, s_carSoft, {L"car_shift_soft_01.wav"});
-  LoadBank(root, s_carPower, {L"car_shift_power_01.wav"});
+  LoadBank(root, s_carShift,
+           {L"car_shift_01.wav", L"car_shift_02.wav",
+            L"car_shift_03.wav", L"car_shift_04.wav",
+            L"car_shift_05.wav", L"car_shift_06.wav"});
+  LoadBank(root, s_carSoft,
+           {L"car_shift_soft_01.wav", L"car_shift_soft_02.wav",
+            L"car_shift_soft_03.wav", L"car_shift_soft_04.wav"});
+  LoadBank(root, s_carPower,
+           {L"car_shift_power_01.wav", L"car_shift_power_02.wav",
+            L"car_shift_power_03.wav", L"car_shift_power_04.wav"});
   LoadBank(root, s_bikeUp,
            {L"bike_shift_up_01.wav", L"bike_shift_up_02.wav",
-            L"bike_shift_up_03.wav"});
+            L"bike_shift_up_03.wav", L"bike_shift_up_04.wav",
+            L"bike_shift_up_05.wav", L"bike_shift_up_06.wav"});
   LoadBank(root, s_bikeDown,
            {L"bike_shift_down_01.wav", L"bike_shift_down_02.wav",
-            L"bike_shift_down_03.wav"});
+            L"bike_shift_down_03.wav", L"bike_shift_down_04.wav",
+            L"bike_shift_down_05.wav", L"bike_shift_down_06.wav"});
   LoadBank(root, s_bikeUpSoft,
-           {L"bike_shift_up_soft_01.wav", L"bike_shift_up_soft_02.wav"});
+           {L"bike_shift_up_soft_01.wav", L"bike_shift_up_soft_02.wav",
+            L"bike_shift_up_soft_03.wav", L"bike_shift_up_soft_04.wav"});
   LoadBank(root, s_bikeDownSoft,
-           {L"bike_shift_down_soft_01.wav", L"bike_shift_down_soft_02.wav"});
+           {L"bike_shift_down_soft_01.wav", L"bike_shift_down_soft_02.wav",
+            L"bike_shift_down_soft_03.wav", L"bike_shift_down_soft_04.wav"});
   LoadBank(root, s_bikeError,
-           {L"bike_shift_error_01.wav", L"bike_shift_error_02.wav"});
+           {L"bike_shift_error_01.wav", L"bike_shift_error_02.wav",
+            L"bike_shift_error_03.wav", L"bike_shift_error_04.wav"});
   LoadBank(root, s_parkApply,
            {L"parking_brake_apply_01.wav", L"parking_brake_apply_02.wav",
-            L"parking_brake_apply_03.wav"});
+            L"parking_brake_apply_03.wav", L"parking_brake_apply_04.wav",
+            L"parking_brake_apply_05.wav"});
   LoadBank(root, s_parkRelease,
-           {L"parking_brake_release_01.wav", L"parking_brake_release_02.wav"});
-  LoadBank(root, s_autoSelector, {L"automatic_park_01.wav"});
+           {L"parking_brake_release_01.wav", L"parking_brake_release_02.wav",
+            L"parking_brake_release_03.wav", L"parking_brake_release_04.wav"});
+  LoadBank(root, s_autoSelector,
+           {L"automatic_selector_01.wav", L"automatic_selector_02.wav",
+            L"automatic_selector_03.wav", L"automatic_selector_04.wav",
+            L"automatic_park_01.wav"});
 
   s_ready = true;
   Update();
@@ -272,6 +293,10 @@ bool Initialize(HMODULE module) {
 }
 
 void Shutdown() {
+  if (s_nativePopVehicle && ENTITY::DOES_ENTITY_EXIST(s_nativePopVehicle))
+    AUDIO::ENABLE_VEHICLE_EXHAUST_POPS(s_nativePopVehicle, FALSE);
+  s_nativePopVehicle = 0;
+  s_nativePopUntil = 0;
   s_ready = false;
   for (auto &voice : s_voices) {
     if (voice) {
@@ -290,6 +315,12 @@ void Shutdown() {
 }
 
 void Update() {
+  if (s_nativePopVehicle && GetTickCount64() >= s_nativePopUntil) {
+    if (ENTITY::DOES_ENTITY_EXIST(s_nativePopVehicle))
+      AUDIO::ENABLE_VEHICLE_EXHAUST_POPS(s_nativePopVehicle, FALSE);
+    s_nativePopVehicle = 0;
+    s_nativePopUntil = 0;
+  }
   if (s_master) {
     // 3 dB-ish bus headroom sesudah limiter per sample.
     s_master->SetVolume(
@@ -299,19 +330,32 @@ void Update() {
 
 bool IsReady() { return s_ready; }
 
-bool PlayManualShift(Vehicle vehicle, bool upshift, bool powerShift,
-                     bool softShift) {
+bool PlayShift(Vehicle vehicle, bool upshift, ShiftCharacter character,
+               bool quickshifter) {
   const Hash model = ENTITY::GET_ENTITY_MODEL(vehicle);
   const bool bike = VEHICLE::IS_THIS_MODEL_A_BIKE(model) ||
                     VEHICLE::IS_THIS_MODEL_A_QUADBIKE(model);
-  if (bike) {
-    Bank &bank = upshift ? (softShift ? s_bikeUpSoft : s_bikeUp)
-                         : (softShift ? s_bikeDownSoft : s_bikeDown);
-    return Play(bank, powerShift ? 1.0f : 0.92f);
+  const bool harsh = character == ShiftCharacter::Harsh;
+  const bool slow = character == ShiftCharacter::Slow;
+
+  if (harsh && Config::AudioNativeLayers) {
+    if (s_nativePopVehicle && s_nativePopVehicle != vehicle &&
+        ENTITY::DOES_ENTITY_EXIST(s_nativePopVehicle))
+      AUDIO::ENABLE_VEHICLE_EXHAUST_POPS(s_nativePopVehicle, FALSE);
+    AUDIO::ENABLE_VEHICLE_EXHAUST_POPS(vehicle, TRUE);
+    s_nativePopVehicle = vehicle;
+    s_nativePopUntil = GetTickCount64() + (quickshifter ? 90 : 140);
   }
-  if (powerShift && !s_carPower.samples.empty())
-    return Play(s_carPower, 0.95f);
-  if (softShift && !s_carSoft.samples.empty())
+
+  if (bike) {
+    Bank &bank = upshift ? (slow ? s_bikeUpSoft : s_bikeUp)
+                         : (slow ? s_bikeDownSoft : s_bikeDown);
+    return Play(bank, harsh ? 1.0f : (slow ? 0.82f : 0.92f), 75,
+                quickshifter ? 1.12f : (harsh ? 1.06f : 1.0f));
+  }
+  if (harsh && !s_carPower.samples.empty())
+    return Play(s_carPower, 0.96f, 90, 1.02f);
+  if (slow && !s_carSoft.samples.empty())
     return Play(s_carSoft, 0.88f);
   return Play(s_carShift, 0.90f);
 }
@@ -328,9 +372,9 @@ bool PlayParkingBrake(bool engaged) {
   return Play(engaged ? s_parkApply : s_parkRelease, 0.86f, 180);
 }
 
-bool PlayAutomaticShift(Vehicle vehicle, bool selectorMove) {
+bool PlaySelector(Vehicle vehicle) {
   (void)vehicle;
-  return selectorMove && Play(s_autoSelector, 0.72f, 160);
+  return Play(s_autoSelector, 0.72f, 150);
 }
 
 } // namespace AudioEngine

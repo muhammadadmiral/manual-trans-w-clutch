@@ -118,6 +118,7 @@ extern bool AudioNativeLayers;
 
 // Fuel dan maintenance.
 extern bool FuelEnabled;
+extern bool FuelBlipsEnabled;
 extern float RefuelRatePerSecond;
 extern bool MaintenanceEnabled;
 extern float OilWearMultiplier;

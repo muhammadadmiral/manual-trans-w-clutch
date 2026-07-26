@@ -14,6 +14,8 @@ namespace TurboSystem {
 struct TurboState {
   bool hasTurbo = false;
   bool blowOffLatched = false;
+  bool nativeBoostActive = false;
+  Vehicle vehicle = 0;
   float spool = 0.0f;
   float boostPressure = 0.0f;
 };

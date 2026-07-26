@@ -34,9 +34,17 @@ void PlayGearGrindSound(Vehicle vehicle) {
 void PlayGearShiftSound(Vehicle vehicle, int fromGear, int toGear,
                         float clutch, float throttle) {
   const bool upshift = toGear > fromGear;
-  const bool powerShift = throttle > 0.78f;
-  const bool softShift = clutch > 0.70f || throttle < 0.18f;
-  if (AudioEngine::PlayManualShift(vehicle, upshift, powerShift, softShift))
+  const auto &shift = GearboxSystem::GetState();
+  const bool harsh = shift.quickShift || shift.powerShift ||
+                     shift.clashSeverity > 0.35f || shift.moneyShift ||
+                     (throttle > 0.82f && clutch < 0.42f);
+  const bool slow = !harsh &&
+                    (clutch > 0.70f || throttle < 0.22f);
+  const auto character =
+      harsh ? AudioEngine::ShiftCharacter::Harsh
+            : (slow ? AudioEngine::ShiftCharacter::Slow
+                    : AudioEngine::ShiftCharacter::Normal);
+  if (AudioEngine::PlayShift(vehicle, upshift, character, shift.quickShift))
     return;
   AUDIO::PLAY_SOUND_FRONTEND(-1, "NAV_LEFT_RIGHT",
                              "HUD_FRONTEND_DEFAULT_SOUNDSET", 1);

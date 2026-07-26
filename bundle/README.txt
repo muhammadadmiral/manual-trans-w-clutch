@@ -14,3 +14,5 @@ Default:
   [          = buka menu
 
 Audio eksternal tidak membutuhkan DLL tambahan. XAudio2 berasal dari Windows.
+Fuel Station Blips dapat dimatikan dari menu FUEL / MAINTENANCE.
+Suara selector memakai melar-transmission\audio\automatic_selector_01.wav.

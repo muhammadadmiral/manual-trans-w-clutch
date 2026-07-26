@@ -431,6 +431,9 @@ void Menu::Initialize() {
   maintenance.title = "FUEL / MAINTENANCE";
   maintenance.items.push_back(
       MenuItem("Fuel Simulation", MenuItem::Bool, &Config::FuelEnabled));
+  maintenance.items.push_back(
+      MenuItem("Fuel Station Blips", MenuItem::Bool,
+               &Config::FuelBlipsEnabled));
   maintenance.items.push_back(MenuItem(
       "Refuel Speed", MenuItem::Float, &Config::RefuelRatePerSecond,
       0.005f, 0.005f, 0.25f));
@@ -620,14 +623,21 @@ void Menu::Draw() {
                  (std::max)(0, itemCount - maxVisibleItems));
 
   const float menuScale = Config::MenuScale;
-  const float menuX = Config::MenuPosX;
-  const float menuY = Config::MenuPosY;
   const float menuWidth = 0.275f * menuScale;
   const float itemHeight = 0.036f * menuScale;
   const float headerHeight = 0.074f * menuScale;
   const float footerHeight = 0.038f * menuScale;
   const float panelHeight =
       headerHeight + itemHeight * visibleCount + footerHeight;
+  const float safeSize =
+      std::clamp(GRAPHICS::GET_SAFE_ZONE_SIZE(), 0.80f, 1.0f);
+  const float safeInset = (1.0f - safeSize) * 0.50f + 0.012f;
+  const float menuX =
+      std::clamp(Config::MenuPosX, safeInset,
+                 1.0f - safeInset - menuWidth);
+  const float menuY =
+      std::clamp(Config::MenuPosY, safeInset,
+                 1.0f - safeInset - panelHeight);
 
   DrawRect(menuX - 0.004f * menuScale, menuY - 0.004f * menuScale,
            menuWidth + 0.008f * menuScale,

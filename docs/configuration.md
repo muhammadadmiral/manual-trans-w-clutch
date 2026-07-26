@@ -175,6 +175,7 @@ NativeLayers=1
 
 [Maintenance]
 FuelEnabled=1
+FuelBlips=1
 RefuelRatePerSecond=0.035
 Enabled=1
 OilWearMultiplier=1.0
@@ -195,5 +196,6 @@ GTA untuk mesin, ban, road/wind noise tetap menjadi layer utama.
 
 `Refuel` dan `OilService` berada di bagian `[Controls]` dan dapat diubah dari
 menu. Nilai default masing-masing adalah virtual-key `69` (E) dan `79` (O).
+`FuelBlips=1` menampilkan pom sebagai blip short-range di minimap.
 Gear HUD sengaja default di kanan atas agar tidak menabrak minimap maupun
 speedometer Menyoo. Posisi dan scale dapat disetel live.

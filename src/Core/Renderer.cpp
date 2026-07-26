@@ -8,6 +8,32 @@
 #include <Windows.h>
 
 namespace Renderer {
+namespace {
+
+struct SafeRect {
+    float left;
+    float top;
+    float right;
+    float bottom;
+    float aspect;
+};
+
+SafeRect GetSafeRect() {
+    const float safe =
+        std::clamp(GRAPHICS::GET_SAFE_ZONE_SIZE(), 0.80f, 1.0f);
+    const float inset = (1.0f - safe) * 0.50f + 0.012f;
+    const float aspect =
+        std::clamp(GRAPHICS::GET_ASPECT_RATIO(FALSE), 1.25f, 3.60f);
+    return {inset, inset, 1.0f - inset, 1.0f - inset, aspect};
+}
+
+float EaseOutCubic(float value) {
+    const float t = std::clamp(value, 0.0f, 1.0f);
+    const float inverse = 1.0f - t;
+    return 1.0f - inverse * inverse * inverse;
+}
+
+} // namespace
 
 void ShowNotification(const char *message) {
     HUD::BEGIN_TEXT_COMMAND_THEFEED_POST("CELL_EMAIL_BCON");
@@ -51,11 +77,18 @@ void DrawBar(float x, float y, float width, float height, float fraction, int r,
 void DrawGearHUD(int manualGear, int maxGear, int activeSignal, bool isEngineOn,
                  bool engineStarting, int transmissionMode,
                  const char *automaticSelector) {
-    const float badgeX = Config::GearHudPosX;
-    const float badgeY = Config::GearHudPosY;
     const float hudScale = Config::GearHudScale;
     const float badgeW = 0.072f * hudScale;
     const float badgeH = 0.145f * hudScale;
+    const SafeRect safe = GetSafeRect();
+    const float badgeX =
+        std::clamp(Config::GearHudPosX,
+                   safe.left + badgeW * 0.5f,
+                   safe.right - badgeW * 0.5f);
+    const float badgeY =
+        std::clamp(Config::GearHudPosY,
+                   safe.top + badgeH * 0.5f + 0.020f,
+                   safe.bottom - badgeH * 0.5f);
     const ULONGLONG tick = GetTickCount64();
 
     auto formatGear = [&](int gear) -> std::string {
@@ -112,8 +145,15 @@ void DrawGearHUD(int manualGear, int maxGear, int activeSignal, bool isEngineOn,
         std::clamp(static_cast<float>(tick - changeTick) / 230.0f, 0.0f, 1.0f);
     const float eased = 1.0f - (1.0f - anim) * (1.0f - anim);
 
-    GRAPHICS::DRAW_RECT(badgeX, badgeY, badgeW, badgeH,
-                        10, 13, 18, 210, 0);
+    const float pulse = anim < 1.0f ? 1.0f - anim : 0.0f;
+    GRAPHICS::DRAW_RECT(badgeX + 0.002f, badgeY + 0.004f,
+                        badgeW + 0.004f, badgeH + 0.005f,
+                        0, 0, 0, 115, 0);
+    GRAPHICS::DRAW_RECT(badgeX, badgeY,
+                        badgeW + pulse * 0.007f,
+                        badgeH + pulse * 0.007f,
+                        10, 13, 18,
+                        static_cast<int>(210 + pulse * 25.0f), 0);
     GRAPHICS::DRAW_RECT(badgeX, badgeY - badgeH * 0.5f + 0.002f,
                         badgeW, 0.004f, r, g, b, 240, 0);
     DrawTextOverlay(transmissionMode == 1 ? "AUTO" : "GEAR",
@@ -184,11 +224,16 @@ void DrawDebugOverlay(int manualGear, unsigned gameGear, unsigned nextGear,
 }
 
 void DrawPedalsOverlay(float rpm, float clutch, float throttle, float brake) {
-    const float barX = Config::OverlayPosX;
-    const float barWidth = Config::OverlayBarWidth;
+    const SafeRect safe = GetSafeRect();
+    const float barWidth =
+        std::clamp(Config::OverlayBarWidth, 0.075f, 0.20f);
     const float barHeight = Config::OverlayBarHeight;
     const float gap = barHeight + 0.02f;
-    float y = Config::OverlayPosY;
+    const float barX =
+        std::clamp(Config::OverlayPosX, safe.left,
+                   safe.right - barWidth);
+    float y = std::clamp(Config::OverlayPosY, safe.top + 0.018f,
+                         safe.bottom - gap * 4.0f);
 
     DrawBar(barX, y, barWidth, barHeight, rpm, 255, 60, 60, "RPM");
     y += gap;
@@ -205,11 +250,23 @@ void DrawSimulationOverlay(float fuel, float oilTemp, float oilLife,
                            float gearboxHealth,
                            float clutchHeat, bool parkingBrake,
                            bool wheelsLocked, float engineBrake) {
-    const float barX = Config::OverlayPosX + Config::OverlayBarWidth + 0.015f;
-    const float barWidth = Config::OverlayBarWidth;
+    const SafeRect safe = GetSafeRect();
+    const float barWidth =
+        std::clamp(Config::OverlayBarWidth, 0.075f, 0.20f);
     const float barHeight = Config::OverlayBarHeight;
     const float gap = barHeight + 0.02f;
-    float y = Config::OverlayPosY;
+    const float pedalX =
+        std::clamp(Config::OverlayPosX, safe.left,
+                   safe.right - barWidth);
+    float barX = pedalX + barWidth + 0.015f;
+    float y = std::clamp(Config::OverlayPosY, safe.top + 0.018f,
+                         safe.bottom - gap * 7.0f);
+    if (barX + barWidth > safe.right) {
+        barX = pedalX;
+        y = std::clamp(y + gap * 4.0f + 0.015f,
+                       safe.top + 0.018f,
+                       safe.bottom - gap * 7.0f);
+    }
 
     int fR = static_cast<int>((1.0f - fuel) * 255);
     int fG = static_cast<int>(fuel * 200);
@@ -249,27 +306,49 @@ void DrawSimulationOverlay(float fuel, float oilTemp, float oilLife,
 
 void DrawInteractionPanel(const char *title, const char *detail,
                           float progress) {
+    const SafeRect safe = GetSafeRect();
+    const ULONGLONG now = GetTickCount64();
+    static ULONGLONG lastDrawAt = 0;
+    static ULONGLONG enteredAt = 0;
+    if (!lastDrawAt || now - lastDrawAt > 180)
+        enteredAt = now;
+    lastDrawAt = now;
+    const float reveal = EaseOutCubic(
+        static_cast<float>(now - enteredAt) / 220.0f);
+
     const float x = 0.5f;
-    const float y = 0.82f;
-    const float width = 0.25f;
-    const float height = progress >= 0.0f ? 0.075f : 0.058f;
-    GRAPHICS::DRAW_RECT(x, y, width, height, 8, 12, 18, 220, 0);
+    const float width =
+        std::clamp(0.29f * (16.0f / 9.0f) / safe.aspect,
+                   0.225f, 0.34f);
+    const float height =
+        (progress >= 0.0f ? 0.078f : 0.060f) * (0.94f + reveal * 0.06f);
+    const float settledY =
+        (std::min)(0.82f, safe.bottom - height * 0.5f - 0.018f);
+    const float y = settledY + (1.0f - reveal) * 0.025f;
+    const int panelAlpha = static_cast<int>(80.0f + reveal * 145.0f);
+    const int contentAlpha = static_cast<int>(80.0f + reveal * 175.0f);
+
+    GRAPHICS::DRAW_RECT(x + 0.002f, y + 0.004f,
+                        width + 0.006f, height + 0.006f,
+                        0, 0, 0, static_cast<int>(reveal * 120.0f), 0);
+    GRAPHICS::DRAW_RECT(x, y, width, height, 8, 12, 18, panelAlpha, 0);
     GRAPHICS::DRAW_RECT(x, y - height * 0.5f + 0.002f,
-                        width, 0.004f, 55, 205, 255, 245, 0);
+                        width, 0.004f, 55, 205, 255, contentAlpha, 0);
     DrawTextOverlay(title, x, y - 0.026f, 0.36f,
-                    235, 245, 255, 255, 0, true, true);
+                    235, 245, 255, contentAlpha, 0, true, true);
     DrawTextOverlay(detail, x, y - 0.002f, 0.29f,
-                    190, 205, 220, 245, 0, false, true);
+                    190, 205, 220, contentAlpha, 0, false, true);
     if (progress >= 0.0f) {
         progress = std::clamp(progress, 0.0f, 1.0f);
         const float barW = width - 0.026f;
         const float left = x - barW * 0.5f;
         const float barY = y + 0.023f;
-        GRAPHICS::DRAW_RECT(x, barY, barW, 0.008f, 22, 30, 38, 245, 0);
+        GRAPHICS::DRAW_RECT(x, barY, barW, 0.008f,
+                            22, 30, 38, contentAlpha, 0);
         if (progress > 0.0f) {
             const float fill = barW * progress;
             GRAPHICS::DRAW_RECT(left + fill * 0.5f, barY, fill, 0.008f,
-                                55, 205, 255, 255, 0);
+                                55, 205, 255, contentAlpha, 0);
         }
     }
 }

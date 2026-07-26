@@ -15,16 +15,26 @@ static TurboState s_state;
 static inline float Clamp01(float v) { return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v); }
 
 void Reset() {
+  if (s_state.vehicle && ENTITY::DOES_ENTITY_EXIST(s_state.vehicle) &&
+      s_state.nativeBoostActive)
+    AUDIO::SET_VEHICLE_BOOST_ACTIVE(s_state.vehicle, FALSE);
   s_state = TurboState{};
 }
 
 void InitializeForVehicle(Vehicle vehicle) {
-  // Check if turbo is installed (mod category 18)
+  if (s_state.vehicle && s_state.vehicle != vehicle &&
+      ENTITY::DOES_ENTITY_EXIST(s_state.vehicle) &&
+      s_state.nativeBoostActive)
+    AUDIO::SET_VEHICLE_BOOST_ACTIVE(s_state.vehicle, FALSE);
+  s_state.vehicle = vehicle;
   s_state.hasTurbo = VEHICLE::IS_TOGGLE_MOD_ON(vehicle, 18) != FALSE;
 }
 
 float Update(Vehicle vehicle, VehicleData &data, float rpm, float throttle, bool isEngineOn) {
   if (!s_state.hasTurbo || !isEngineOn) {
+    if (s_state.nativeBoostActive && ENTITY::DOES_ENTITY_EXIST(vehicle))
+      AUDIO::SET_VEHICLE_BOOST_ACTIVE(vehicle, FALSE);
+    s_state.nativeBoostActive = false;
     s_state.spool = 0.0f;
     s_state.boostPressure = 0.0f;
     return 1.0f; // 1.0x power multiplier (no effect)
@@ -51,6 +61,14 @@ float Update(Vehicle vehicle, VehicleData &data, float rpm, float throttle, bool
   }
   
   s_state.boostPressure = s_state.spool;
+  const bool nativeBoost =
+      Config::AudioNativeLayers && throttle > 0.16f &&
+      s_state.boostPressure > 0.18f;
+  if (nativeBoost != s_state.nativeBoostActive) {
+    AUDIO::SET_VEHICLE_BOOST_ACTIVE(vehicle,
+                                    nativeBoost ? TRUE : FALSE);
+    s_state.nativeBoostActive = nativeBoost;
+  }
   
   (void)data;
   return 1.0f + (s_state.boostPressure * 0.35f);

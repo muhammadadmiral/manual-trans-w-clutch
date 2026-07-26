@@ -105,20 +105,25 @@ float PrepareIdleDrive(Vehicle vehicle, VehicleData &data, int gear,
                        bool automaticMode, bool gentleClutchRelease) {
   s_state.creepThrottle = 0.0f;
   s_state.hillRollback = false;
+  const float throttleGate = automaticMode ? 0.12f : 0.025f;
   if (!Config::IdleCreep || !engineOn || std::abs(gear) != 1 ||
-      throttle >= 0.02f || engagement <= 0.08f)
+      throttle >= throttleGate || engagement <= 0.08f)
     return 0.0f;
 
   const uint8_t ratioIndex =
       gear < 0 ? 0 : static_cast<uint8_t>(gear);
   const float ratio = std::fabs(data.GetGearRatio(ratioIndex));
   const float flatVelocity = ResolveFlatVelocity(vehicle, data, maxGear);
-  if (!std::isfinite(ratio) || ratio <= 0.01f ||
-      !std::isfinite(flatVelocity) || flatVelocity <= 1.0f)
-    return 0.0f;
-
+  const bool drivetrainEstimateValid =
+      std::isfinite(ratio) && ratio > 0.01f &&
+      std::isfinite(flatVelocity) && flatVelocity > 1.0f;
+  // Memory handling beberapa add-on vehicle nggak punya flat velocity yang
+  // layak. Creep tetap boleh hidup; fallback ini cuma target jalan idle,
+  // bukan pemaksa kecepatan kendaraan.
   const float idleRoadSpeed =
-      s_state.idleRPM * flatVelocity / ratio;
+      drivetrainEstimateValid
+          ? std::clamp(s_state.idleRPM * flatVelocity / ratio, 1.5f, 4.5f)
+          : (automaticMode ? 2.6f : 2.0f);
   const float directionalSpeed = gear < 0 ? -speedMps : speedMps;
   const float speedGap =
       idleRoadSpeed > 0.01f
@@ -142,10 +147,13 @@ float PrepareIdleDrive(Vehicle vehicle, VehicleData &data, int gear,
   if (automaticMode) {
     const float brakeRelease =
         1.0f - SmoothStep(Clamp01(brake / 0.25f));
+    const float pedalRelease =
+        1.0f - SmoothStep(Clamp01(throttle / throttleGate));
     const float converterTransfer =
-        0.55f + Clamp01(engagement) * 0.45f;
+        0.68f + Clamp01(engagement) * 0.32f;
     s_state.creepThrottle =
-        base * speedGap * brakeRelease * converterTransfer;
+        std::max(0.075f, base) * speedGap * brakeRelease *
+        converterTransfer * pedalRelease;
   } else if (gentleClutchRelease && brake < 0.05f) {
     const float biteTransfer =
         SmoothStep((Clamp01(engagement) - 0.12f) / 0.78f);

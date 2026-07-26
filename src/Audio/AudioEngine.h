@@ -6,15 +6,21 @@ using Vehicle = int;
 
 namespace AudioEngine {
 
+enum class ShiftCharacter {
+  Slow,
+  Normal,
+  Harsh
+};
+
 bool Initialize(HMODULE module);
 void Shutdown();
 void Update();
 bool IsReady();
 
-bool PlayManualShift(Vehicle vehicle, bool upshift, bool powerShift,
-                     bool softShift);
+bool PlayShift(Vehicle vehicle, bool upshift, ShiftCharacter character,
+               bool quickshifter = false);
 bool PlayGearGrind(Vehicle vehicle);
 bool PlayParkingBrake(bool engaged);
-bool PlayAutomaticShift(Vehicle vehicle, bool selectorMove);
+bool PlaySelector(Vehicle vehicle);
 
 } // namespace AudioEngine

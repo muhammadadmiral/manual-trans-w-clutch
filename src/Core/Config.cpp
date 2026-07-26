@@ -119,6 +119,7 @@ float AudioLimiterCeiling = 0.72f;
 bool AudioNativeLayers = true;
 
 bool FuelEnabled = true;
+bool FuelBlipsEnabled = true;
 float RefuelRatePerSecond = 0.035f;
 bool MaintenanceEnabled = true;
 float OilWearMultiplier = 1.0f;
@@ -368,6 +369,8 @@ void ReadConfig(HMODULE module) {
 
     FuelEnabled =
         GetPrivateProfileIntA("Maintenance", "FuelEnabled", 1, ini) != 0;
+    FuelBlipsEnabled =
+        GetPrivateProfileIntA("Maintenance", "FuelBlips", 1, ini) != 0;
     RefuelRatePerSecond =
         std::clamp(ReadFloat("Maintenance", "RefuelRatePerSecond", 0.035f,
                              ini),
@@ -565,6 +568,8 @@ void SaveConfig(HMODULE module) {
     WriteInt("Audio", "NativeLayers", AudioNativeLayers ? 1 : 0, ini);
 
     WriteInt("Maintenance", "FuelEnabled", FuelEnabled ? 1 : 0, ini);
+    WriteInt("Maintenance", "FuelBlips",
+             FuelBlipsEnabled ? 1 : 0, ini);
     WriteFloat("Maintenance", "RefuelRatePerSecond",
                RefuelRatePerSecond, ini);
     WriteInt("Maintenance", "Enabled", MaintenanceEnabled ? 1 : 0, ini);

@@ -210,9 +210,15 @@ void ScriptMain() {
     Menu::Update();
     AudioEngine::Update();
     const Ped playerPed = PLAYER::PLAYER_PED_ID();
-    RefuelInteraction::Update(playerPed);
-    if (!RefuelInteraction::IsActive())
+    if (ServiceInteraction::IsActive()) {
       ServiceInteraction::Update(playerPed);
+    } else {
+      RefuelInteraction::Update(playerPed);
+      const bool oilServiceRequested =
+          (GetAsyncKeyState(Config::KeyOilService) & 0x8000) != 0;
+      if (!RefuelInteraction::IsPromptVisible() || oilServiceRequested)
+        ServiceInteraction::Update(playerPed);
+    }
 
     // ── Not in a vehicle ──────────────────────────────────────────────────
     if (!PED::IS_PED_IN_ANY_VEHICLE(playerPed, FALSE)) {
@@ -260,7 +266,7 @@ void ScriptMain() {
       const VehicleOffsets &off = VehicleData::GetResolvedOffsets();
       const std::string bv = VehicleData::GetGameBuildVersion();
       char notify[256]{};
-      sprintf_s(notify, "Melar Transmission r23: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
+      sprintf_s(notify, "Melar Transmission r24: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
                 VehicleData::GetOffsetSourceName(),
                 bv.empty() ? "?" : bv.c_str(), off.Gear, off.NextGear, off.RPM,
                 off.Clutch);
@@ -996,8 +1002,14 @@ void ScriptMain() {
           TurboSystem::GetBoostPressure() > 0.05f)
         warnings += "~b~BOOST ";
       if (!warnings.empty()) {
+        const float warningX =
+            std::clamp(Config::GearHudPosX, 0.10f, 0.90f);
+        const float warningY =
+            std::clamp(Config::GearHudPosY +
+                           0.095f * Config::GearHudScale,
+                       0.14f, 0.78f);
         Renderer::DrawTextOverlay(
-            warnings.c_str(), 0.88f, 0.80f, 0.34f,
+            warnings.c_str(), warningX, warningY, 0.31f,
             255, 255, 255, 255, 0, true, true);
       }
     }
