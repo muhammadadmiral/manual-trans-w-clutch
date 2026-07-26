@@ -1,5 +1,6 @@
 #include "AutomaticGearbox.h"
 #include "GearboxSystem.h"
+#include "../DrivetrainKinematics.h"
 #include "../VehicleData.h"
 #include "../../Core/Config.h"
 #include "../../Core/ModLogger.h"
@@ -26,30 +27,14 @@ static float SmoothStep(float value) {
   return t * t * (3.0f - 2.0f * t);
 }
 
-static float ResolveFlatVelocity(Vehicle vehicle, VehicleData &data,
-                                 int maxGear) {
-  const float memoryValue = std::fabs(data.GetDriveMaxFlatVel());
-  if (std::isfinite(memoryValue) && memoryValue > 1.0f)
-    return memoryValue;
-  const float estimatedTop =
-      (std::max)(8.0f, VEHICLE::GET_VEHICLE_ESTIMATED_MAX_SPEED(vehicle));
-  const float topRatio = std::fabs(
-      data.GetGearRatio(static_cast<uint8_t>((std::max)(1, maxGear))));
-  return topRatio > 0.01f ? estimatedTop * topRatio : estimatedTop;
-}
-
 static float RoadRPM(Vehicle vehicle, VehicleData &data, int maxGear,
                      int gear, float signedSpeedMps) {
   if (gear < 1)
     return 0.2f;
-  const float ratio =
-      std::fabs(data.GetGearRatio(static_cast<uint8_t>(gear)));
-  const float flatVelocity =
-      ResolveFlatVelocity(vehicle, data, maxGear);
-  if (ratio <= 0.01f || flatVelocity <= 1.0f)
-    return std::clamp(data.GetRPM(), 0.0f, 1.0f);
-  return std::clamp(std::fabs(signedSpeedMps) * ratio / flatVelocity,
-                    0.0f, 1.25f);
+  const float calibrated = DrivetrainKinematics::ResolveRoadRPM(
+      vehicle, data, gear, maxGear, signedSpeedMps);
+  return calibrated > 0.0f ? calibrated
+                           : std::clamp(data.GetRPM(), 0.0f, 1.0f);
 }
 
 static bool CanSelect(Vehicle vehicle, Selector from, Selector target,
@@ -83,27 +68,9 @@ static bool DownshiftIsSafe(Vehicle vehicle, VehicleData &data,
                             float signedSpeedMps) {
   if (toGear < 1 || fromGear <= toGear)
     return false;
-  const float fromRatio =
-      std::fabs(data.GetGearRatio(static_cast<uint8_t>(fromGear)));
-  const float toRatio =
-      std::fabs(data.GetGearRatio(static_cast<uint8_t>(toGear)));
-  if (fromRatio <= 0.01f || toRatio <= 0.01f)
-    return true;
   const float projectedRPM =
       RoadRPM(vehicle, data, vehicleMaxGear, toGear, signedSpeedMps);
-  if (projectedRPM >= 0.98f)
-    return false;
-
-  const float topRatio = std::fabs(
-      data.GetGearRatio(static_cast<uint8_t>((std::max)(1, vehicleMaxGear))));
-  if (topRatio > 0.01f) {
-    const float estimatedTop =
-        (std::max)(8.0f, VEHICLE::GET_VEHICLE_ESTIMATED_MAX_SPEED(vehicle));
-    const float targetGearLimit = estimatedTop * topRatio / toRatio;
-    if (std::fabs(signedSpeedMps) > targetGearLimit * 0.97f)
-      return false;
-  }
-  return true;
+  return projectedRPM < 0.98f;
 }
 
 void Reset(Selector initialSelector) {
@@ -112,6 +79,15 @@ void Reset(Selector initialSelector) {
   s_state.lastShiftTime = GetTickCount();
   s_state.phaseStartedAt = s_state.lastShiftTime;
   s_state.fluidTemperature = 0.18f;
+}
+
+void ServiceTransmission() {
+  s_state.fluidTemperature = 0.0f;
+  s_state.brakeBoostTime = 0.0f;
+  s_state.stallRequest = false;
+  s_state.limpMode = false;
+  s_state.neutralDrop = false;
+  s_state.torqueManagement = 0.0f;
 }
 
 void UpdateSelector(Vehicle vehicle, bool selectorUp, bool selectorDown,

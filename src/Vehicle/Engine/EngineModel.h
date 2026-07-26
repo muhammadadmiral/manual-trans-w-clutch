@@ -21,6 +21,9 @@ struct State {
   float wheelRPM = 0.2f;
   float connectedRPMTarget = 0.2f;
   float estimatedFlatVelocity = 0.0f;
+  float gearLimitSpeedMps = 0.0f;
+  float drivenWheelSpeedMps = 0.0f;
+  float rollingRadius = 0.34f;
   float driveTorqueFactor = 1.0f;
   float longitudinalAcceleration = 0.0f;
   float lowRpmRecovery = 0.0f;
@@ -39,7 +42,10 @@ struct State {
   bool nativeCutRecovered = false;
   bool redlineCut = false;
   bool handlingBacked = false;
+  bool adaptiveGearing = false;
   bool speedSampleValid = false;
+  bool wheelTelemetryValid = false;
+  bool burnoutActive = false;
   bool airborne = false;
   bool upsideDown = false;
   bool environmentStall = false;

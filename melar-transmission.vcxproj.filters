@@ -120,6 +120,9 @@
     <ClCompile Include="src\Vehicle\VehicleProfile.cpp">
       <Filter>Source Files\Vehicle</Filter>
     </ClCompile>
+    <ClCompile Include="src\Vehicle\DrivetrainKinematics.cpp">
+      <Filter>Source Files\Vehicle</Filter>
+    </ClCompile>
     <ClCompile Include="src\Vehicle\Engine\FuelSystem.cpp">
       <Filter>Source Files\Vehicle\Engine</Filter>
     </ClCompile>
@@ -171,6 +174,9 @@
     <ClCompile Include="src\Vehicle\Maintenance\ServiceInteraction.cpp">
       <Filter>Source Files\Vehicle\Maintenance</Filter>
     </ClCompile>
+    <ClCompile Include="src\Vehicle\Maintenance\WorkshopIntegration.cpp">
+      <Filter>Source Files\Vehicle\Maintenance</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Audio\AudioEngine.h">
@@ -210,6 +216,9 @@
       <Filter>Header Files\Vehicle</Filter>
     </ClInclude>
     <ClInclude Include="src\Vehicle\VehicleProfile.h">
+      <Filter>Header Files\Vehicle</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vehicle\DrivetrainKinematics.h">
       <Filter>Header Files\Vehicle</Filter>
     </ClInclude>
     <ClInclude Include="src\Vehicle\Engine\FuelSystem.h">
@@ -261,6 +270,9 @@
       <Filter>Header Files\Vehicle\Maintenance</Filter>
     </ClInclude>
     <ClInclude Include="src\Vehicle\Maintenance\ServiceInteraction.h">
+      <Filter>Header Files\Vehicle\Maintenance</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vehicle\Maintenance\WorkshopIntegration.h">
       <Filter>Header Files\Vehicle\Maintenance</Filter>
     </ClInclude>
   </ItemGroup>

@@ -35,10 +35,16 @@ private:
     std::vector<std::string> choiceLabels;
 
     int targetSubmenu = -1;
+    int actionId = 0;
 
     // Constructor for Submenu
     MenuItem(std::string n, Type t, int target)
-        : name(n), type(t), targetSubmenu(target) {}
+        : name(n), type(t) {
+      if (t == Action)
+        actionId = target;
+      else
+        targetSubmenu = target;
+    }
 
     // Constructor for Bool
     MenuItem(std::string n, Type t, bool *b) : name(n), type(t), boolVal(b) {}

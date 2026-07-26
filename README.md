@@ -42,6 +42,16 @@ Sprint drivetrain aktif. Fokus saat ini:
 - launch control opsional memakai soft throttle cut tanpa menulis RPM;
 - temperatur rem, brake fade, clutch heat, dan brake-throttle override dapat
   dituning lewat GUI.
+- stall manual memakai RPM mesin aktual dan cutoff terpisah; gas+rem di gear 1
+  tidak lagi dianggap stall selama power-brake/burnout aktif;
+- kalibrasi rasio memvalidasi seluruh ratio set dan flat velocity. Add-on
+  vehicle yang datanya tidak koheren memakai kurva adaptif dari top speed
+  native, dengan baseline mobil enam gigi sekitar 43-45 km/h di gigi 1 dan
+  84-89 km/h di gigi 2 untuk mobil 240-250 km/h;
+- speedometer assetless native memiliki tiga layout mobil dan tiga layout
+  motor, pilihan unit/accent/posisi/scale, serta telemetry drivetrain lengkap;
+- service bay Los Santos Customs, Beeker's, dan Benny's dapat melakukan servis
+  oli, rebuild gearbox/clutch/ATF, dan tuning drivetrain/pedal/assist.
 
 Sprint 2 menambahkan audio mekanikal randomized berbasis XAudio2, limiter dan
 headroom, refuel native dengan pom/jerigen, serta oil-life dan servis beranimasi.
@@ -80,7 +90,7 @@ dijelaskan di [docs/configuration.md](docs/configuration.md).
 5. Salin seluruh isi `bundle/` ke folder GTA V yang sudah memuat ScriptHookV.
 
 Sesudah mengganti ASI, cek awal `melar-transmission.log`. Build sprint ini wajib
-mencetak `Runtime=melar-transmission-r24-sprint2` dan path file yang benar-benar dimuat. Kalau
+mencetak `Runtime=melar-transmission-r25-refine` dan path file yang benar-benar dimuat. Kalau
 baris itu tidak ada, GTA masih memakai salinan ASI lama.
 
 Artefak yang sudah diverifikasi pada sprint ini:
@@ -101,6 +111,7 @@ ShiftDown=162
 ClutchKey=88
 
 [Analog]
+Preset=0
 ThrottleAttack=0.080
 ThrottleRelease=0.280
 BrakeAttack=0.070
@@ -114,6 +125,7 @@ LaunchControlRPM=0.72
 IdleCreep=1
 StallEnabled=1
 LugStallRPM=1500
+StallCutoffRPM=950
 LugStallDelay=2.20
 WaterStallDelay=2.50
 RolloverStallDelay=7.00
@@ -141,6 +153,18 @@ NativeLayers=1
 [Maintenance]
 FuelEnabled=1
 FuelBlips=1
+
+[Speedometer]
+Enabled=1
+CarStyle=0
+BikeStyle=0
+Units=0
+Accent=0
+Detailed=1
+
+[Workshop]
+Enabled=1
+Radius=14.0
 ```
 
 `Mode=0` melepas kontrol drivetrain ke GTA, `Mode=1` mengaktifkan automatic

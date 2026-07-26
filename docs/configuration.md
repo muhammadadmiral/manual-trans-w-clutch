@@ -20,6 +20,10 @@ CVT gas-rem.
 
 ## Pedal / Keyboard
 
+- `Pedal Preset`: `DEFAULT`, `RESPONSIVE`, `SMOOTH`, atau `SIM RACING`.
+  Mengubah satu parameter pedal secara manual menandai map sebagai `CUSTOM`.
+- `Reset Pedals to Default`: mengembalikan seluruh attack/release/curve
+  throttle, brake, dan clutch sekaligus.
 - `Throttle Attack/Release` membentuk waktu naik dan turun pedal virtual W.
 - `Brake Attack/Release` membentuk pressure virtual tombol S.
 - `Throttle/Brake Curve` mencampur respons linear dan cubic.
@@ -37,6 +41,9 @@ menahan tombol tetap mencapai 1.0.
 - `Idle Torque`: cadangan torsi kendaraan saat throttle nol.
 - `Lug Stall RPM`: batas zona lugging dalam RPM fisik estimasi. Default 1500
   RPM; mesin masih boleh menarik di bawah angka ini.
+- `Actual Stall Cutoff`: batas RPM mesin aktual yang mengizinkan stall
+  drivetrain. Default 950 RPM. Zona lugging masih dapat mengurangi torsi di
+  atas angka ini, tetapi tidak boleh mematikan mesin.
 - `Lug Stall Delay`: waktu dasar sebelum lugging yang tidak pulih menjadi
   stall. Timer melambat saat defisit kecil dan dipercepat brake, tanjakan,
   clutch lock, serta gear tinggi.
@@ -46,7 +53,8 @@ menahan tombol tetap mencapai 1.0.
 - `Rev Hang`: lama RPM free-rev tertahan setelah throttle ditutup.
 - `Hard Brake Stall`: stall saat pengereman darurat menjelang berhenti tanpa
   memutus clutch. Jika telemetry ABS roda belum valid, fallback memakai brake,
-  deselerasi longitudinal, RPM, dan kecepatan.
+  deselerasi longitudinal, RPM, dan kecepatan. Throttle aktif dan window
+  power-brake/burnout selalu dikecualikan.
 - `Fuel Cut Engine Brake`: konsumsi nol pada overrun dan tambahan drag ringan.
 - `Starter Interlock`: manual wajib netral/clutch; automatic wajib P/N.
 - `Auto Start Needs Brake`: menambah syarat brake pada starter automatic.
@@ -141,6 +149,12 @@ fiturnya mati. Cek `TCSEn`/`ABSEn` untuk konfigurasi dan
 9. Bandingkan kendaraan stock dan engine/transmission upgrade. Cek
    `EngMod`, `TransMod`, `Race`, `ShiftQuick`, `ShiftPower`, dan
    `ShiftSynchro` di log.
+10. Manual gear 1: tahan gas+rem. Throttle tidak boleh dipotong atau memicu
+    stall palsu; saat roda penggerak mulai berputar, `Burnout=1` dan tachometer
+    mengikuti wheel telemetry walaupun body speed hampir nol.
+11. Cek limiter mobil enam gigi 240-250 km/h. Handling normal umumnya berada
+    sekitar 43-45 km/h (gigi 1) dan 84-89 km/h (gigi 2). Add-on dengan handling
+    rusak harus menunjukkan `Adaptive=1` di log.
 
 Baris `STATUS` di `melar-transmission.log` dicatat setelah final drivetrain write dan
 memuat profile kendaraan, selector, logical/physical gear, clutch, RPM native,
@@ -188,6 +202,22 @@ GearScale=1.0
 MenuPosX=0.695
 MenuPosY=0.105
 MenuScale=1.0
+
+[Speedometer]
+Enabled=1
+CarStyle=0
+BikeStyle=0
+Units=0
+Accent=0
+Detailed=1
+PosX=0.815
+PosY=0.790
+Scale=1.0
+Opacity=0.92
+
+[Workshop]
+Enabled=1
+Radius=14.0
 ```
 
 `LimiterCeiling` diterapkan saat WAV dimuat, jadi perubahan nilai ini perlu
@@ -199,3 +229,26 @@ menu. Nilai default masing-masing adalah virtual-key `69` (E) dan `79` (O).
 `FuelBlips=1` menampilkan pom sebagai blip short-range di minimap.
 Gear HUD sengaja default di kanan atas agar tidak menabrak minimap maupun
 speedometer Menyoo. Posisi dan scale dapat disetel live.
+
+## Speedometer Studio
+
+Speedometer dirender langsung dengan primitive native GTA, jadi tidak
+membutuhkan DLL UI, SVG, texture dictionary, atau file aset tambahan. Data
+speed memakai `GET_ENTITY_SPEED`, sedangkan RPM/gear berasal dari state yang
+sama dengan drivetrain frame aktif.
+
+- Mobil: `GT DIGITAL`, `CLASSIC`, `TRACK`.
+- Motor/quad: `RACE DASH`, `NAKED`, `TOURING`.
+- `Units`: km/h atau mph.
+- `Accent`, `Position`, `Scale`, dan `Opacity`: customization live.
+- `Detailed Telemetry`: fuel, temperatur/life oli, engine/gearbox health,
+  clutch heat, boost, odometer, TCS, ABS, launch control, parking brake,
+  burnout, dan service warning.
+
+## Los Santos Customs integration
+
+`LS Customs Service Bays` menambahkan menu Melar ketika kendaraan berhenti di
+dekat Los Santos Customs Burton/La Mesa/LSIA/Harmony, Beeker's Garage, atau
+Benny's. Tekan key `Workshop` (default E). Service mekanikal mewajibkan mesin
+mati; drivetrain mode, pedal map, TCS, dan ABS dapat dituning dari panel yang
+sama. `Workshop Radius` dapat diperbesar untuk map overhaul.

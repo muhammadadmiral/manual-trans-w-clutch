@@ -28,6 +28,7 @@
 #include "../Vehicle/Maintenance/RefuelInteraction.h"
 #include "../Vehicle/Maintenance/MaintenanceSystem.h"
 #include "../Vehicle/Maintenance/ServiceInteraction.h"
+#include "../Vehicle/Maintenance/WorkshopIntegration.h"
 #include "../Vehicle/TelemetryLogger.h"
 #include "../Vehicle/VehicleData.h"
 #include "../Vehicle/VehicleProfile.h"
@@ -238,6 +239,7 @@ void ScriptMain() {
       activeSignal = 0;
       firstControlledFrameTrace = true;
       InputHandler::ResetEdges();
+      WorkshopIntegration::Reset();
       Menu::Draw();
       continue;
     }
@@ -256,6 +258,7 @@ void ScriptMain() {
       activeSignal = 0;
       firstControlledFrameTrace = true;
       InputHandler::ResetEdges();
+      WorkshopIntegration::Reset();
       Menu::Draw();
       continue;
     }
@@ -266,7 +269,7 @@ void ScriptMain() {
       const VehicleOffsets &off = VehicleData::GetResolvedOffsets();
       const std::string bv = VehicleData::GetGameBuildVersion();
       char notify[256]{};
-      sprintf_s(notify, "Melar Transmission r24: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
+      sprintf_s(notify, "Melar Transmission r25: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
                 VehicleData::GetOffsetSourceName(),
                 bv.empty() ? "?" : bv.c_str(), off.Gear, off.NextGear, off.RPM,
                 off.Clutch);
@@ -328,6 +331,7 @@ void ScriptMain() {
       RefuelInteraction::TrackVehicle(vehicle);
       MaintenanceSystem::SelectVehicle(vehicle);
       ServiceInteraction::TrackVehicle(vehicle);
+      WorkshopIntegration::Reset();
       TractionControl::Reset();
       TurboSystem::Reset();
       TurboSystem::InitializeForVehicle(vehicle);
@@ -361,6 +365,9 @@ void ScriptMain() {
       Menu::Draw();
       continue;
     }
+
+    WorkshopIntegration::Update(playerPed, vehicle, isEngineOn);
+    const bool workshopOpen = WorkshopIntegration::IsOpen();
 
     if (VehicleData::IsInitialized() && !activeLayoutChecked) {
       activeLayoutValid =
@@ -667,8 +674,10 @@ void ScriptMain() {
                    ? 1.0f
                    : (!automaticMode ? InputHandler::GetSmoothedClutch()
                                      : 0.0f));
-    float rawThrottle = InputHandler::GetSmoothedThrottle();
-    const float rawBrake = InputHandler::GetSmoothedBrake();
+    float rawThrottle =
+        workshopOpen ? 0.0f : InputHandler::GetSmoothedThrottle();
+    const float rawBrake =
+        workshopOpen ? 1.0f : InputHandler::GetSmoothedBrake();
     const float rpm = data.GetRPM();
     VehicleUpgrades::Refresh(vehicle);
     const bool traceFrame = firstControlledFrameTrace;
@@ -896,14 +905,21 @@ void ScriptMain() {
       LOG_INFO(Physics,
                "ENGINE: Owned=%d CtrlRPM=%.3f Target=%.3f WheelRPM=%.3f "
                "Physical=%.0f Idle=%.0f Redline=%.0f Load=%.3f "
-               "Reserve=%.3f Lug=%.3f Stall=%.3f LowRec=%.3f",
+               "Reserve=%.3f Lug=%.3f Stall=%.3f LowRec=%.3f "
+               "GearLimit=%.1fkm/h Driven=%.1fkm/h WheelData=%d "
+               "Burnout=%d Adaptive=%d",
                engineState.rpmOwned ? 1 : 0, engineState.controlledRPM,
                engineState.connectedRPMTarget, engineState.wheelRPM,
                engineState.estimatedEngineRPM,
                engineState.estimatedIdlePhysicalRPM,
                engineState.estimatedRedlineRPM, engineState.load,
                engineState.torqueReserve, engineState.lugSeverity,
-               engineState.stallProgress, engineState.lowRpmRecovery);
+               engineState.stallProgress, engineState.lowRpmRecovery,
+               engineState.gearLimitSpeedMps * 3.6f,
+               engineState.drivenWheelSpeedMps * 3.6f,
+               engineState.wheelTelemetryValid ? 1 : 0,
+               engineState.burnoutActive ? 1 : 0,
+               engineState.adaptiveGearing ? 1 : 0);
       LOG_INFO(Physics,
                "IDLE_DRIVE: Creep=%.3f HillRollback=%d Power=%.3f "
                "Profile=%s",
@@ -956,11 +972,54 @@ void ScriptMain() {
     }
 
     // ── HUD ───────────────────────────────────────────────────────────────
-    if (Config::GearHudEnabled && !Menu::IsOpen()) {
+    if (Config::GearHudEnabled && !Config::SpeedometerEnabled &&
+        !Menu::IsOpen()) {
       Renderer::DrawGearHUD(
           manualGear, maxGear, activeSignal, isEngineOn, engineStarting,
           transmissionMode,
           automaticMode ? AutomaticGearbox::GetSelectorName() : nullptr);
+    }
+
+    // Tetap digambar saat menu terbuka agar Speedometer Studio punya live
+    // preview untuk layout, posisi, warna, scale, dan opacity.
+    if (Config::SpeedometerEnabled) {
+      const auto &engineState = EngineModel::GetState();
+      Renderer::SpeedometerData cluster{};
+      cluster.speedKmH = speedKmH;
+      cluster.normalizedRPM = data.GetRPM();
+      cluster.physicalRPM = engineState.estimatedEngineRPM;
+      cluster.redlineRPM = engineState.estimatedRedlineRPM;
+      cluster.fuel = FuelSystem::GetFuelLevel();
+      cluster.oilTemperature = FuelSystem::GetOilTemperature();
+      cluster.oilLife = MaintenanceSystem::GetState().oilLife;
+      cluster.engineHealth =
+          std::clamp(VEHICLE::GET_VEHICLE_ENGINE_HEALTH(vehicle) / 1000.0f,
+                     0.0f, 1.0f);
+      cluster.gearboxHealth = GearboxSystem::GetHealth();
+      cluster.clutchHeat = ClutchSystem::GetHeat();
+      cluster.boost = TurboSystem::GetBoostPressure();
+      cluster.odometerKm = MaintenanceSystem::GetState().odometerKm;
+      cluster.throttle = throttle;
+      cluster.brake = absBrake;
+      cluster.gear = manualGear;
+      cluster.maxGear = maxGear;
+      cluster.transmissionMode = transmissionMode;
+      cluster.automaticSelector =
+          automaticMode ? AutomaticGearbox::GetSelectorName() : nullptr;
+      const Hash model = ENTITY::GET_ENTITY_MODEL(vehicle);
+      cluster.motorcycle =
+          VEHICLE::IS_THIS_MODEL_A_BIKE(model) ||
+          VEHICLE::IS_THIS_MODEL_A_QUADBIKE(model);
+      cluster.electric =
+          vehicleProfile == VehicleProfile::Drivetrain::Electric;
+      cluster.engineOn = isEngineOn;
+      cluster.engineStarting = engineStarting;
+      cluster.parkingBrake = ParkingBrake::IsEngaged();
+      cluster.tcsActive = TractionControl::IsTCSActive();
+      cluster.absActive = BrakeSystem::IsABSActive();
+      cluster.launchControl = LaunchControl::IsActive();
+      cluster.burnout = engineState.burnoutActive;
+      Renderer::DrawSpeedometer(cluster);
     }
 
     if (grindWarningTimer > 0 && !Menu::IsOpen()) {

@@ -1,4 +1,5 @@
 #include "EngineModel.h"
+#include "../DrivetrainKinematics.h"
 #include "../VehicleData.h"
 #include "../VehicleUpgrades.h"
 #include "../../Core/Config.h"
@@ -67,32 +68,61 @@ static float ResolveTorqueCurve(float engineRPM,
                     0.18f, 1.0f);
 }
 
-static float ResolveFlatVelocity(Vehicle vehicle, VehicleData &data,
-                                 int maxGear) {
-  const float memoryValue = std::fabs(data.GetDriveMaxFlatVel());
-  if (std::isfinite(memoryValue) && memoryValue > 1.0f)
-    return memoryValue;
-
-  const float estimatedTop =
-      std::max(1.0f, VEHICLE::GET_VEHICLE_ESTIMATED_MAX_SPEED(vehicle));
-  const float topRatio =
-      maxGear > 0
-          ? std::fabs(data.GetGearRatio(static_cast<uint8_t>(maxGear)))
-          : 0.0f;
-  return topRatio > 0.01f ? estimatedTop * topRatio : estimatedTop;
-}
-
 static float ResolveWheelRPM(Vehicle vehicle, VehicleData &data, int gear,
-                             int maxGear, float speedMps, float idleRPM) {
-  if (gear == 0)
-    return idleRPM;
-  const uint8_t ratioIndex =
-      gear < 0 ? 0 : static_cast<uint8_t>(gear);
-  const float ratio = std::fabs(data.GetGearRatio(ratioIndex));
-  const float flatVelocity = ResolveFlatVelocity(vehicle, data, maxGear);
-  if (ratio <= 0.01f || flatVelocity <= 1.0f)
-    return idleRPM;
-  return std::clamp(std::fabs(speedMps) * ratio / flatVelocity, 0.0f, 1.25f);
+                             int maxGear, float speedMps, float throttle,
+                             float brake, float engagement, float dt) {
+  if (gear == 0) {
+    s_state.wheelTelemetryValid = false;
+    s_state.burnoutActive = false;
+    s_state.drivenWheelSpeedMps = std::fabs(speedMps);
+    return 0.0f;
+  }
+
+  const float bodySpeed = std::fabs(speedMps);
+  const uint8_t count = data.GetWheelCount();
+  float fastestDrivenOmega = 0.0f;
+  float allOmega = 0.0f;
+  int valid = 0;
+  int driven = 0;
+  for (uint8_t i = 0; i < count; ++i) {
+    const auto wheel = data.GetWheelTelemetry(i);
+    if (!wheel.valid || !std::isfinite(wheel.angularVelocity))
+      continue;
+    const float omega = std::fabs(wheel.angularVelocity);
+    allOmega += omega;
+    ++valid;
+    if (std::fabs(wheel.power) > 0.001f) {
+      fastestDrivenOmega = std::max(fastestDrivenOmega, omega);
+      ++driven;
+    }
+  }
+
+  s_state.wheelTelemetryValid = valid >= 2;
+  const float omega =
+      driven > 0 ? fastestDrivenOmega
+                 : (valid > 0 ? allOmega / static_cast<float>(valid) : 0.0f);
+  if (s_state.wheelTelemetryValid && bodySpeed > 4.0f && omega > 1.0f &&
+      throttle < 0.12f && brake < 0.08f) {
+    const float measuredRadius = bodySpeed / omega;
+    if (measuredRadius > 0.15f && measuredRadius < 0.80f) {
+      s_state.rollingRadius +=
+          (measuredRadius - s_state.rollingRadius) *
+          Clamp01(dt * 1.8f);
+    }
+  }
+
+  s_state.drivenWheelSpeedMps =
+      s_state.wheelTelemetryValid ? omega * s_state.rollingRadius : bodySpeed;
+  s_state.burnoutActive =
+      gear == 1 && driven > 0 && engagement > 0.55f &&
+      throttle > 0.35f && brake > 0.18f && bodySpeed < 6.0f &&
+      s_state.drivenWheelSpeedMps > bodySpeed + 1.5f;
+  const float effectiveSpeed =
+      s_state.burnoutActive
+          ? std::max(bodySpeed, s_state.drivenWheelSpeedMps)
+          : bodySpeed;
+  return DrivetrainKinematics::ResolveRoadRPM(
+      vehicle, data, gear, maxGear, effectiveSpeed);
 }
 
 void Reset() {
@@ -110,19 +140,17 @@ float PrepareIdleDrive(Vehicle vehicle, VehicleData &data, int gear,
       throttle >= throttleGate || engagement <= 0.08f)
     return 0.0f;
 
-  const uint8_t ratioIndex =
-      gear < 0 ? 0 : static_cast<uint8_t>(gear);
-  const float ratio = std::fabs(data.GetGearRatio(ratioIndex));
-  const float flatVelocity = ResolveFlatVelocity(vehicle, data, maxGear);
+  const auto calibration =
+      DrivetrainKinematics::Resolve(vehicle, data, gear, maxGear);
+  const float gearLimitSpeed = calibration.gearLimitSpeedMps;
   const bool drivetrainEstimateValid =
-      std::isfinite(ratio) && ratio > 0.01f &&
-      std::isfinite(flatVelocity) && flatVelocity > 1.0f;
+      std::isfinite(gearLimitSpeed) && gearLimitSpeed > 1.0f;
   // Memory handling beberapa add-on vehicle nggak punya flat velocity yang
   // layak. Creep tetap boleh hidup; fallback ini cuma target jalan idle,
   // bukan pemaksa kecepatan kendaraan.
   const float idleRoadSpeed =
       drivetrainEstimateValid
-          ? std::clamp(s_state.idleRPM * flatVelocity / ratio, 1.5f, 4.5f)
+          ? std::clamp(s_state.idleRPM * gearLimitSpeed, 1.5f, 4.5f)
           : (automaticMode ? 2.6f : 2.0f);
   const float directionalSpeed = gear < 0 ? -speedMps : speedMps;
   const float speedGap =
@@ -239,10 +267,12 @@ static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
   const uint8_t ratioIndex =
       gear < 0 ? 0 : static_cast<uint8_t>(gear);
   const float ratio = std::fabs(data.GetGearRatio(ratioIndex));
-  const float maxFlatVel = ResolveFlatVelocity(vehicle, data, maxGear);
+  const auto calibration =
+      DrivetrainKinematics::Resolve(vehicle, data, gear, maxGear);
+  const float maxFlatVel = calibration.flatVelocity;
   const bool hasDrivelineData =
-      std::isfinite(ratio) && ratio > 0.01f &&
-      std::isfinite(maxFlatVel) && maxFlatVel > 1.0f;
+      std::isfinite(calibration.gearLimitSpeedMps) &&
+      calibration.gearLimitSpeedMps > 1.0f;
 
   const float nativeTopSpeed =
       std::max(1.0f, VEHICLE::GET_VEHICLE_ESTIMATED_MAX_SPEED(vehicle));
@@ -252,7 +282,7 @@ static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
   const float effectiveTopSpeed = hasDrivelineData ? maxFlatVel : nativeTopSpeed;
   const float idleRoadSpeed =
       hasDrivelineData
-          ? s_state.idleRPM * effectiveTopSpeed / effectiveRatio
+          ? s_state.idleRPM * calibration.gearLimitSpeedMps
           : s_state.idleRPM * effectiveTopSpeed *
                 static_cast<float>((std::max)(1, std::abs(gear))) /
                 static_cast<float>((std::max)(1, maxGear));
@@ -271,11 +301,11 @@ static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
   // Torque converter memindahkan torsi tanpa menyamakan putaran poros.
   // Mencampur RPM roda di sini bikin mesin matic terbaca 300-400 RPM saat
   // diam, lalu model torsinya sendiri menganggap mesin lug parah.
+  // Stall harus mengikuti RPM mesin yang benar-benar ditampilkan/dikontrol.
+  // Road RPM tetap dipakai untuk load dan limiter, tetapi tidak boleh
+  // menyatakan mesin 0 RPM hanya karena body diam saat roda sedang burnout.
   const float engineSpeedForLoad =
-      automaticMode
-          ? data.GetRPM()
-          : s_state.wheelRPM * Clamp01(engagement) +
-                data.GetRPM() * (1.0f - Clamp01(engagement));
+      s_state.rpmOwned ? s_state.controlledRPM : data.GetRPM();
   s_state.estimatedEngineRPM =
       ToPhysicalRPM(engineSpeedForLoad, s_state.idleRPM, rpmRange);
   const float lugThreshold =
@@ -335,16 +365,24 @@ static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
 
   const float stallClutch =
       std::clamp(Config::StallClutchThreshold, 0.30f, 0.95f);
+  const float stallCutoffRPM =
+      std::clamp(Config::StallCutoffRPM,
+                 rpmRange.idle * 0.60f,
+                 rpmRange.redline * 0.24f);
   const float netReserve = s_state.torqueReserve - uphillLoad * 0.20f;
   const float decelerationRisk =
       Clamp01((-s_state.longitudinalAcceleration - 0.15f) / 2.50f);
   const bool unresolvedLug =
       netReserve < 0.0f ||
       (s_state.lugSeverity > 0.20f && decelerationRisk > 0.05f);
+  const bool powerBrakeWindow =
+      !automaticMode && gear == 1 && usefulSpeed < 3.0f &&
+      throttle > 0.35f && brake > 0.18f;
   const bool bogging = !automaticMode && Config::StallEnabled &&
                        engagement > stallClutch &&
-                       s_state.estimatedEngineRPM < lugThreshold &&
-                       unresolvedLug;
+                       s_state.estimatedEngineRPM < stallCutoffRPM &&
+                       unresolvedLug && !powerBrakeWindow &&
+                       !s_state.burnoutActive;
   if (bogging) {
     const float clutchLoad =
         Clamp01((engagement - stallClutch) / (1.0f - stallClutch));
@@ -376,9 +414,10 @@ static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
   const bool hardBraking =
       Config::HardBrakeStall && !automaticMode && engineOn && gear != 0 &&
       engagement > 0.75f && brake > 0.88f &&
+      throttle < 0.12f && !s_state.burnoutActive &&
       s_state.longitudinalAcceleration < -4.5f &&
       (std::fabs(speedMps) < 3.5f ||
-       s_state.estimatedEngineRPM < lugThreshold * 0.85f);
+       s_state.estimatedEngineRPM < stallCutoffRPM);
   if (hardBraking) {
     s_state.hardBrakeStallProgress += dt / 0.22f;
   } else {
@@ -530,11 +569,14 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
       engineOn && open && (!automaticMode || gear == 0);
   s_state.nativeCutRecovered = false;
 
-  s_state.estimatedFlatVelocity =
-      ResolveFlatVelocity(vehicle, data, maxGear);
+  const auto activeCalibration =
+      DrivetrainKinematics::Resolve(vehicle, data, gear, maxGear);
+  s_state.estimatedFlatVelocity = activeCalibration.flatVelocity;
+  s_state.gearLimitSpeedMps = activeCalibration.gearLimitSpeedMps;
+  s_state.adaptiveGearing = activeCalibration.usedAdaptiveCurve;
   s_state.wheelRPM =
-      ResolveWheelRPM(vehicle, data, gear, maxGear, speedMps,
-                      s_state.idleRPM);
+      ResolveWheelRPM(vehicle, data, gear, maxGear, speedMps, throttle,
+                      brake, clutchEngagement, dt);
   s_state.connectedRPMTarget = s_state.wheelRPM;
   s_state.expectedRPM = open ? rpm : std::min(1.0f, s_state.wheelRPM);
 
@@ -599,6 +641,9 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
         s_state.idleRPM +
         std::pow(pedal, 0.62f) * (1.0f - s_state.idleRPM);
     float target = s_state.wheelRPM;
+    const bool powerBrakeWindow =
+        !automaticMode && gear == 1 && std::fabs(speedMps) < 3.0f &&
+        pedal > 0.35f && brake > 0.18f;
 
     if (automaticMode) {
       // Converter D boleh slip sedikit, tapi RPM utamanya tetap ikut rasio
@@ -612,6 +657,11 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
       const float discSlip =
           std::pow(1.0f - Clamp01(clutchEngagement), 1.35f);
       target += (freeTarget - target) * discSlip;
+    } else if (powerBrakeWindow && !s_state.burnoutActive) {
+      // Sedikit torsional slip sebelum ban mulai berputar. Begitu wheel
+      // telemetry membaca wheelspin, target penuh kembali berasal dari roda.
+      target = std::max(
+          target, s_state.idleRPM + std::pow(pedal, 0.75f) * 0.10f);
     }
 
     target = std::clamp(target, s_state.idleRPM, 1.08f);

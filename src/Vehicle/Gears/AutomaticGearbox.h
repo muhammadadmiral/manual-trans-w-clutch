@@ -57,6 +57,7 @@ struct State {
 };
 
 void Reset(Selector initialSelector = Selector::Park);
+void ServiceTransmission();
 void UpdateSelector(Vehicle vehicle, bool selectorUp, bool selectorDown,
                     float brake, float signedSpeedMps, float engineRPM);
 int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,

@@ -30,6 +30,7 @@ int KeySignalHazard = 0x48;       // H
 int KeyParkingBrake = 0x50;       // P
 int KeyRefuel       = 0x45;       // E
 int KeyOilService   = 0x4F;       // O
+int KeyWorkshop     = 0x45;       // E
 
 bool SignalAutoCancelSteer = true;
 
@@ -55,6 +56,7 @@ float StallRate = 1.20f;
 float StallClutchThreshold = 0.65f;
 float IdleTorqueFraction = 0.18f;
 float LugStallRPM = 1500.0f;
+float StallCutoffRPM = 950.0f;
 float LugStallDelay = 2.20f;
 float WaterStallDelay = 2.50f;
 float RolloverStallDelay = 7.00f;
@@ -147,6 +149,7 @@ float SteerDeadzonePct = 0.05f;
 float ThrottleExpo = 0.45f;
 float BrakeExpo    = 0.35f;
 float ClutchExpo   = 0.25f;
+int PedalPreset    = 0;
 
 // ── Excluded vehicle classes ──────────────────────────────────────────────────
 std::vector<int> ExcludedVehicleClasses;
@@ -154,6 +157,16 @@ std::vector<int> ExcludedVehicleClasses;
 // ── Overlay ───────────────────────────────────────────────────────────────────
 bool  OverlayBars      = true;
 bool  GearHudEnabled   = true;
+bool  SpeedometerEnabled = true;
+int   SpeedometerCarStyle = 0;
+int   SpeedometerBikeStyle = 0;
+int   SpeedometerUnits = 0;
+int   SpeedometerAccent = 0;
+bool  SpeedometerDetailed = true;
+float SpeedometerPosX = 0.815f;
+float SpeedometerPosY = 0.790f;
+float SpeedometerScale = 1.00f;
+float SpeedometerOpacity = 0.92f;
 float OverlayPosX      = 0.02f;
 float OverlayPosY      = 0.22f;
 float OverlayBarWidth  = 0.12f;
@@ -164,6 +177,64 @@ float GearHudScale     = 1.00f;
 float MenuPosX         = 0.695f;
 float MenuPosY         = 0.105f;
 float MenuScale        = 1.00f;
+bool  WorkshopEnabled  = true;
+float WorkshopRadius   = 14.0f;
+
+void ApplyPedalPreset(int preset) {
+    PedalPreset = std::clamp(preset, 0, 4);
+    switch (PedalPreset) {
+    case 0:
+        ThrottleAttack = 0.08f;
+        ThrottleRelease = 0.28f;
+        BrakeAttack = 0.07f;
+        BrakeRelease = 0.18f;
+        ClutchAttack = 0.045f;
+        ClutchRelease = 0.06f;
+        ThrottleExpo = 0.25f;
+        BrakeExpo = 0.20f;
+        ClutchExpo = 0.10f;
+        break;
+    case 1:
+        ThrottleAttack = 0.04f;
+        ThrottleRelease = 0.14f;
+        BrakeAttack = 0.035f;
+        BrakeRelease = 0.12f;
+        ClutchAttack = 0.025f;
+        ClutchRelease = 0.045f;
+        ThrottleExpo = 0.12f;
+        BrakeExpo = 0.10f;
+        ClutchExpo = 0.05f;
+        break;
+    case 2:
+        ThrottleAttack = 0.14f;
+        ThrottleRelease = 0.34f;
+        BrakeAttack = 0.12f;
+        BrakeRelease = 0.28f;
+        ClutchAttack = 0.06f;
+        ClutchRelease = 0.10f;
+        ThrottleExpo = 0.35f;
+        BrakeExpo = 0.28f;
+        ClutchExpo = 0.18f;
+        break;
+    case 3:
+        ThrottleAttack = 0.055f;
+        ThrottleRelease = 0.18f;
+        BrakeAttack = 0.045f;
+        BrakeRelease = 0.15f;
+        ClutchAttack = 0.035f;
+        ClutchRelease = 0.075f;
+        ThrottleExpo = 0.50f;
+        BrakeExpo = 0.42f;
+        ClutchExpo = 0.30f;
+        break;
+    default:
+        break;
+    }
+}
+
+void ResetPedalsToDefault() {
+    ApplyPedalPreset(0);
+}
 
 // =============================================================================
 namespace {
@@ -249,6 +320,7 @@ void ReadConfig(HMODULE module) {
     KeyParkingBrake = GetPrivateProfileIntA("Controls", "ParkingBrake",0x50,        ini);
     KeyRefuel       = GetPrivateProfileIntA("Controls", "Refuel",      0x45,        ini);
     KeyOilService   = GetPrivateProfileIntA("Controls", "OilService",  0x4F,        ini);
+    KeyWorkshop     = GetPrivateProfileIntA("Controls", "Workshop",    0x45,        ini);
 
     SignalAutoCancelSteer = GetPrivateProfileIntA("Controls","SignalAutoCancelSteer",1,ini) != 0;
 
@@ -269,6 +341,9 @@ void ReadConfig(HMODULE module) {
         ReadFloat("Engine", "IdleTorqueFraction", 0.18f, ini);
     LugStallRPM =
         ReadFloat("Engine", "LugStallRPM", 1500.0f, ini);
+    StallCutoffRPM =
+        std::clamp(ReadFloat("Engine", "StallCutoffRPM", 950.0f, ini),
+                   450.0f, 1800.0f);
     LugStallDelay =
         ReadFloat("Engine", "LugStallDelay", 2.20f, ini);
     WaterStallDelay =
@@ -427,6 +502,9 @@ void ReadConfig(HMODULE module) {
     ThrottleExpo     = ReadFloat("Analog", "ThrottleExpo",     0.25f,  ini);
     BrakeExpo        = ReadFloat("Analog", "BrakeExpo",        0.20f,  ini);
     ClutchExpo       = ReadFloat("Analog", "ClutchExpo",       0.10f,  ini);
+    PedalPreset = std::clamp(
+        static_cast<int>(GetPrivateProfileIntA("Analog", "Preset", 0, ini)),
+        0, 4);
 
     // Steering
     SteerAttack      = ReadFloat("Steering", "Attack",      0.055f, ini);
@@ -442,6 +520,38 @@ void ReadConfig(HMODULE module) {
     // Overlay
     OverlayBars      = GetPrivateProfileIntA("Overlay", "Bars",  1,   ini) != 0;
     GearHudEnabled   = GetPrivateProfileIntA("Overlay", "GearHud", 1, ini) != 0;
+    SpeedometerEnabled =
+        GetPrivateProfileIntA("Speedometer", "Enabled", 1, ini) != 0;
+    SpeedometerCarStyle = std::clamp(
+        static_cast<int>(
+            GetPrivateProfileIntA("Speedometer", "CarStyle", 0, ini)),
+        0, 2);
+    SpeedometerBikeStyle = std::clamp(
+        static_cast<int>(
+            GetPrivateProfileIntA("Speedometer", "BikeStyle", 0, ini)),
+        0, 2);
+    SpeedometerUnits = std::clamp(
+        static_cast<int>(
+            GetPrivateProfileIntA("Speedometer", "Units", 0, ini)),
+        0, 1);
+    SpeedometerAccent = std::clamp(
+        static_cast<int>(
+            GetPrivateProfileIntA("Speedometer", "Accent", 0, ini)),
+        0, 4);
+    SpeedometerDetailed =
+        GetPrivateProfileIntA("Speedometer", "Detailed", 1, ini) != 0;
+    SpeedometerPosX =
+        std::clamp(ReadFloat("Speedometer", "PosX", 0.815f, ini),
+                   0.12f, 0.92f);
+    SpeedometerPosY =
+        std::clamp(ReadFloat("Speedometer", "PosY", 0.790f, ini),
+                   0.20f, 0.92f);
+    SpeedometerScale =
+        std::clamp(ReadFloat("Speedometer", "Scale", 1.0f, ini),
+                   0.65f, 1.40f);
+    SpeedometerOpacity =
+        std::clamp(ReadFloat("Speedometer", "Opacity", 0.92f, ini),
+                   0.35f, 1.0f);
     OverlayPosX      = ReadFloat("Overlay", "PosX",      0.02f,  ini);
     OverlayPosY      = ReadFloat("Overlay", "PosY",      0.22f,  ini);
     OverlayBarWidth  = ReadFloat("Overlay", "BarWidth",  0.12f,  ini);
@@ -458,6 +568,15 @@ void ReadConfig(HMODULE module) {
                                   0.02f, 0.55f);
     MenuScale        = std::clamp(ReadFloat("Overlay", "MenuScale", 1.0f, ini),
                                   0.70f, 1.20f);
+    WorkshopEnabled =
+        GetPrivateProfileIntA("Workshop", "Enabled", 1, ini) != 0;
+    WorkshopRadius =
+        std::clamp(ReadFloat("Workshop", "Radius", 14.0f, ini),
+                   6.0f, 30.0f);
+    if (drivetrainSchema < 10 && SpeedometerEnabled) {
+        OverlayBars = false;
+        GearHudEnabled = false;
+    }
     // Pindahkan layout default lama yang numpuk minimap/notifikasi.
     if (std::fabs(OverlayPosX - 0.02f) < 0.001f &&
         std::fabs(OverlayPosY - 0.60f) < 0.001f) {
@@ -466,11 +585,11 @@ void ReadConfig(HMODULE module) {
 
     // Auto-create if the file doesn't exist yet
     if (GetFileAttributesA(ini) == INVALID_FILE_ATTRIBUTES ||
-        drivetrainSchema < 9 || migratedFromLegacy) {
+        drivetrainSchema < 10 || migratedFromLegacy) {
         SaveConfig(module);
         char currentIni[MAX_PATH]{};
         if (BuildIniPath(module, currentIni))
-            WriteInt("Internal", "DrivetrainSchema", 9, currentIni);
+            WriteInt("Internal", "DrivetrainSchema", 10, currentIni);
     }
 }
 
@@ -491,6 +610,7 @@ void SaveConfig(HMODULE module) {
     WriteInt("Controls", "ParkingBrake",         KeyParkingBrake, ini);
     WriteInt("Controls", "Refuel",               KeyRefuel,       ini);
     WriteInt("Controls", "OilService",           KeyOilService,   ini);
+    WriteInt("Controls", "Workshop",             KeyWorkshop,     ini);
     WriteInt("Controls", "SignalAutoCancelSteer",SignalAutoCancelSteer ? 1 : 0, ini);
 
     WriteInt("Debug",    "Overlay",          DebugOverlay     ? 1 : 0, ini);
@@ -506,6 +626,7 @@ void SaveConfig(HMODULE module) {
     WriteFloat("Engine", "StallClutchThreshold", StallClutchThreshold, ini);
     WriteFloat("Engine", "IdleTorqueFraction", IdleTorqueFraction, ini);
     WriteFloat("Engine", "LugStallRPM", LugStallRPM, ini);
+    WriteFloat("Engine", "StallCutoffRPM", StallCutoffRPM, ini);
     WriteFloat("Engine", "LugStallDelay", LugStallDelay, ini);
     WriteFloat("Engine", "WaterStallDelay", WaterStallDelay, ini);
     WriteFloat("Engine", "RolloverStallDelay", RolloverStallDelay, ini);
@@ -611,6 +732,7 @@ void SaveConfig(HMODULE module) {
     WriteFloat("Analog", "ThrottleExpo",     ThrottleExpo,    ini);
     WriteFloat("Analog", "BrakeExpo",        BrakeExpo,       ini);
     WriteFloat("Analog", "ClutchExpo",       ClutchExpo,      ini);
+    WriteInt("Analog", "Preset", PedalPreset, ini);
 
     WriteFloat("Steering", "Attack",      SteerAttack,      ini);
     WriteFloat("Steering", "Release",     SteerRelease,     ini);
@@ -619,6 +741,16 @@ void SaveConfig(HMODULE module) {
 
     WriteInt("Overlay", "Bars", OverlayBars ? 1 : 0, ini);
     WriteInt("Overlay", "GearHud", GearHudEnabled ? 1 : 0, ini);
+    WriteInt("Speedometer", "Enabled", SpeedometerEnabled ? 1 : 0, ini);
+    WriteInt("Speedometer", "CarStyle", SpeedometerCarStyle, ini);
+    WriteInt("Speedometer", "BikeStyle", SpeedometerBikeStyle, ini);
+    WriteInt("Speedometer", "Units", SpeedometerUnits, ini);
+    WriteInt("Speedometer", "Accent", SpeedometerAccent, ini);
+    WriteInt("Speedometer", "Detailed", SpeedometerDetailed ? 1 : 0, ini);
+    WriteFloat("Speedometer", "PosX", SpeedometerPosX, ini);
+    WriteFloat("Speedometer", "PosY", SpeedometerPosY, ini);
+    WriteFloat("Speedometer", "Scale", SpeedometerScale, ini);
+    WriteFloat("Speedometer", "Opacity", SpeedometerOpacity, ini);
     WriteFloat("Overlay", "PosX",      OverlayPosX,      ini);
     WriteFloat("Overlay", "PosY",      OverlayPosY,      ini);
     WriteFloat("Overlay", "BarWidth",  OverlayBarWidth,  ini);
@@ -629,6 +761,8 @@ void SaveConfig(HMODULE module) {
     WriteFloat("Overlay", "MenuPosX", MenuPosX, ini);
     WriteFloat("Overlay", "MenuPosY", MenuPosY, ini);
     WriteFloat("Overlay", "MenuScale", MenuScale, ini);
+    WriteInt("Workshop", "Enabled", WorkshopEnabled ? 1 : 0, ini);
+    WriteFloat("Workshop", "Radius", WorkshopRadius, ini);
 }
 
 } // namespace Config

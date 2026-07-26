@@ -304,6 +304,241 @@ void DrawSimulationOverlay(float fuel, float oilTemp, float oilLife,
     }
 }
 
+void DrawSpeedometer(const SpeedometerData &data) {
+    const SafeRect safe = GetSafeRect();
+    const float scale = std::clamp(Config::SpeedometerScale, 0.65f, 1.40f);
+    const int opacity = static_cast<int>(
+        std::clamp(Config::SpeedometerOpacity, 0.35f, 1.0f) * 255.0f);
+    int ar = 55, ag = 205, ab = 255;
+    switch (Config::SpeedometerAccent) {
+    case 1: ar = 255; ag = 70;  ab = 65;  break;
+    case 2: ar = 70;  ag = 235; ab = 120; break;
+    case 3: ar = 255; ag = 175; ab = 45;  break;
+    case 4: ar = 235; ag = 240; ab = 245; break;
+    default: break;
+    }
+
+    const int style = data.motorcycle ? Config::SpeedometerBikeStyle
+                                      : Config::SpeedometerCarStyle;
+    float width = (data.motorcycle ? 0.255f : 0.300f) * scale;
+    float height = (Config::SpeedometerDetailed ? 0.188f : 0.145f) * scale;
+    if ((!data.motorcycle && style == 2) ||
+        (data.motorcycle && style == 2))
+        width += 0.035f * scale;
+    const float x = std::clamp(
+        Config::SpeedometerPosX, safe.left + width * 0.5f,
+        safe.right - width * 0.5f);
+    const float y = std::clamp(
+        Config::SpeedometerPosY, safe.top + height * 0.5f,
+        safe.bottom - height * 0.5f);
+    const float left = x - width * 0.5f;
+    const float top = y - height * 0.5f;
+
+    GRAPHICS::DRAW_RECT(x + 0.003f * scale, y + 0.004f * scale,
+                        width + 0.006f * scale, height + 0.007f * scale,
+                        0, 0, 0, opacity / 2, 0);
+    GRAPHICS::DRAW_RECT(x, y, width, height,
+                        style == 1 ? 18 : 7,
+                        style == 1 ? 17 : 11,
+                        style == 1 ? 15 : 17,
+                        (std::min)(245, opacity), 0);
+    GRAPHICS::DRAW_RECT(x, top + 0.002f * scale, width,
+                        0.004f * scale, ar, ag, ab, opacity, 0);
+
+    const float rpm = std::clamp(data.normalizedRPM, 0.0f, 1.08f);
+    const int segments = data.motorcycle ? 18 : 16;
+    const float segmentGap = 0.0020f * scale;
+    const float segmentW =
+        (width - 0.026f * scale - segmentGap * (segments - 1)) /
+        static_cast<float>(segments);
+    const float tachLeft = left + 0.013f * scale;
+    const float tachY = top + 0.017f * scale;
+    for (int i = 0; i < segments; ++i) {
+        const float threshold =
+            static_cast<float>(i + 1) / static_cast<float>(segments);
+        const bool lit = rpm >= threshold - 0.001f;
+        const bool red = i >= segments - (data.motorcycle ? 4 : 3);
+        const int sr = lit ? (red ? 255 : ar) : 32;
+        const int sg = lit ? (red ? 55 : ag) : 37;
+        const int sb = lit ? (red ? 45 : ab) : 43;
+        GRAPHICS::DRAW_RECT(
+            tachLeft + i * (segmentW + segmentGap) + segmentW * 0.5f,
+            tachY, segmentW, 0.009f * scale, sr, sg, sb,
+            lit ? opacity : opacity / 2, 0);
+    }
+
+    const float shownSpeed =
+        Config::SpeedometerUnits == 1 ? data.speedKmH * 0.621371f
+                                      : data.speedKmH;
+    const char *unit = Config::SpeedometerUnits == 1 ? "MPH" : "KM/H";
+    char speedText[24]{};
+    sprintf_s(speedText, "%03d",
+              static_cast<int>(std::clamp(shownSpeed, 0.0f, 999.0f) + 0.5f));
+    char rpmText[32]{};
+    sprintf_s(rpmText, "%s %.1f",
+              data.electric ? "POWER" : "RPM x1000",
+              data.electric ? rpm * 100.0f
+                            : ((std::max)(0.0f, data.physicalRPM) / 1000.0f));
+    std::string gearText;
+    if (!data.engineOn && !data.engineStarting) {
+        gearText = data.electric ? "OFF" : "OFF";
+    } else if (data.engineStarting) {
+        gearText = "START";
+    } else if (data.transmissionMode == 1 && data.automaticSelector) {
+        const char selector = data.automaticSelector[0];
+        gearText = data.automaticSelector;
+        if ((selector == 'D' || selector == 'S') && data.gear > 0)
+            gearText += std::to_string(data.gear);
+    } else if (data.gear < 0) {
+        gearText = "R";
+    } else if (data.gear == 0) {
+        gearText = "N";
+    } else {
+        gearText = std::to_string(data.gear);
+    }
+
+    if (!data.motorcycle && style == 0) {
+        DrawTextOverlay("GT DRIVE", left + 0.013f * scale,
+                        top + 0.027f * scale, 0.25f * scale,
+                        130, 145, 160, opacity, 0, false, false);
+        DrawTextOverlay(speedText, left + 0.012f * scale,
+                        top + 0.043f * scale, 0.86f * scale,
+                        245, 248, 252, opacity, 2, true, false);
+        DrawTextOverlay(unit, left + 0.113f * scale,
+                        top + 0.084f * scale, 0.27f * scale,
+                        145, 160, 175, opacity, 0, false, false);
+        GRAPHICS::DRAW_RECT(left + width - 0.052f * scale,
+                            top + 0.071f * scale,
+                            0.074f * scale, 0.070f * scale,
+                            12, 19, 26, opacity, 0);
+        DrawTextOverlay(gearText.c_str(), left + width - 0.052f * scale,
+                        top + 0.045f * scale, 0.80f * scale,
+                        ar, ag, ab, opacity, 2, true, true);
+    } else if (!data.motorcycle && style == 1) {
+        DrawTextOverlay("CLASSIC", x, top + 0.028f * scale,
+                        0.25f * scale, ar, ag, ab, opacity, 0, false, true);
+        DrawTextOverlay(speedText, left + width * 0.31f,
+                        top + 0.050f * scale, 0.72f * scale,
+                        244, 232, 207, opacity, 2, true, true);
+        DrawTextOverlay(unit, left + width * 0.31f,
+                        top + 0.088f * scale, 0.24f * scale,
+                        175, 158, 132, opacity, 0, false, true);
+        DrawTextOverlay(gearText.c_str(), left + width * 0.73f,
+                        top + 0.047f * scale, 0.78f * scale,
+                        ar, ag, ab, opacity, 2, true, true);
+        DrawTextOverlay(rpmText, left + width * 0.73f,
+                        top + 0.090f * scale, 0.23f * scale,
+                        175, 158, 132, opacity, 0, false, true);
+    } else if (!data.motorcycle) {
+        DrawTextOverlay("TRACK", left + 0.014f * scale,
+                        top + 0.029f * scale, 0.26f * scale,
+                        ar, ag, ab, opacity, 0, false, false);
+        DrawTextOverlay(gearText.c_str(), x,
+                        top + 0.038f * scale, 1.08f * scale,
+                        ar, ag, ab, opacity, 2, true, true);
+        DrawTextOverlay(speedText, left + 0.016f * scale,
+                        top + 0.071f * scale, 0.55f * scale,
+                        245, 248, 252, opacity, 2, true, false);
+        DrawTextOverlay(unit, left + 0.019f * scale,
+                        top + 0.103f * scale, 0.23f * scale,
+                        145, 160, 175, opacity, 0, false, false);
+        DrawTextOverlay(rpmText, left + width - 0.083f * scale,
+                        top + 0.081f * scale, 0.27f * scale,
+                        205, 215, 225, opacity, 0, false, true);
+    } else if (style == 0) {
+        DrawTextOverlay("RACE DASH", left + 0.014f * scale,
+                        top + 0.029f * scale, 0.24f * scale,
+                        ar, ag, ab, opacity, 0, false, false);
+        DrawTextOverlay(gearText.c_str(), x,
+                        top + 0.037f * scale, 1.05f * scale,
+                        ar, ag, ab, opacity, 2, true, true);
+        DrawTextOverlay(speedText, left + 0.014f * scale,
+                        top + 0.074f * scale, 0.52f * scale,
+                        245, 248, 252, opacity, 2, true, false);
+        DrawTextOverlay(unit, left + 0.016f * scale,
+                        top + 0.104f * scale, 0.22f * scale,
+                        145, 160, 175, opacity, 0, false, false);
+    } else if (style == 1) {
+        DrawTextOverlay("NAKED", x, top + 0.028f * scale,
+                        0.24f * scale, ar, ag, ab, opacity, 0, false, true);
+        DrawTextOverlay(speedText, left + width * 0.35f,
+                        top + 0.053f * scale, 0.68f * scale,
+                        245, 248, 252, opacity, 2, true, true);
+        DrawTextOverlay(gearText.c_str(), left + width * 0.76f,
+                        top + 0.050f * scale, 0.75f * scale,
+                        ar, ag, ab, opacity, 2, true, true);
+        DrawTextOverlay(rpmText, x, top + 0.100f * scale,
+                        0.25f * scale, 165, 180, 195, opacity,
+                        0, false, true);
+    } else {
+        DrawTextOverlay("TOURING", left + 0.014f * scale,
+                        top + 0.029f * scale, 0.24f * scale,
+                        ar, ag, ab, opacity, 0, false, false);
+        DrawTextOverlay(speedText, left + width * 0.28f,
+                        top + 0.050f * scale, 0.75f * scale,
+                        245, 248, 252, opacity, 2, true, true);
+        DrawTextOverlay(unit, left + width * 0.28f,
+                        top + 0.090f * scale, 0.23f * scale,
+                        145, 160, 175, opacity, 0, false, true);
+        DrawTextOverlay(gearText.c_str(), left + width * 0.72f,
+                        top + 0.047f * scale, 0.82f * scale,
+                        ar, ag, ab, opacity, 2, true, true);
+    }
+
+    if (!Config::SpeedometerDetailed)
+        return;
+
+    const float detailTop = top + 0.122f * scale;
+    GRAPHICS::DRAW_RECT(x, detailTop - 0.004f * scale, width,
+                        0.002f * scale, 45, 53, 62, opacity, 0);
+    char lineOne[128]{};
+    sprintf_s(lineOne, "FUEL %02d%%   OIL %02d%%/%02d%%   ENG %02d%%",
+              static_cast<int>(std::clamp(data.fuel, 0.0f, 1.0f) * 100.0f),
+              static_cast<int>(
+                  std::clamp(data.oilTemperature, 0.0f, 1.0f) * 100.0f),
+              static_cast<int>(
+                  std::clamp(data.oilLife, 0.0f, 1.0f) * 100.0f),
+              static_cast<int>(
+                  std::clamp(data.engineHealth, 0.0f, 1.0f) * 100.0f));
+    DrawTextOverlay(lineOne, left + 0.012f * scale, detailTop,
+                    0.225f * scale, 185, 198, 210, opacity,
+                    0, false, false);
+
+    char lineTwo[144]{};
+    sprintf_s(lineTwo, "GBX %02d%%   CLT %02d%%   BOOST %.1f   %.1f KM",
+              static_cast<int>(
+                  std::clamp(data.gearboxHealth, 0.0f, 1.0f) * 100.0f),
+              static_cast<int>(
+                  std::clamp(data.clutchHeat, 0.0f, 1.0f) * 100.0f),
+              (std::max)(0.0f, data.boost),
+              (std::max)(0.0f, data.odometerKm));
+    DrawTextOverlay(lineTwo, left + 0.012f * scale,
+                    detailTop + 0.023f * scale, 0.225f * scale,
+                    150, 166, 180, opacity, 0, false, false);
+
+    std::string lamps;
+    if (data.tcsActive) lamps += "~y~TCS ";
+    if (data.absActive) lamps += "~y~ABS ";
+    if (data.launchControl) lamps += "~b~LC ";
+    if (data.parkingBrake) lamps += "~o~PARK ";
+    if (data.burnout) lamps += "~r~BURNOUT ";
+    if (data.oilLife < 0.18f) lamps += "~r~SERVICE OIL ";
+    if (data.gearboxHealth < 0.35f) lamps += "~r~GEARBOX ";
+    if (lamps.empty()) lamps = "~g~SYSTEM OK";
+    char pedalLine[48]{};
+    sprintf_s(pedalLine, "THR %02d%%  BRK %02d%%",
+              static_cast<int>(
+                  std::clamp(data.throttle, 0.0f, 1.0f) * 100.0f),
+              static_cast<int>(
+                  std::clamp(data.brake, 0.0f, 1.0f) * 100.0f));
+    DrawTextOverlay(pedalLine, left + 0.012f * scale,
+                    detailTop + 0.044f * scale, 0.225f * scale,
+                    145, 160, 175, opacity, 0, false, false);
+    DrawTextOverlay(lamps.c_str(), left + width - 0.070f * scale,
+                    detailTop + 0.044f * scale, 0.225f * scale,
+                    235, 240, 245, opacity, 0, true, true);
+}
+
 void DrawInteractionPanel(const char *title, const char *detail,
                           float progress) {
     const SafeRect safe = GetSafeRect();

@@ -76,6 +76,7 @@ void Menu::Initialize() {
   main.items.push_back(MenuItem("Automatic D / S", MenuItem::Submenu, 9));
   main.items.push_back(MenuItem("Audio", MenuItem::Submenu, 10));
   main.items.push_back(MenuItem("Fuel / Maintenance", MenuItem::Submenu, 11));
+  main.items.push_back(MenuItem("Speedometer Studio", MenuItem::Submenu, 12));
   menus.push_back(main);
 
   // 1: Main Settings
@@ -97,6 +98,11 @@ void Menu::Initialize() {
   // 2: Analog Tuning
   Submenu analog;
   analog.title = "PEDAL / KEYBOARD";
+  analog.items.push_back(MenuItem(
+      "Pedal Preset", MenuItem::IntChoice, &Config::PedalPreset,
+      0, 4, {"DEFAULT", "RESPONSIVE", "SMOOTH", "SIM RACING", "CUSTOM"}));
+  analog.items.push_back(
+      MenuItem("Reset Pedals to Default", MenuItem::Action, 1));
   analog.items.push_back(MenuItem("Throttle Attack", MenuItem::Float,
                                   &Config::ThrottleAttack,
                                   0.01f, 0.01f, 1.50f));
@@ -190,6 +196,8 @@ void Menu::Initialize() {
   keys.items.push_back(
       MenuItem("Oil Service (hold)", MenuItem::KeyBind,
                &Config::KeyOilService));
+  keys.items.push_back(
+      MenuItem("LSC Workshop", MenuItem::KeyBind, &Config::KeyWorkshop));
   menus.push_back(keys);
 
   Submenu engine;
@@ -213,6 +221,9 @@ void Menu::Initialize() {
   engine.items.push_back(MenuItem("Lug Stall RPM", MenuItem::Float,
                                   &Config::LugStallRPM,
                                   50.0f, 800.0f, 2500.0f));
+  engine.items.push_back(MenuItem("Actual Stall Cutoff", MenuItem::Float,
+                                  &Config::StallCutoffRPM,
+                                  25.0f, 450.0f, 1800.0f));
   engine.items.push_back(MenuItem("Lug Stall Delay", MenuItem::Float,
                                   &Config::LugStallDelay,
                                   0.10f, 0.40f, 8.00f));
@@ -443,7 +454,47 @@ void Menu::Initialize() {
   maintenance.items.push_back(MenuItem(
       "Oil Wear", MenuItem::Float, &Config::OilWearMultiplier,
       0.10f, 0.00f, 5.00f));
+  maintenance.items.push_back(
+      MenuItem("LS Customs Service Bays", MenuItem::Bool,
+               &Config::WorkshopEnabled));
+  maintenance.items.push_back(MenuItem(
+      "Workshop Radius", MenuItem::Float, &Config::WorkshopRadius,
+      1.0f, 6.0f, 30.0f));
   menus.push_back(maintenance);
+
+  Submenu speedometer;
+  speedometer.title = "SPEEDOMETER STUDIO";
+  speedometer.items.push_back(
+      MenuItem("Custom Speedometer", MenuItem::Bool,
+               &Config::SpeedometerEnabled));
+  speedometer.items.push_back(MenuItem(
+      "Car Layout", MenuItem::IntChoice, &Config::SpeedometerCarStyle,
+      0, 2, {"GT DIGITAL", "CLASSIC", "TRACK"}));
+  speedometer.items.push_back(MenuItem(
+      "Bike Layout", MenuItem::IntChoice, &Config::SpeedometerBikeStyle,
+      0, 2, {"RACE DASH", "NAKED", "TOURING"}));
+  speedometer.items.push_back(MenuItem(
+      "Units", MenuItem::IntChoice, &Config::SpeedometerUnits,
+      0, 1, {"KM/H", "MPH"}));
+  speedometer.items.push_back(MenuItem(
+      "Accent", MenuItem::IntChoice, &Config::SpeedometerAccent,
+      0, 4, {"CYAN", "RED", "GREEN", "AMBER", "WHITE"}));
+  speedometer.items.push_back(
+      MenuItem("Detailed Telemetry", MenuItem::Bool,
+               &Config::SpeedometerDetailed));
+  speedometer.items.push_back(MenuItem(
+      "Position X", MenuItem::Float, &Config::SpeedometerPosX,
+      0.005f, 0.12f, 0.92f));
+  speedometer.items.push_back(MenuItem(
+      "Position Y", MenuItem::Float, &Config::SpeedometerPosY,
+      0.005f, 0.20f, 0.92f));
+  speedometer.items.push_back(MenuItem(
+      "Scale", MenuItem::Float, &Config::SpeedometerScale,
+      0.05f, 0.65f, 1.40f));
+  speedometer.items.push_back(MenuItem(
+      "Opacity", MenuItem::Float, &Config::SpeedometerOpacity,
+      0.05f, 0.35f, 1.00f));
+  menus.push_back(speedometer);
 
   menuStack.push_back(0); // Push Main Menu
 }
@@ -577,21 +628,45 @@ void Menu::Update() {
       menuStack.push_back(selectedItem.targetSubmenu);
     } else if (selectedItem.type == MenuItem::KeyBind) {
       waitingForKeyBind = true;
+    } else if (selectedItem.type == MenuItem::Action) {
+      if (selectedItem.actionId == 1) {
+        Config::ResetPedalsToDefault();
+        Config::SaveConfig(g_pluginModule);
+        HUD::BEGIN_TEXT_COMMAND_THEFEED_POST("STRING");
+        HUD::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME(
+            "~b~Pedal map~w~ reset ke default");
+        HUD::END_TEXT_COMMAND_THEFEED_POST_TICKER(false, false);
+      }
     }
   }
 
   if (selectedItem.type == MenuItem::Float && selectedItem.floatVal) {
+    bool adjusted = false;
     if (PAD::IS_DISABLED_CONTROL_PRESSED(0, 174) ||
         PAD::IS_DISABLED_CONTROL_JUST_PRESSED(0, 174)) { // LEFT
       *selectedItem.floatVal -= selectedItem.floatStep;
       if (*selectedItem.floatVal < selectedItem.floatMin)
         *selectedItem.floatVal = selectedItem.floatMin;
+      adjusted = true;
     }
     if (PAD::IS_DISABLED_CONTROL_PRESSED(0, 175) ||
         PAD::IS_DISABLED_CONTROL_JUST_PRESSED(0, 175)) { // RIGHT
       *selectedItem.floatVal += selectedItem.floatStep;
       if (*selectedItem.floatVal > selectedItem.floatMax)
         *selectedItem.floatVal = selectedItem.floatMax;
+      adjusted = true;
+    }
+    if (adjusted &&
+        (selectedItem.floatVal == &Config::ThrottleAttack ||
+         selectedItem.floatVal == &Config::ThrottleRelease ||
+         selectedItem.floatVal == &Config::ThrottleExpo ||
+         selectedItem.floatVal == &Config::BrakeAttack ||
+         selectedItem.floatVal == &Config::BrakeRelease ||
+         selectedItem.floatVal == &Config::BrakeExpo ||
+         selectedItem.floatVal == &Config::ClutchAttack ||
+         selectedItem.floatVal == &Config::ClutchRelease ||
+         selectedItem.floatVal == &Config::ClutchExpo)) {
+      Config::PedalPreset = 4;
     }
   }
 
@@ -599,11 +674,15 @@ void Menu::Update() {
     if (PAD::IS_DISABLED_CONTROL_JUST_PRESSED(0, 174)) {
       *selectedItem.keyVal =
           (std::max)(selectedItem.intMin, *selectedItem.keyVal - 1);
+      if (selectedItem.keyVal == &Config::PedalPreset)
+        Config::ApplyPedalPreset(*selectedItem.keyVal);
       Config::SaveConfig(g_pluginModule);
     }
     if (PAD::IS_DISABLED_CONTROL_JUST_PRESSED(0, 175)) {
       *selectedItem.keyVal =
           (std::min)(selectedItem.intMax, *selectedItem.keyVal + 1);
+      if (selectedItem.keyVal == &Config::PedalPreset)
+        Config::ApplyPedalPreset(*selectedItem.keyVal);
       Config::SaveConfig(g_pluginModule);
     }
   }
@@ -680,8 +759,14 @@ void Menu::Draw() {
 
     // Draw Value
     char valBuf[64]{};
+    int valueR = textR;
+    int valueG = textG;
+    int valueB = textB;
     if (item.type == MenuItem::Bool && item.boolVal) {
       sprintf_s(valBuf, "%s", *item.boolVal ? "ON" : "OFF");
+      valueR = *item.boolVal ? 75 : 255;
+      valueG = *item.boolVal ? 235 : 95;
+      valueB = *item.boolVal ? 125 : 90;
     } else if (item.type == MenuItem::Float && item.floatVal) {
       sprintf_s(valBuf, "< %.2f >", *item.floatVal);
     } else if (item.type == MenuItem::IntChoice && item.keyVal) {
@@ -694,6 +779,11 @@ void Menu::Draw() {
       }
     } else if (item.type == MenuItem::Submenu) {
       sprintf_s(valBuf, ">>>");
+    } else if (item.type == MenuItem::Action) {
+      sprintf_s(valBuf, "[ APPLY ]");
+      valueR = 75;
+      valueG = 210;
+      valueB = 255;
     } else if (item.type == MenuItem::KeyBind && item.keyVal) {
       if (waitingForKeyBind && isSelected) {
         sprintf_s(valBuf, "[PRESS KEY]");
@@ -705,7 +795,7 @@ void Menu::Draw() {
     if (valBuf[0] != '\0') {
       DrawTextStr(valBuf, menuX + menuWidth - 0.058f * menuScale,
                   currentY + 0.006f * menuScale, 0.33f * menuScale,
-                  textR, textG, textB, 255, true);
+                  valueR, valueG, valueB, 255, true);
     }
 
     currentY += itemHeight;

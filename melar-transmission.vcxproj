@@ -31,6 +31,7 @@
       <ClCompile Include="src\Vehicle\VehicleData.cpp" />
       <ClCompile Include="src\Vehicle\VehicleProfile.cpp" />
       <ClCompile Include="src\Vehicle\VehicleUpgrades.cpp" />
+    <ClCompile Include="src\Vehicle\DrivetrainKinematics.cpp" />
     <ClCompile Include="src\Vehicle\Engine\EngineModel.cpp" />
     <ClCompile Include="src\Vehicle\Engine\FuelSystem.cpp" />
     <ClCompile Include="src\Vehicle\Engine\LaunchControl.cpp" />
@@ -47,6 +48,7 @@
     <ClCompile Include="src\Vehicle\Maintenance\RefuelInteraction.cpp" />
     <ClCompile Include="src\Vehicle\Maintenance\MaintenanceSystem.cpp" />
     <ClCompile Include="src\Vehicle\Maintenance\ServiceInteraction.cpp" />
+    <ClCompile Include="src\Vehicle\Maintenance\WorkshopIntegration.cpp" />
     <ClCompile Include="src\Vehicle\TelemetryLogger.cpp" />
     <ClCompile Include="src\Core\Config.cpp" />
     <ClCompile Include="src\Core\Menu.cpp" />
@@ -69,6 +71,7 @@
       <ClInclude Include="src\Vehicle\VehicleData.h" />
       <ClInclude Include="src\Vehicle\VehicleProfile.h" />
       <ClInclude Include="src\Vehicle\VehicleUpgrades.h" />
+    <ClInclude Include="src\Vehicle\DrivetrainKinematics.h" />
     <ClInclude Include="src\Vehicle\Engine\EngineModel.h" />
     <ClInclude Include="src\Vehicle\Engine\FuelSystem.h" />
     <ClInclude Include="src\Vehicle\Engine\LaunchControl.h" />
@@ -85,6 +88,7 @@
     <ClInclude Include="src\Vehicle\Maintenance\RefuelInteraction.h" />
     <ClInclude Include="src\Vehicle\Maintenance\MaintenanceSystem.h" />
     <ClInclude Include="src\Vehicle\Maintenance\ServiceInteraction.h" />
+    <ClInclude Include="src\Vehicle\Maintenance\WorkshopIntegration.h" />
     <ClInclude Include="src\Vehicle\TelemetryLogger.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

@@ -16,6 +16,20 @@ void Reset() {
   s_state = State{};
 }
 
+void ServiceGearbox() {
+  s_state.health = 1.0f;
+  s_state.overRev = 0.0f;
+  s_state.syncError = 0.0f;
+  s_state.clashSeverity = 0.0f;
+  s_state.shockRemaining = 0.0f;
+  s_state.torqueCut = 0.0f;
+  s_state.selectedSynchroWear = 0.0f;
+  s_state.synchroWear.fill(0.0f);
+  s_state.shiftRejected = false;
+  s_state.moneyShift = false;
+  s_state.stallRequest = false;
+}
+
 void Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
             float clutchDisengagement, float throttle, bool engineOn) {
   const float dt = std::clamp(MISC::GET_FRAME_TIME(), 0.001f, 0.05f);

@@ -23,6 +23,16 @@ void Reset() {
   s_state = State{};
 }
 
+void ServiceClutch() {
+  s_state.heat = 0.0f;
+  s_state.overloadSlip = 0.0f;
+  s_state.dumpSeverity = 0.0f;
+  s_state.dumpRemaining = 0.0f;
+  s_state.judder = 0.0f;
+  s_state.slipping = false;
+  s_state.overloaded = false;
+}
+
 float UpdatePedal(float rawPedal, float throttle, float rpm, int gear,
                   int maxGear, bool engineOn) {
   const float freePlayEnd =
