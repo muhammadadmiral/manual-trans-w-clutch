@@ -66,6 +66,7 @@ void Menu::Initialize() {
   Submenu main;
   main.title = "MANUAL TRANS";
   main.items.push_back(MenuItem("Main Settings", MenuItem::Submenu, 1));
+  main.items.push_back(MenuItem("Pedal / Keyboard", MenuItem::Submenu, 2));
   main.items.push_back(MenuItem("Controls / Keybinds", MenuItem::Submenu, 4));
   main.items.push_back(MenuItem("HUD Settings", MenuItem::Submenu, 3));
   main.items.push_back(MenuItem("Engine / Stall", MenuItem::Submenu, 5));
@@ -93,11 +94,32 @@ void Menu::Initialize() {
 
   // 2: Analog Tuning
   Submenu analog;
-  analog.title = "ANALOG TUNING";
+  analog.title = "PEDAL / KEYBOARD";
+  analog.items.push_back(MenuItem("Throttle Attack", MenuItem::Float,
+                                  &Config::ThrottleAttack,
+                                  0.01f, 0.01f, 1.50f));
+  analog.items.push_back(MenuItem("Throttle Release", MenuItem::Float,
+                                  &Config::ThrottleRelease,
+                                  0.01f, 0.01f, 1.50f));
+  analog.items.push_back(MenuItem("Throttle Curve", MenuItem::Float,
+                                  &Config::ThrottleExpo,
+                                  0.01f, 0.00f, 1.00f));
+  analog.items.push_back(MenuItem("Brake Attack", MenuItem::Float,
+                                  &Config::BrakeAttack,
+                                  0.01f, 0.01f, 1.50f));
+  analog.items.push_back(MenuItem("Brake Release", MenuItem::Float,
+                                  &Config::BrakeRelease,
+                                  0.01f, 0.01f, 1.50f));
+  analog.items.push_back(MenuItem("Brake Curve", MenuItem::Float,
+                                  &Config::BrakeExpo,
+                                  0.01f, 0.00f, 1.00f));
   analog.items.push_back(MenuItem("Clutch Attack", MenuItem::Float,
                                   &Config::ClutchAttack, 0.01f, 0.01f, 1.0f));
   analog.items.push_back(MenuItem("Clutch Release", MenuItem::Float,
                                   &Config::ClutchRelease, 0.01f, 0.01f, 1.0f));
+  analog.items.push_back(MenuItem("Clutch Curve", MenuItem::Float,
+                                  &Config::ClutchExpo,
+                                  0.01f, 0.00f, 1.00f));
   menus.push_back(analog);
 
   // 3: HUD Settings
@@ -137,6 +159,8 @@ void Menu::Initialize() {
       MenuItem("Turn Signal Left", MenuItem::KeyBind, &Config::KeySignalLeft));
   keys.items.push_back(MenuItem("Turn Signal Right", MenuItem::KeyBind,
                                 &Config::KeySignalRight));
+  keys.items.push_back(MenuItem("Hazard Lights", MenuItem::KeyBind,
+                                &Config::KeySignalHazard));
   keys.items.push_back(MenuItem("Parking Brake", MenuItem::KeyBind,
                                 &Config::KeyParkingBrake));
   menus.push_back(keys);
@@ -529,32 +553,55 @@ void Menu::Draw() {
 
   Submenu &current = GetCurrentMenu();
 
-  const float menuX = 0.75f;
-  const float menuY = 0.2f;
-  const float menuWidth = 0.2f;
-  const float itemHeight = 0.035f;
-  const float headerHeight = 0.08f;
+  constexpr int maxVisibleItems = 12;
+  const int itemCount = static_cast<int>(current.items.size());
+  const int visibleCount = (std::min)(itemCount, maxVisibleItems);
+  const int firstVisible =
+      std::clamp(current.selectedIndex - maxVisibleItems / 2, 0,
+                 (std::max)(0, itemCount - maxVisibleItems));
 
-  // Header
-  DrawRect(menuX, menuY, menuWidth, headerHeight, 200, 50, 50, 255);
-  DrawTextStr(current.title, menuX + menuWidth / 2, menuY + 0.02f, 0.6f, 255,
-              255, 255, 255, true);
+  const float menuX = 0.695f;
+  const float menuY = 0.105f;
+  const float menuWidth = 0.275f;
+  const float itemHeight = 0.036f;
+  const float headerHeight = 0.074f;
+  const float footerHeight = 0.038f;
+  const float panelHeight =
+      headerHeight + itemHeight * visibleCount + footerHeight;
+
+  DrawRect(menuX - 0.004f, menuY - 0.004f,
+           menuWidth + 0.008f, panelHeight + 0.008f,
+           0, 0, 0, 145);
+  DrawRect(menuX, menuY, menuWidth, panelHeight, 9, 13, 19, 238);
+  DrawRect(menuX, menuY, menuWidth, headerHeight, 13, 24, 36, 255);
+  DrawRect(menuX, menuY + headerHeight - 0.004f,
+           menuWidth, 0.004f, 55, 205, 255, 255);
+  DrawTextStr(current.title, menuX + 0.014f, menuY + 0.018f,
+              0.52f, 238, 246, 255, 255);
+  DrawTextStr("DRIVETRAIN CONTROL",
+              menuX + menuWidth - 0.075f, menuY + 0.024f,
+              0.25f, 95, 175, 205, 230, true);
 
   float currentY = menuY + headerHeight;
 
-  for (size_t i = 0; i < current.items.size(); ++i) {
+  for (int row = 0; row < visibleCount; ++row) {
+    const int i = firstVisible + row;
     MenuItem &item = current.items[i];
-    bool isSelected = (static_cast<int>(i) == current.selectedIndex);
+    bool isSelected = i == current.selectedIndex;
 
-    int bgR = isSelected ? 255 : 20;
-    int bgG = isSelected ? 255 : 20;
-    int bgB = isSelected ? 255 : 20;
-    int textR = isSelected ? 0 : 255;
-    int textG = isSelected ? 0 : 255;
-    int textB = isSelected ? 0 : 255;
+    int bgR = isSelected ? 24 : 13;
+    int bgG = isSelected ? 74 : 18;
+    int bgB = isSelected ? 98 : 25;
+    int textR = isSelected ? 255 : 215;
+    int textG = isSelected ? 255 : 225;
+    int textB = isSelected ? 255 : 235;
 
-    DrawRect(menuX, currentY, menuWidth, itemHeight, bgR, bgG, bgB, 200);
-    DrawTextStr(item.name, menuX + 0.005f, currentY + 0.005f, 0.35f, textR,
+    DrawRect(menuX, currentY, menuWidth, itemHeight,
+             bgR, bgG, bgB, isSelected ? 245 : 225);
+    if (isSelected)
+      DrawRect(menuX, currentY, 0.004f, itemHeight,
+               55, 205, 255, 255);
+    DrawTextStr(item.name, menuX + 0.012f, currentY + 0.006f, 0.34f, textR,
                 textG, textB, 255);
 
     // Draw Value
@@ -582,10 +629,21 @@ void Menu::Draw() {
     }
 
     if (valBuf[0] != '\0') {
-      DrawTextStr(valBuf, menuX + menuWidth - 0.05f, currentY + 0.005f, 0.35f,
+      DrawTextStr(valBuf, menuX + menuWidth - 0.058f,
+                  currentY + 0.006f, 0.33f,
                   textR, textG, textB, 255, true);
     }
 
     currentY += itemHeight;
   }
+
+  DrawRect(menuX, currentY, menuWidth, footerHeight,
+           11, 19, 28, 255);
+  char pageBuf[48]{};
+  sprintf_s(pageBuf, "%d / %d", current.selectedIndex + 1, itemCount);
+  DrawTextStr(pageBuf, menuX + 0.012f, currentY + 0.009f,
+              0.27f, 105, 195, 225, 235);
+  DrawTextStr("ARROWS adjust   ENTER select   BACK close",
+              menuX + menuWidth - 0.115f, currentY + 0.009f,
+              0.24f, 150, 165, 180, 225, true);
 }

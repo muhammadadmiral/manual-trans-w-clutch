@@ -99,6 +99,67 @@ void Reset() {
   s_state = State{};
 }
 
+float PrepareIdleDrive(Vehicle vehicle, VehicleData &data, int gear,
+                       int maxGear, float engagement, float throttle,
+                       float brake, float speedMps, bool engineOn,
+                       bool automaticMode, bool gentleClutchRelease) {
+  s_state.creepThrottle = 0.0f;
+  s_state.hillRollback = false;
+  if (!Config::IdleCreep || !engineOn || std::abs(gear) != 1 ||
+      throttle >= 0.02f || engagement <= 0.08f)
+    return 0.0f;
+
+  const uint8_t ratioIndex =
+      gear < 0 ? 0 : static_cast<uint8_t>(gear);
+  const float ratio = std::fabs(data.GetGearRatio(ratioIndex));
+  const float flatVelocity = ResolveFlatVelocity(vehicle, data, maxGear);
+  if (!std::isfinite(ratio) || ratio <= 0.01f ||
+      !std::isfinite(flatVelocity) || flatVelocity <= 1.0f)
+    return 0.0f;
+
+  const float idleRoadSpeed =
+      s_state.idleRPM * flatVelocity / ratio;
+  const float directionalSpeed = gear < 0 ? -speedMps : speedMps;
+  const float speedGap =
+      idleRoadSpeed > 0.01f
+          ? Clamp01((idleRoadSpeed -
+                     std::max(0.0f, directionalSpeed)) /
+                    idleRoadSpeed)
+          : 0.0f;
+  if (speedGap <= 0.01f)
+    return 0.0f;
+
+  const float pitchLoad =
+      Clamp01(std::max(0.0f, ENTITY::GET_ENTITY_PITCH(vehicle)) / 18.0f);
+  const float idleHoldCapacity =
+      Clamp01(Config::IdleTorqueFraction) * engagement * 1.65f;
+  s_state.hillRollback =
+      brake < 0.05f && pitchLoad > idleHoldCapacity;
+  if (s_state.hillRollback)
+    return 0.0f;
+
+  const float base = Clamp01(Config::IdleCreepThrottle);
+  if (automaticMode) {
+    const float brakeRelease =
+        1.0f - SmoothStep(Clamp01(brake / 0.25f));
+    const float converterTransfer =
+        0.55f + Clamp01(engagement) * 0.45f;
+    s_state.creepThrottle =
+        base * speedGap * brakeRelease * converterTransfer;
+  } else if (gentleClutchRelease) {
+    const float biteTransfer =
+        SmoothStep((Clamp01(engagement) - 0.12f) / 0.78f);
+    const float idleGovernor =
+        0.08f * biteTransfer * speedGap;
+    s_state.creepThrottle =
+        (base + idleGovernor) * speedGap * biteTransfer;
+  }
+
+  s_state.creepThrottle =
+      std::clamp(s_state.creepThrottle, 0.0f, 0.32f);
+  return s_state.creepThrottle;
+}
+
 static bool UpdateEnvironment(Vehicle vehicle, bool engineOn, float dt) {
   const Hash model = ENTITY::GET_ENTITY_MODEL(vehicle);
   const bool electric = VEHICLE::_GET_IS_VEHICLE_ELECTRIC(model) != FALSE;
@@ -218,26 +279,8 @@ static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
   s_state.torqueCurve =
       ResolveTorqueCurve(s_state.estimatedEngineRPM, rpmRange);
 
-  s_state.creepThrottle = 0.0f;
   const float pitchLoad =
       Clamp01(std::max(0.0f, ENTITY::GET_ENTITY_PITCH(vehicle)) / 18.0f);
-  const float idleHoldCapacity =
-      Clamp01(Config::IdleTorqueFraction) * engagement *
-      (std::abs(gear) == 1 ? 1.65f : 0.75f);
-  s_state.hillRollback =
-      std::abs(gear) == 1 && brake < 0.05f &&
-      pitchLoad > idleHoldCapacity + Clamp01(throttle) * 0.45f;
-  if (Config::IdleCreep && std::abs(gear) == 1 && throttle < 0.02f &&
-      brake < 0.05f &&
-      engagement > 0.50f && speedGap > 0.01f &&
-      !s_state.hillRollback) {
-    s_state.creepThrottle =
-        Clamp01(Config::IdleCreepThrottle) * speedGap * engagement;
-    const int driveControl = gear < 0 ? 72 : 71;
-    PAD::DISABLE_CONTROL_ACTION(0, driveControl, true);
-    PAD::SET_CONTROL_VALUE_NEXT_FRAME(
-        0, driveControl, s_state.creepThrottle);
-  }
 
   const float firstRatio = std::fabs(data.GetGearRatio(1));
   const float gearLeverage =
@@ -416,8 +459,11 @@ static void UpdateDriveTorque(int gear, int maxGear, float engagement,
 
   // RPM boleh mentok limiter, tapi gaya roda wajib habis setelah rasio gigi
   // mencapai redline. Ini yang mencegah gigi 1 narik tanpa batas.
-  const float limiter =
+  const float ratioLimiter =
       SmoothStep((s_state.wheelRPM - 1.0f) / 0.08f);
+  const float engineLimiter =
+      SmoothStep((s_state.controlledRPM - 0.965f) / 0.035f);
+  const float limiter = ratioLimiter * engineLimiter;
   output *= 1.0f - limiter;
   s_state.redlineCut = limiter >= 0.98f;
   s_state.driveTorqueFactor = std::clamp(output, 0.0f, 4.50f);

@@ -556,6 +556,8 @@ void ScriptMain() {
         vehicleProfile == VehicleProfile::Drivetrain::Electric;
     const bool scooterVehicle =
         vehicleProfile == VehicleProfile::Drivetrain::ScooterCVT;
+    const bool utilitySingleSpeed =
+        vehicleProfile == VehicleProfile::Drivetrain::UtilitySingleSpeed;
     const int transmissionMode =
         VehicleProfile::ForcesAutomatic(vehicleProfile) ? 1 : requestedMode;
     const bool nativePatchReady =
@@ -593,6 +595,9 @@ void ScriptMain() {
       } else if (scooterVehicle && requestedMode != 1) {
         Renderer::ShowNotification(
             "~y~Scooter CVT:~w~ gas/rem only, clutch dan manual nonaktif");
+      } else if (utilitySingleSpeed && requestedMode != 1) {
+        Renderer::ShowNotification(
+            "~y~Utility drive:~w~ single-speed automatic aktif");
       } else {
         Renderer::ShowNotification(
             transmissionMode == 0
@@ -747,15 +752,25 @@ void ScriptMain() {
                        1.0f - std::clamp(Config::AutomaticSTorqueBoost,
                                          0.0f, 0.50f))
             : tcsThrottle;
-    InputHandler::ApplyGameControls(vehicle, manualGear, simulatedClutch,
-                                    driveThrottle, absBrake, maxGear,
-                                    forwardSpeed);
-    if (traceFrame)
-      LOG_INFO(Script, "TRACE r18 stage=controls-applied");
-
     const float clutchEngagement =
         automaticMode ? AutomaticGearbox::GetCoupling()
                       : ClutchSystem::GetEngagement();
+    const bool gentleClutchRelease =
+        automaticMode || !ClutchSystem::IsDumpActive();
+    const float idleDrive =
+        parkingBrakeOn
+            ? 0.0f
+            : EngineModel::PrepareIdleDrive(
+                  vehicle, data, manualGear, maxGear, clutchEngagement,
+                  driveThrottle, absBrake, forwardSpeed, isEngineOn,
+                  automaticMode, gentleClutchRelease);
+    const float controlThrottle =
+        std::max(driveThrottle, idleDrive);
+    InputHandler::ApplyGameControls(vehicle, manualGear, simulatedClutch,
+                                    controlThrottle, absBrake, maxGear,
+                                    forwardSpeed);
+    if (traceFrame)
+      LOG_INFO(Script, "TRACE r18 stage=controls-applied");
 
     if (automaticMode) {
       AutomaticGearbox::ApplyToMemory(vehicle, data, manualGear,
@@ -868,6 +883,13 @@ void ScriptMain() {
                engineState.estimatedRedlineRPM, engineState.load,
                engineState.torqueReserve, engineState.lugSeverity,
                engineState.stallProgress, engineState.lowRpmRecovery);
+      LOG_INFO(Physics,
+               "IDLE_DRIVE: Creep=%.3f HillRollback=%d Power=%.3f "
+               "Profile=%s",
+               engineState.creepThrottle,
+               engineState.hillRollback ? 1 : 0,
+               engineState.driveTorqueFactor,
+               VehicleProfile::GetName(vehicleProfile));
       LOG_INFO(Physics,
                "CLUTCH_GEARBOX: Engage=%.3f Demand=%.3f Cap=%.3f "
                "OSlip=%.3f Heat=%.3f Judder=%.3f Clash=%.3f Shock=%.3f "

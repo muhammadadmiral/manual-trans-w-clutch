@@ -45,7 +45,7 @@ float UpdatePedal(float rawPedal, float throttle, float rpm, int gear,
   const float dumpRate = std::max(1.0f, Config::ClutchDumpRate);
   const float freshDump =
       Clamp01((s_state.releaseRate - dumpRate) / dumpRate) *
-      Clamp01(throttle) * engagement;
+      (0.35f + Clamp01(throttle) * 0.65f) * engagement;
   if (engineOn && freshDump > 0.05f) {
     s_state.dumpSeverity =
         std::max(s_state.dumpSeverity, freshDump);

@@ -20,6 +20,12 @@ static float Follow(float current, float target, float attack, float release,
   return current + (target - current) * Clamp01(alpha);
 }
 
+static float ApplyExpo(float value, float expo) {
+  value = Clamp01(value);
+  expo = Clamp01(expo);
+  return value * (1.0f - expo) + value * value * value * expo;
+}
+
 void Reset() { s_state = State{}; }
 
 void Update(float rawThrottle, float rawBrake, float clutchDisengagement,
@@ -41,11 +47,21 @@ void Update(float rawThrottle, float rawBrake, float clutchDisengagement,
                std::clamp(Config::AutomaticBrakeRelease, 0.01f, 1.50f),
                dt);
   } else {
-    s_state.actuatorThrottle = throttleTarget;
-    s_state.actuatorBrake = brakeTarget;
+    s_state.actuatorThrottle =
+        Follow(s_state.actuatorThrottle, throttleTarget,
+               std::clamp(Config::ThrottleAttack, 0.01f, 1.50f),
+               std::clamp(Config::ThrottleRelease, 0.01f, 1.50f),
+               dt);
+    s_state.actuatorBrake =
+        Follow(s_state.actuatorBrake, brakeTarget,
+               std::clamp(Config::BrakeAttack, 0.01f, 1.50f),
+               std::clamp(Config::BrakeRelease, 0.01f, 1.50f),
+               dt);
   }
-  s_state.throttle = Clamp01(s_state.actuatorThrottle);
-  s_state.brake = Clamp01(s_state.actuatorBrake);
+  s_state.throttle =
+      ApplyExpo(s_state.actuatorThrottle, Config::ThrottleExpo);
+  s_state.brake =
+      ApplyExpo(s_state.actuatorBrake, Config::BrakeExpo);
   s_state.heelToeWindow =
       !automaticMode && clutchDisengagement > 0.35f && gear != 0;
 

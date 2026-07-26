@@ -49,6 +49,13 @@ struct State {
 
 void Reset();
 
+// Hitung torsi idle yang perlu dikirim ke control axis sebelum native GTA
+// memproses frame. Nilai pedal pemain tetap terpisah dari creep ini.
+float PrepareIdleDrive(Vehicle vehicle, VehicleData &data, int gear,
+                       int maxGear, float clutchEngagement, float throttle,
+                       float brake, float speedMps, bool engineOn,
+                       bool automaticMode, bool gentleClutchRelease);
+
 // Return true kalau beban drivetrain sukses bikin mesin mati.
 bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
             float clutchDisengagement, float clutchEngagement,

@@ -8,7 +8,8 @@ enum class Drivetrain {
   Standard,
   ScooterCVT,
   MotorcycleSequential,
-  Electric
+  Electric,
+  UtilitySingleSpeed
 };
 
 Drivetrain Detect(Vehicle vehicle);
