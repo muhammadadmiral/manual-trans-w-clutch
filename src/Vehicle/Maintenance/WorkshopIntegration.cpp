@@ -51,6 +51,7 @@ void Notify(const char *message) {
   Renderer::ShowNotification(message);
 }
 
+// Menghitung kuadrat jarak 3D untuk optimasi (menghindari operasi sqrt yang mahal)
 float DistanceSquared(const Vector3 &a, const ServiceBay &b) {
   const float dx = a.x - b.x;
   const float dy = a.y - b.y;
@@ -58,6 +59,7 @@ float DistanceSquared(const Vector3 &a, const ServiceBay &b) {
   return dx * dx + dy * dy + dz * dz;
 }
 
+// Mencari service bay terdekat dari kendaraan pemain yang berada di dalam batas radius
 const ServiceBay *FindNearest(Vehicle vehicle) {
   const Vector3 position = ENTITY::GET_ENTITY_COORDS(vehicle, TRUE);
   const float radius =
@@ -75,6 +77,7 @@ const ServiceBay *FindNearest(Vehicle vehicle) {
   return nearest;
 }
 
+// Menggambar antarmuka UI Service Bay dan informasi kendaraan di layar
 void DrawPanel(bool engineOn) {
   const float x = 0.50f;
   const float y = 0.48f;
@@ -180,6 +183,7 @@ void DrawPanel(bool engineOn) {
       145, 160, 175, 235, 0, false, true);
 }
 
+// Mengubah nilai konfigurasi/opsi menu ke kiri (-1) atau kanan (+1)
 void AdjustSelected(int direction) {
   if (s_selected == 4) {
     Config::TransmissionMode =
@@ -193,6 +197,7 @@ void AdjustSelected(int direction) {
   }
 }
 
+// Mengeksekusi servis mekanikal atau mengubah pengaturan saat tombol ENTER/SELECT ditekan
 void ActivateSelected(bool engineOn) {
   if (s_selected <= 3 && engineOn) {
     Notify("~r~Service locked:~w~ matikan mesin terlebih dahulu");
@@ -242,6 +247,8 @@ void Reset() {
   s_activeBay = nullptr;
 }
 
+// Fungsi utama yang dipanggil setiap frame untuk menangani deteksi jarak bengkel,
+// input pemain (buka menu, navigasi), dan mengunci pergerakan kendaraan.
 void Update(Ped playerPed, Vehicle vehicle, bool engineOn) {
   if (!Config::WorkshopEnabled || !vehicle ||
       !ENTITY::DOES_ENTITY_EXIST(vehicle) ||
@@ -278,10 +285,14 @@ void Update(Ped playerPed, Vehicle vehicle, bool engineOn) {
     return;
   }
 
+  // Nonaktifkan kontrol kendaraan dan menu navigasi standar GTA
+  // (59-64: Steering/Movement, 71-72: Gas/Brake, 75-76: Exit/Handbrake, 172-177: UI Navigation)
   const int controls[] = {
       59, 60, 63, 64, 71, 72, 75, 76, 172, 173, 174, 175, 176, 177};
   for (const int control : controls)
     PAD::DISABLE_CONTROL_ACTION(0, control, TRUE);
+  
+  // Memaksa pedal rem (kontrol 72) ditekan penuh agar mobil tidak menggelinding saat di menu
   PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 72, 1.0f);
 
   if (PAD::IS_DISABLED_CONTROL_JUST_PRESSED(0, 172))
