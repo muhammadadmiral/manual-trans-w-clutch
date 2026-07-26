@@ -89,9 +89,11 @@ static float s_smoothedClutch   = 0.0f;
 static float s_smoothedSteer    = 0.0f;
 static float s_driveCoupling    = 0.0f;
 static float s_reverseInjectedBrakeAxis = 0.0f;
+static float s_forwardInjectedThrottleAxis = 0.0f;
 
 // ── Raw state ─────────────────────────────────────────────────────────────────
 static bool  s_throttleDown  = false;
+static bool  s_keyboardThrottle = false;
 static bool  s_brakeDown     = false;
 static bool  s_clutchDown    = false;
 static float s_rawSteerTarget = 0.0f;
@@ -135,16 +137,22 @@ void Update(int selectedGear) {
 
     // ── Throttle: W or UP ──────────────────────────────────────────────────────
     const bool keyboardThrottle = keyDown(0x57) || keyDown(VK_UP);
+    s_keyboardThrottle = keyboardThrottle;
     const float nativeThrottle = Clamp01(PAD::GET_CONTROL_NORMAL(0, 71));
-    s_throttleDown = nativeThrottle > 0.001f || keyboardThrottle;
+    const bool idleDriveEcho =
+        !keyboardThrottle && s_forwardInjectedThrottleAxis > 0.01f &&
+        std::fabs(nativeThrottle - s_forwardInjectedThrottleAxis) < 0.12f;
+    const float physicalThrottle = idleDriveEcho ? 0.0f : nativeThrottle;
+    s_throttleDown = physicalThrottle > 0.001f || keyboardThrottle;
     s_smoothedThrottle =
-        keyboardThrottle ? 1.0f : nativeThrottle;
+        keyboardThrottle ? 1.0f : physicalThrottle;
+    s_forwardInjectedThrottleAxis = 0.0f;
 
     // ── Brake: S or DOWN ──────────────────────────────────────────────────────
     const bool keyboardBrake = keyDown(0x53) || keyDown(VK_DOWN);
     const float nativeBrake = Clamp01(PAD::GET_CONTROL_NORMAL(0, 72));
     const bool reverseInjectionEcho =
-        selectedGear < 0 && keyboardThrottle && !keyboardBrake &&
+        selectedGear < 0 && !keyboardBrake &&
         s_reverseInjectedBrakeAxis > 0.01f &&
         std::fabs(nativeBrake - s_reverseInjectedBrakeAxis) < 0.12f;
     const float physicalBrake = reverseInjectionEcho ? 0.0f : nativeBrake;
@@ -216,6 +224,7 @@ void ApplyGameControls(Vehicle vehicle, int manualGear, float clutch,
         if (std::fabs(finalThrottle - s_smoothedThrottle) > 0.005f) {
             PAD::DISABLE_CONTROL_ACTION(0, 71, true);
             PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, finalThrottle);
+            s_forwardInjectedThrottleAxis = finalThrottle;
         }
         if (needsNativeBrake) {
             PAD::DISABLE_CONTROL_ACTION(0, 72, true);
@@ -237,6 +246,8 @@ void ResetEdges() {
     s_smoothedThrottle = s_smoothedBrake = s_smoothedClutch = 0.0f;
     s_smoothedSteer = s_rawSteerTarget = s_driveCoupling = 0.0f;
     s_reverseInjectedBrakeAxis = 0.0f;
+    s_forwardInjectedThrottleAxis = 0.0f;
+    s_keyboardThrottle = false;
 }
 
 // =============================================================================
@@ -250,6 +261,7 @@ bool IsSignalRightJustPressed()  { return s_signalRightJustPressed;   }
 bool IsSignalHazardJustPressed() { return s_signalHazardJustPressed;  }
 
 bool IsThrottleDown() { return s_throttleDown; }
+bool IsKeyboardThrottle() { return s_keyboardThrottle; }
 bool IsBrakeDown()    { return s_brakeDown;     }
 bool IsClutchDown()   { return s_clutchDown;    }
 

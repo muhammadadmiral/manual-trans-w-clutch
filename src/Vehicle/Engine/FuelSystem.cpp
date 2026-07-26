@@ -1,6 +1,7 @@
 // Fuel dan temperatur. Semua rate wajib dikali delta-time.
 #include "FuelSystem.h"
 #include "../VehicleData.h"
+#include "../../Core/Config.h"
 #include "../../../sdk/inc/natives.h"
 #include <cmath>
 #include <cstdlib>
@@ -29,7 +30,8 @@ void Reset(float savedFuelLevel) {
 }
 
 bool Update(Vehicle vehicle, VehicleData &data, float throttle, float rpm,
-            bool isEngineOn, float speedKmH) {
+            bool isEngineOn, float speedKmH, int gear,
+            float clutchEngagement) {
   const float dt = std::fminf(MISC::GET_FRAME_TIME(), 0.05f);
   const float frameScale = dt * 60.0f;
 
@@ -54,7 +56,14 @@ bool Update(Vehicle vehicle, VehicleData &data, float throttle, float rpm,
   }
 
   // ── Consumption ───────────────────────────────────────────────────────────
-  float consumption    = ComputeConsumptionRate(rpm, throttle, isEngineOn);
+  s_state.decelerationFuelCut =
+      Config::FuelCutoffEngineBrake && isEngineOn && gear != 0 &&
+      clutchEngagement > 0.80f && throttle < 0.01f &&
+      rpm > 0.30f && speedKmH > 8.0f;
+  float consumption =
+      s_state.decelerationFuelCut
+          ? 0.0f
+          : ComputeConsumptionRate(rpm, throttle, isEngineOn);
   float speedMult      = 1.0f + speedKmH / 200.0f;
   consumption         *= speedMult * frameScale;
 

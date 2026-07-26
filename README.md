@@ -19,15 +19,26 @@ Sprint drivetrain aktif. Fokus saat ini:
 - dump clutch, bog, dan stall memakai RPM, rasio/handling yang tervalidasi,
   lalu fallback data native per kendaraan bila optional pointer tidak tersedia;
 - shift manual tanpa clutch tetap masuk, tetapi menghasilkan clash, torque cut,
-  shock, wear, dan risiko over-rev saat salah downshift;
+  shock, synchronizer wear/resistance, dan risiko over-rev + skid pulse saat
+  salah downshift;
+- clutch punya kapasitas torsi, overload slip, heat fade, serta judder di bite
+  point; release pelan tanpa gas memakai idle governor, sedangkan dump tanpa
+  gas tetap dapat stall dan idle take-off menyerah pada tanjakan;
+- free-rev punya rev-hang berbasis inertia, pengereman darurat tanpa clutch bisa
+  stall, dan overrun memakai fuel cut;
 - automatic D melakukan shift santai, sedangkan S menahan RPM, lebih cepat
-  kickdown, dan memakai sport pedal map tanpa cheat-power global;
+  kickdown, memberi downshift blip, dan memakai sport pedal map;
+- automatic memodelkan TCC lockup, kickdown delay, temperatur ATF/limp mode,
+  neutral-drop damage, DSG ignition cut, brake-boost stall, dan safety-neutral;
 - L2/L1 membatasi gear tertinggi; LShift maju di gate selector dan LCtrl kembali;
-- Faggio/Faggio2/Faggio3/Pizza Boy diprofilkan sebagai scooter CVT gas-rem,
-  motor lain sequential dengan auto-clutch, dan EV dikunci ke automatic;
+- Pizza Boy diprofilkan sebagai scooter CVT gas-rem; seluruh Faggio tetap
+  sequential. Kendaraan utility single-speed memakai automatic dan EV dikunci
+  ke automatic;
 - selector automatic punya brake interlock serta lockout P/R saat kendaraan
   masih bergerak ke arah yang salah;
 - TCS dan ABS memakai telemetry `CWheel`, bukan estimasi RPM palsu;
+- engine/transmission upgrade native memengaruhi stall resistance, durability,
+  quickshift, powershift, dan shift penalty;
 - launch control opsional memakai soft throttle cut tanpa menulis RPM;
 - temperatur rem, brake fade, clutch heat, dan brake-throttle override dapat
   dituning lewat GUI.
@@ -47,7 +58,7 @@ src/
    ├─ Clutch/            kurva pedal, slip/heat, actuator drivetrain
    ├─ Brakes/            ABS berbasis roda dan parking brake
    ├─ VehicleData.*      facade memory per kendaraan
-   ├─ VehicleProfile.*   EV, scooter CVT, dan motor sequential
+   ├─ VehicleProfile.*   EV, utility, scooter CVT, dan motor sequential
    ├─ LightsLogic.*
    └─ TelemetryLogger.*
 ```
@@ -67,7 +78,7 @@ dijelaskan di [docs/configuration.md](docs/configuration.md).
    memuat ScriptHookV.
 
 Sesudah mengganti ASI, cek awal `manual-trans.log`. Build sprint ini wajib
-mencetak `Runtime=driveline-r12` dan path file yang benar-benar dimuat. Kalau
+mencetak `Runtime=driveline-r22-final-clutch-rc` dan path file yang benar-benar dimuat. Kalau
 baris itu tidak ada, GTA masih memakai salinan ASI lama.
 
 Artefak yang sudah diverifikasi pada sprint ini:
@@ -88,6 +99,10 @@ ShiftDown=162
 ClutchKey=88
 
 [Analog]
+ThrottleAttack=0.080
+ThrottleRelease=0.280
+BrakeAttack=0.070
+BrakeRelease=0.180
 ClutchAttack=0.045
 ClutchRelease=0.060
 
@@ -98,6 +113,11 @@ IdleCreep=1
 StallEnabled=1
 LugStallRPM=1500
 LugStallDelay=2.20
+WaterStallDelay=2.50
+RolloverStallDelay=7.00
+RevHangDuration=0.50
+HardBrakeStall=1
+FuelCutoffEngineBrake=1
 
 [Automatic]
 DUpRPM=0.50
@@ -105,13 +125,20 @@ DDownRPM=0.22
 SUpRPM=0.84
 SDownRPM=0.34
 SportTorqueBoost=0.10
+DKeyboardThrottle=1.00
+KickdownDelay=0.65
+TCC=1
+FluidOverheat=1
+NeutralDropDamage=1
+BrakeBoostStall=1
 ```
 
 `Mode=0` melepas kontrol drivetrain ke GTA, `Mode=1` mengaktifkan automatic
 P-R-N-D-S-L2-L1, dan `Mode=2` mengaktifkan manual sequential. Kendaraan
-listrik dan scooter CVT selalu memakai automatic.
+listrik, scooter CVT, dan utility single-speed selalu memakai automatic.
 
-Throttle, brake, dan steer tetap berasal dari control GTA. RPM tersambung
+Input throttle dan brake keyboard dibentuk menjadi pedal virtual dengan
+attack, release, dan curve terpisah. RPM tersambung
 berasal dari rasio dan road speed; throttle hanya memengaruhi seberapa cepat
 kendaraan mencapai road RPM itu. Roda dan vehicle speed tidak pernah ditulis.
 `ClutchAttack` dan `ClutchRelease` membentuk travel clutch digital. S di gear
@@ -124,6 +151,8 @@ terverifikasi. TCS/ABS otomatis tidak mengintervensi bila `CWheel` tidak
 ter-resolve. Cluster engine memakai `Clutch=RPM+0xC` dan
 `EngineThrottle=RPM+0x10`; field throttle ini bukan pedal input. Saat mode
 transmisi aktif, RPM dan engine-throttle dapat ditulis untuk menjaga
-sinkronisasi poros setelah auto-shift native dinonaktifkan. Lima code patch
-wajib resolve unik; satu kegagalan membatalkan semuanya. Byte asli direstore
+sinkronisasi poros. Native gearbox override r20 hanya mengganti opcode branch
+`JNE` menjadi `JMP` lewat write satu byte; body instruksi tidak ditimpa.
+Toggle `Native Gearbox Override` dapat mematikannya secara runtime dan
+merestore byte asli untuk diagnosis fail-open.
 saat mod Off, keluar kendaraan, atau unload.

@@ -492,10 +492,6 @@ float   VehicleData::GetHoverTransformRatioLerp() const { return m_vehicle.GetHo
 
 float VehicleData::GetDriveForce() const {
     if (!m_isValid) return 0.0f;
-    const float runtimeValue = m_vehicle.GetTransmissionDriveForce();
-    if (std::isfinite(runtimeValue) && runtimeValue > 0.001f &&
-        runtimeValue < 10.0f)
-        return runtimeValue;
     auto h = m_vehicle.GetHandlingData();
     return h.IsValid() ? h.GetDriveForce() : 0.0f;
 }

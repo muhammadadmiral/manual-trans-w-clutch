@@ -2,6 +2,7 @@
 #include "../../sdk/inc/main.h" // For getScriptHandleBaseAddress
 #include "AOBScanner.h"
 #include "OffsetResolver.h"
+#include <cmath>
 
 namespace GameMemory {
 

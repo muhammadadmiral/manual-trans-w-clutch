@@ -22,6 +22,7 @@ struct ParkingBrakeState {
   bool  isEngaged     = false;
   bool  wasKeyDown    = false;
   bool  hillHoldActive = false;
+  bool  justPressed = false;
   int   engageDelay   = 0;
   float lastSpeed     = 0.0f;
 };
@@ -43,5 +44,6 @@ void SetKey(int vk);
 int  GetKey();
 bool IsEngaged();
 bool IsHillHoldActive();
+bool WasJustPressed();
 
 } // namespace ParkingBrake

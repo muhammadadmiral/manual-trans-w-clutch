@@ -55,14 +55,21 @@ tanpa throttle yang cukup menghasilkan stall request langsung.
 Cadangan torsi juga membentuk multiplier torsi native per frame. Gigi tinggi
 di bawah power band tetap mendapat gaya roda kecil selama cadangan torsinya
 positif; torque deficit mengurangi output dan tetap menaikkan stall progress.
-Saat road RPM melewati redline, output turun halus lalu menjadi nol. RPM boleh
+Saat road RPM dan RPM mesin aktual sama-sama mencapai redline, output turun
+halus lalu menjadi nol. Konfirmasi ganda ini mencegah rasio ekstrem motor atau
+mobil sport mengunci gigi 1 sebelum tachometer mencapai limiter. RPM boleh
 meraung di limiter, tetapi gigi 1 tidak bisa terus mempercepat kendaraan tanpa
 batas. Jalur ini memakai `SET_VEHICLE_CHEAT_POWER_INCREASE`; velocity dan
 angular velocity roda tidak ditulis.
 
-Idle creep hanya diinjeksikan pada gear 1/reverse ketika brake dan throttle
-dilepas. Pada tanjakan tidak ada hill-hold manual di gear: bila torque idle
-kalah oleh beban, kendaraan boleh rollback dan mesin dapat stall.
+Idle drive dihitung sebelum native GTA memproses control axis. Pada manual
+gear 1/reverse, release clutch yang cukup pelan membuka idle governor secara
+proporsional terhadap bite point. Dump tanpa gas tidak mendapat bantuan ini
+dan dapat stall. Pada automatic D/R, creep naik bertahap mengikuti release
+brake dan coupling torque converter. Echo control dari creep dibuang pada
+frame berikutnya supaya tidak dibaca sebagai input pemain. Pada tanjakan tidak
+ada hill-hold manual: bila torque idle kalah oleh beban, kendaraan boleh
+rollback dan mesin dapat stall.
 
 ## Manual shift edge cases
 
@@ -110,9 +117,12 @@ agar gearbox tidak hunting 2-3. Throttle internal Enhanced
 ditulis ulang dari pedal GTA yang sudah melewati TCS ketika gear maju aktif;
 ini memulihkan kasus RPM valid tetapi GTA membuang throttle karena gear dipaksa.
 
-Scooter `FAGGIO`, `FAGGIO2`, `FAGGIO3`, dan `PIZZABOY` langsung memakai D
-sebagai CVT gas-rem. Motor lain tetap sequential, tetapi auto-clutch membuka
-driveline sebentar pada shift. EV tetap automatic dan tidak menyediakan manual.
+`PIZZABOY` langsung memakai D sebagai CVT gas-rem. `FAGGIO`, `FAGGIO2`, dan
+`FAGGIO3` tetap sequential seperti motor lain; auto-clutch hanya membuka
+driveline sebentar pada shift. Airtug, baggage tractor, caddy, forklift,
+docktug, mower, loader, handler, dan utility single-speed sejenis dipaksa ke
+automatic supaya tidak tampil sebagai gearbox sequential satu gigi. EV tetap
+automatic dan tidak menyediakan manual.
 
 ## Pedal, reverse, dan rem
 
@@ -129,6 +139,11 @@ dikecualikan supaya power-brake/burnout tidak memotong throttle dan memicu
 stall palsu. ABS tetap fail-open bila telemetry roda tidak valid. Temperatur
 rem tetap dihitung dari brake input dan road speed; setelah ambang fade,
 tekanan maksimum berkurang sampai rem kembali dingin.
+
+Input W/S digital dibentuk menjadi pedal virtual menggunakan attack, release,
+dan curve terpisah. Tap singkat menghasilkan bukaan parsial; menahan tombol
+tetap mencapai nilai penuh. Automatic memiliki konstanta actuator tambahan
+karena torque converter dan pressure brake memerlukan respons yang berbeda.
 
 ## TCS dan ABS
 
@@ -158,5 +173,48 @@ defisit torsi/deceleration bertahan, timer naik sampai mesin mati. Partial
 clutch mengurangi load sehingga start dari gear 2 tetap mungkin, tetapi lebih
 lama dan lebih panas.
 
+Build r15-safe hanya memakai native `SET_VEHICLE_CHEAT_POWER_INCREASE` untuk
+recovery. Attack recovery diperbesar secara adaptif sampai batas aman saat
+akselerasi tetap negatif. Field CVehicle `NextGear-0x68` dikarantina dan
+dipaksa nol di resolver: r13 membuktikan field tersebut tidak aman ditulis
+walaupun nilai read-nya terlihat masuk akal. Kecepatan dan angular velocity
+roda tetap tidak pernah ditulis.
+
 Automatic D membuka torque converter lebih banyak pada low RPM supaya mesin
 tidak langsung terkunci ke putaran roda. S tetap lebih rapat dan agresif.
+
+Shift map D memakai upshift lebih awal dan downshift lebih rendah saat throttle
+ringan. Pedal besar tetap dianggap permintaan kickdown; pengujian cruising
+efisien dilakukan dengan throttle parsial, bukan full throttle.
+
+## Upgrade kendaraan dan shift assist
+
+Mod native GTA dibaca langsung dari kategori engine `11`, transmission `13`,
+dan turbo `18`.
+
+- Engine level 1-3 menambah idle reserve dan stall resistance, serta
+  mengurangi damage over-rev. Engine health rendah mengurangi torque dan
+  mempercepat stall.
+- Transmission upgrade mengurangi grind, clash, dan shift shock secara
+  bertahap. Level tertinggi dianggap race transmission.
+- Motor dengan transmission upgrade memperoleh quickshifter untuk upshift:
+  clutch tidak dibuka, tetapi ignition/throttle dipotong sangat singkat.
+- Mobil race-transmission mendukung powershift ketika clutch diinjak, gear
+  dinaikkan, dan throttle tetap besar.
+- Clutchless shift dengan throttle terangkat dan RPM yang sudah sinkron
+  diperlakukan sebagai synchro shift dengan penalty kecil.
+- Money shift tetap berbahaya meskipun memakai race transmission; upgrade
+  durability mengurangi damage tetapi tidak menghapus over-rev.
+
+## Kondisi lingkungan
+
+- Saat kendaraan airborne atau terbalik, RPM connected dikembalikan ke GTA dan
+  low-RPM recovery dihentikan. Automatic juga menahan keputusan shift sampai
+  kendaraan kembali stabil.
+- Mesin pembakaran yang cukup lama terendam mengakumulasi water ingestion lalu
+  stall. Motor mencapai cutoff lebih cepat.
+- Kendaraan terbalik mengakumulasi oil-starvation. Timer pulih perlahan setelah
+  kendaraan kembali tegak.
+- EV tidak memakai hydrolock atau oil-starvation combustion model.
+- Field log `Air`, `Upside`, `Water`, `OilStarve`, dan `EnvStall` menunjukkan
+  state lingkungan tanpa perlu menebak dari gejala.

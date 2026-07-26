@@ -1,5 +1,6 @@
 #include "ClutchSystem.h"
 #include "../VehicleData.h"
+#include "../VehicleUpgrades.h"
 #include "../../Core/Config.h"
 #include "../../../sdk/inc/natives.h"
 #include <algorithm>
@@ -22,7 +23,8 @@ void Reset() {
   s_state = State{};
 }
 
-float UpdatePedal(float rawPedal, float throttle, bool engineOn) {
+float UpdatePedal(float rawPedal, float throttle, float rpm, int gear,
+                  int maxGear, bool engineOn) {
   const float freePlayEnd =
       std::clamp(Config::ClutchBiteStart, 0.02f, 0.80f);
   const float fullyOpenAt =
@@ -43,7 +45,7 @@ float UpdatePedal(float rawPedal, float throttle, bool engineOn) {
   const float dumpRate = std::max(1.0f, Config::ClutchDumpRate);
   const float freshDump =
       Clamp01((s_state.releaseRate - dumpRate) / dumpRate) *
-      Clamp01(throttle) * engagement;
+      (0.35f + Clamp01(throttle) * 0.65f) * engagement;
   if (engineOn && freshDump > 0.05f) {
     s_state.dumpSeverity =
         std::max(s_state.dumpSeverity, freshDump);
@@ -66,10 +68,49 @@ float UpdatePedal(float rawPedal, float throttle, bool engineOn) {
                                      175.0f));
   }
 
-  s_state.slipping = engineOn && engagement > 0.01f && engagement < 0.99f;
+  const float gearLoad =
+      gear == 0
+          ? 0.0f
+          : Clamp01(static_cast<float>((std::max)(0, std::abs(gear) - 1)) /
+                    static_cast<float>((std::max)(1, maxGear - 1)));
+  const float lugLoad = 1.0f - SmoothStep((rpm - 0.12f) / 0.38f);
+  const float upgradeTorque =
+      1.0f + VehicleUpgrades::GetState().engineStage * 0.14f;
+  s_state.torqueDemand =
+      engineOn && gear != 0
+          ? Clamp01(throttle) * upgradeTorque *
+                (0.72f + gearLoad * 0.38f + lugLoad * gearLoad * 0.35f)
+          : 0.0f;
+  const float heatFade =
+      1.0f - Clamp01((s_state.heat -
+                      std::clamp(Config::ClutchFadeStart, 0.50f, 0.99f)) /
+                     std::max(0.01f, 1.0f - Config::ClutchFadeStart)) *
+                 Clamp01(Config::ClutchFadeStrength);
+  s_state.torqueCapacity =
+      std::max(0.05f, Config::MaxClutchTorque) *
+      (0.08f + engagement * 0.92f) * heatFade;
+  const float overloadTarget =
+      engineOn && engagement > 0.08f &&
+              s_state.torqueDemand > s_state.torqueCapacity
+          ? Clamp01((s_state.torqueDemand - s_state.torqueCapacity) /
+                    std::max(0.10f, s_state.torqueCapacity))
+          : 0.0f;
+  const float overloadRate =
+      overloadTarget > s_state.overloadSlip ? 8.0f : 3.0f;
+  s_state.overloadSlip +=
+      (overloadTarget - s_state.overloadSlip) *
+      Clamp01(dt * overloadRate);
+  s_state.overloaded = s_state.overloadSlip > 0.02f;
+  engagement *= 1.0f - s_state.overloadSlip * 0.55f;
+  disengagement = 1.0f - engagement;
+
+  s_state.slipping =
+      engineOn && engagement > 0.01f &&
+      (engagement < 0.99f || s_state.overloaded);
   if (s_state.slipping) {
     const float slipEnergy =
-        (1.0f - engagement) * (0.25f + Clamp01(throttle) * 0.75f);
+        ((1.0f - engagement) + s_state.overloadSlip * 0.80f) *
+        (0.25f + Clamp01(throttle) * 0.75f);
     s_state.heat += slipEnergy * std::max(0.0f, Config::ClutchHeatRate) * dt;
   } else {
     s_state.heat -= std::max(0.0f, Config::ClutchCoolRate) * dt;
@@ -83,6 +124,26 @@ float UpdatePedal(float rawPedal, float throttle, bool engineOn) {
     engagement *=
         1.0f - Clamp01(Config::ClutchFadeStrength) * Clamp01(fade);
     disengagement = 1.0f - engagement;
+  }
+
+  s_state.judder = 0.0f;
+  if (Config::ClutchJudder && s_state.heat > fadeStart &&
+      engagement > 0.12f && engagement < 0.88f &&
+      s_state.torqueDemand > 0.10f) {
+    const float heatSeverity =
+        Clamp01((s_state.heat - fadeStart) / (1.0f - fadeStart));
+    const float biteBand =
+        1.0f - std::fabs(engagement - 0.50f) * 2.0f;
+    s_state.judderPhase =
+        std::fmod(s_state.judderPhase + dt * (34.0f + throttle * 18.0f),
+                  6.2831853f);
+    s_state.judder =
+        std::sin(s_state.judderPhase) * heatSeverity *
+        Clamp01(biteBand) * 0.13f;
+    engagement = Clamp01(engagement * (1.0f + s_state.judder));
+    disengagement = 1.0f - engagement;
+    PAD::SET_CONTROL_SHAKE(
+        0, 70, static_cast<int>(55.0f + heatSeverity * 120.0f));
   }
 
   s_state.disengagement = disengagement;

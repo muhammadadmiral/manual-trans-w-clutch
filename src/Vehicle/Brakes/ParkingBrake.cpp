@@ -24,6 +24,7 @@ bool Update(Vehicle vehicle, VehicleData &data, float speedKmH,
   const bool keyDown =
       (GetAsyncKeyState(Config::KeyParkingBrake) & 0x8000) != 0;
   const bool justPressed = keyDown && !s_state.wasKeyDown;
+  s_state.justPressed = justPressed;
   s_state.wasKeyDown    = keyDown;
 
   if (justPressed) {
@@ -90,5 +91,6 @@ void ForceRelease(Vehicle vehicle) {
 
 bool IsEngaged()        { return s_state.isEngaged;     }
 bool IsHillHoldActive() { return s_state.hillHoldActive; }
+bool WasJustPressed()   { return s_state.justPressed; }
 
 } // namespace ParkingBrake

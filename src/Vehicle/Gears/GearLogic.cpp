@@ -6,11 +6,15 @@
 #include "GearboxSystem.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <limits>
 
 namespace GearLogic {
 
 static int s_manualGear = 0;
 static DWORD s_lastShiftTime = 0;
+static int s_pendingGear = 0;
+static DWORD s_pendingAt = 0;
 
 void PlayGearGrindSound(Vehicle vehicle) {
   const Hash model = ENTITY::GET_ENTITY_MODEL(vehicle);
@@ -32,6 +36,8 @@ void PlayGearShiftSound() {
 void Reset(int defaultGear) {
   s_manualGear = defaultGear;
   s_lastShiftTime = GetTickCount();
+  s_pendingGear = defaultGear;
+  s_pendingAt = 0;
 }
 
 int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
@@ -41,6 +47,18 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
   const bool canShift =
       (currentTime - s_lastShiftTime) > 80; // permit quick multi-gear selection
 
+  if (s_pendingAt != 0 && currentTime >= s_pendingAt) {
+    const int fromGear = s_manualGear;
+    const int toGear = s_pendingGear;
+    GearboxSystem::NotifyShift(vehicle, data, fromGear, toGear, clutch,
+                               throttle);
+    s_manualGear = toGear;
+    PlayGearShiftSound();
+    s_pendingAt = 0;
+    s_lastShiftTime = currentTime;
+    LOG_INFO(Gear, "Delayed synchro engagement: %d -> %d", fromGear, toGear);
+  }
+
   if (canShift && (isUp || isDown) && GearboxSystem::IsSeized()) {
     PlayGearGrindSound(vehicle);
     grindWarningTimer = 60;
@@ -49,14 +67,33 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
     return s_manualGear;
   }
 
-  if (canShift) {
+  if (canShift && s_pendingAt == 0) {
     if (isUp && s_manualGear < maxGear) {
       const int fromGear = s_manualGear;
       const int toGear = s_manualGear + 1;
       const bool clutchless = clutch < 0.35f && isEngineOn;
-      GearboxSystem::NotifyShift(data, fromGear, toGear, clutch, throttle);
+      const uint32_t resistance = GearboxSystem::GetShiftResistanceMs(
+          data, fromGear, toGear, clutch, throttle);
+      if (resistance == (std::numeric_limits<uint32_t>::max)()) {
+        PlayGearGrindSound(vehicle);
+        grindWarningTimer = 60;
+        s_lastShiftTime = currentTime;
+        LOG_WARN(Gear, "Synchro menolak shift %d -> %d wear=%.3f",
+                 fromGear, toGear,
+                 GearboxSystem::GetState().selectedSynchroWear);
+        return s_manualGear;
+      }
+      if (resistance > 0) {
+        s_pendingGear = toGear;
+        s_pendingAt = currentTime + resistance;
+        s_lastShiftTime = currentTime;
+        return s_manualGear;
+      }
+      GearboxSystem::NotifyShift(vehicle, data, fromGear, toGear, clutch,
+                                 throttle);
       s_manualGear = toGear;
-      if (clutchless) {
+      if (clutchless && !GearboxSystem::GetState().quickShift &&
+          !GearboxSystem::GetState().synchroShift) {
         PlayGearGrindSound(vehicle);
         grindWarningTimer = 45;
       } else {
@@ -77,9 +114,28 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
       const int fromGear = s_manualGear;
       const int toGear = s_manualGear - 1;
       const bool clutchless = clutch < 0.35f && isEngineOn;
-      GearboxSystem::NotifyShift(data, fromGear, toGear, clutch, throttle);
+      const uint32_t resistance = GearboxSystem::GetShiftResistanceMs(
+          data, fromGear, toGear, clutch, throttle);
+      if (resistance == (std::numeric_limits<uint32_t>::max)()) {
+        PlayGearGrindSound(vehicle);
+        grindWarningTimer = 60;
+        s_lastShiftTime = currentTime;
+        LOG_WARN(Gear, "Synchro menolak shift %d -> %d wear=%.3f",
+                 fromGear, toGear,
+                 GearboxSystem::GetState().selectedSynchroWear);
+        return s_manualGear;
+      }
+      if (resistance > 0) {
+        s_pendingGear = toGear;
+        s_pendingAt = currentTime + resistance;
+        s_lastShiftTime = currentTime;
+        return s_manualGear;
+      }
+      GearboxSystem::NotifyShift(vehicle, data, fromGear, toGear, clutch,
+                                 throttle);
       s_manualGear = toGear;
-      if (clutchless) {
+      if (clutchless && !GearboxSystem::GetState().quickShift &&
+          !GearboxSystem::GetState().synchroShift) {
         PlayGearGrindSound(vehicle);
         grindWarningTimer = 45;
       } else {

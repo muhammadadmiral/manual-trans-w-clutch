@@ -35,6 +35,7 @@ struct FuelState {
   bool  lowFuelNotified = false;
   bool  criticalFuelNotified = false;
   bool  isRefueling = false;
+  bool  decelerationFuelCut = false;
   int   refuelCooldown = 0;
 
   // Consumption tracking
@@ -50,7 +51,8 @@ void Reset(float savedFuelLevel = 1.0f);
 // Called every frame when player is in a valid vehicle with engine running.
 // Returns true if engine ran out of fuel this frame (trigger stall).
 bool Update(Vehicle vehicle, VehicleData& data, float throttle, float rpm,
-            bool isEngineOn, float speedKmH);
+            bool isEngineOn, float speedKmH, int gear = 0,
+            float clutchEngagement = 0.0f);
 
 // Trigger a refuel event (call when player is near a gas station).
 void StartRefuel();

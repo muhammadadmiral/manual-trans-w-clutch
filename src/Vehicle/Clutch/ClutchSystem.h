@@ -14,13 +14,20 @@ struct State {
   float releaseRate = 0.0f;
   float dumpSeverity = 0.0f;
   float dumpRemaining = 0.0f;
+  float overloadSlip = 0.0f;
+  float torqueDemand = 0.0f;
+  float torqueCapacity = 1.0f;
+  float judder = 0.0f;
+  float judderPhase = 0.0f;
   bool slipping = false;
+  bool overloaded = false;
 };
 
 void Reset();
 
 // rawPedal: 0 dilepas, 1 diinjak penuh.
-float UpdatePedal(float rawPedal, float throttle, bool engineOn);
+float UpdatePedal(float rawPedal, float throttle, float rpm, int gear,
+                  int maxGear, bool engineOn);
 
 // Logical gear tetap kepasang; hard-open memakai carrier gear 1 di GearLogic.
 void ApplyToVehicle(VehicleData &data, int gear, float speedMps);

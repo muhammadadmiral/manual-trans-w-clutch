@@ -6,8 +6,11 @@ struct State {
   float throttle = 0.0f;
   float brake = 0.0f;
   float overlapTime = 0.0f;
+  float actuatorThrottle = 0.0f;
+  float actuatorBrake = 0.0f;
   bool brakeOverrideActive = false;
   bool heelToeWindow = false;
+  bool automaticActuator = false;
 };
 
 void Reset();

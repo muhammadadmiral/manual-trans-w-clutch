@@ -31,20 +31,34 @@ struct State {
   int pendingGear = 1;
   DWORD lastShiftTime = 0;
   DWORD phaseStartedAt = 0;
+  DWORD kickdownStartedAt = 0;
   int lastShiftDirection = 0;
   float coupling = 0.0f;
+  float hydraulicCoupling = 0.0f;
   float decisionRPM = 0.2f;
   float shiftTargetRPM = 0.2f;
   float inputThrottle = 0.0f;
+  float fluidTemperature = 0.18f;
+  float brakeBoostTime = 0.0f;
+  float torqueManagement = 0.0f;
+  float sportBlip = 0.0f;
   ShiftPhase shiftPhase = ShiftPhase::Engaged;
   bool kickdown = false;
   bool rpmRecovery = false;
   bool selectorRejected = false;
+  bool kickdownPending = false;
+  bool tccLocked = false;
+  bool limpMode = false;
+  bool neutralDrop = false;
+  bool ignitionCut = false;
+  bool hillCreepFailure = false;
+  bool safetyNeutral = false;
+  bool stallRequest = false;
 };
 
 void Reset(Selector initialSelector = Selector::Park);
 void UpdateSelector(Vehicle vehicle, bool selectorUp, bool selectorDown,
-                    float brake, float signedSpeedMps);
+                    float brake, float signedSpeedMps, float engineRPM);
 int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
            float brake, float signedSpeedMps, bool engineOn);
 void ApplyToMemory(Vehicle vehicle, VehicleData &data, int activeGear,
@@ -58,6 +72,9 @@ bool IsSport();
 bool IsKickdownActive();
 bool IsShifting();
 bool WasSelectorRejected();
+void ForceNeutral();
+void SetTorqueManagement(float intervention);
+bool ConsumeStallRequest();
 const char *GetSelectorName();
 const char *GetShiftPhaseName();
 const State &GetState();
