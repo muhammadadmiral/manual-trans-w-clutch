@@ -774,7 +774,7 @@ void ScriptMain() {
 
     if (automaticMode) {
       AutomaticGearbox::ApplyToMemory(vehicle, data, manualGear,
-                                      driveThrottle);
+                                      controlThrottle);
     } else {
       GearLogic::ApplyToMemory(vehicle, data, manualGear, maxGear,
                                simulatedClutch, throttle, speedKmH);
@@ -835,7 +835,7 @@ void ScriptMain() {
                         InputHandler::GetSmoothedBrake(), throttle);
     if (automaticMode) {
       AutomaticGearbox::ApplyToMemory(vehicle, data, manualGear,
-                                      driveThrottle);
+                                      controlThrottle);
     } else {
       GearLogic::ApplyToMemory(vehicle, data, manualGear, maxGear,
                                simulatedClutch, throttle, speedKmH);
