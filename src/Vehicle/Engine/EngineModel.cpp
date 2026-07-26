@@ -146,7 +146,7 @@ float PrepareIdleDrive(Vehicle vehicle, VehicleData &data, int gear,
         0.55f + Clamp01(engagement) * 0.45f;
     s_state.creepThrottle =
         base * speedGap * brakeRelease * converterTransfer;
-  } else if (gentleClutchRelease) {
+  } else if (gentleClutchRelease && brake < 0.05f) {
     const float biteTransfer =
         SmoothStep((Clamp01(engagement) - 0.12f) / 0.78f);
     const float idleGovernor =

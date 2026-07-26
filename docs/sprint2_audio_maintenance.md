@@ -49,3 +49,22 @@ Mengubah mod ini menjadi sistem *survival* kendaraan yang realistis menggunakan 
 3. Buat implementasi `AudioEngine.cpp`.
 4. *Test Drive*: Tes sinkronisasi suara *Gear Grind* dan *Blow-off Valve* dengan fisika di dalam game.
 5. Mulai rancang UI/Teks untuk *Fuel* & *Maintenance*.
+
+## 4. Entry Gate dari Sprint Drivetrain
+
+Sprint 2 baru dibuat di branch terpisah setelah release candidate drivetrain
+lulus smoke test berikut:
+
+1. Manual idle take-off bekerja lewat release clutch pelan tanpa gas, tetapi
+   dump cepat dan tanjakan tetap dapat stall/rollback.
+2. Automatic D/R melakukan creep mengikuti release brake dan tidak membaca
+   injeksi creep sebagai input pemain.
+3. Faggio tetap sequential, Pizza Boy tetap CVT, dan utility single-speed
+   tidak lagi tampil sebagai sequential satu gigi.
+4. Motor dan mobil sport tidak kehilangan tenaga gigi 1 sebelum RPM mesin
+   aktual mencapai limiter.
+5. Netral, reverse, low-RPM gear tinggi, serta manual/automatic regression test
+   tetap lulus tanpa crash.
+
+Asset audio, FMOD, dan persistence maintenance tidak masuk ke commit release
+candidate drivetrain agar PR ke master tetap mudah direview.

@@ -22,7 +22,8 @@ Sprint drivetrain aktif. Fokus saat ini:
   shock, synchronizer wear/resistance, dan risiko over-rev + skid pulse saat
   salah downshift;
 - clutch punya kapasitas torsi, overload slip, heat fade, serta judder di bite
-  point; idle creep menyerah pada tanjakan bila torsinya tidak cukup;
+  point; release pelan tanpa gas memakai idle governor, sedangkan dump tanpa
+  gas tetap dapat stall dan idle take-off menyerah pada tanjakan;
 - free-rev punya rev-hang berbasis inertia, pengereman darurat tanpa clutch bisa
   stall, dan overrun memakai fuel cut;
 - automatic D melakukan shift santai, sedangkan S menahan RPM, lebih cepat
@@ -30,8 +31,9 @@ Sprint drivetrain aktif. Fokus saat ini:
 - automatic memodelkan TCC lockup, kickdown delay, temperatur ATF/limp mode,
   neutral-drop damage, DSG ignition cut, brake-boost stall, dan safety-neutral;
 - L2/L1 membatasi gear tertinggi; LShift maju di gate selector dan LCtrl kembali;
-- Faggio/Faggio2/Faggio3/Pizza Boy diprofilkan sebagai scooter CVT gas-rem,
-  motor lain sequential dengan auto-clutch, dan EV dikunci ke automatic;
+- Pizza Boy diprofilkan sebagai scooter CVT gas-rem; seluruh Faggio tetap
+  sequential. Kendaraan utility single-speed memakai automatic dan EV dikunci
+  ke automatic;
 - selector automatic punya brake interlock serta lockout P/R saat kendaraan
   masih bergerak ke arah yang salah;
 - TCS dan ABS memakai telemetry `CWheel`, bukan estimasi RPM palsu;
@@ -56,7 +58,7 @@ src/
    ├─ Clutch/            kurva pedal, slip/heat, actuator drivetrain
    ├─ Brakes/            ABS berbasis roda dan parking brake
    ├─ VehicleData.*      facade memory per kendaraan
-   ├─ VehicleProfile.*   EV, scooter CVT, dan motor sequential
+   ├─ VehicleProfile.*   EV, utility, scooter CVT, dan motor sequential
    ├─ LightsLogic.*
    └─ TelemetryLogger.*
 ```
@@ -76,7 +78,7 @@ dijelaskan di [docs/configuration.md](docs/configuration.md).
    memuat ScriptHookV.
 
 Sesudah mengganti ASI, cek awal `manual-trans.log`. Build sprint ini wajib
-mencetak `Runtime=driveline-r21-auto-converter` dan path file yang benar-benar dimuat. Kalau
+mencetak `Runtime=driveline-r22-final-clutch-rc` dan path file yang benar-benar dimuat. Kalau
 baris itu tidak ada, GTA masih memakai salinan ASI lama.
 
 Artefak yang sudah diverifikasi pada sprint ini:
@@ -97,6 +99,10 @@ ShiftDown=162
 ClutchKey=88
 
 [Analog]
+ThrottleAttack=0.080
+ThrottleRelease=0.280
+BrakeAttack=0.070
+BrakeRelease=0.180
 ClutchAttack=0.045
 ClutchRelease=0.060
 
@@ -119,7 +125,7 @@ DDownRPM=0.22
 SUpRPM=0.84
 SDownRPM=0.34
 SportTorqueBoost=0.10
-DKeyboardThrottle=0.62
+DKeyboardThrottle=1.00
 KickdownDelay=0.65
 TCC=1
 FluidOverheat=1
@@ -129,9 +135,10 @@ BrakeBoostStall=1
 
 `Mode=0` melepas kontrol drivetrain ke GTA, `Mode=1` mengaktifkan automatic
 P-R-N-D-S-L2-L1, dan `Mode=2` mengaktifkan manual sequential. Kendaraan
-listrik dan scooter CVT selalu memakai automatic.
+listrik, scooter CVT, dan utility single-speed selalu memakai automatic.
 
-Throttle, brake, dan steer tetap berasal dari control GTA. RPM tersambung
+Input throttle dan brake keyboard dibentuk menjadi pedal virtual dengan
+attack, release, dan curve terpisah. RPM tersambung
 berasal dari rasio dan road speed; throttle hanya memengaruhi seberapa cepat
 kendaraan mencapai road RPM itu. Roda dan vehicle speed tidak pernah ditulis.
 `ClutchAttack` dan `ClutchRelease` membentuk travel clutch digital. S di gear

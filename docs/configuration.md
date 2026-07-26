@@ -11,9 +11,21 @@ Semua opsi berikut tersedia dari menu dalam game dan disimpan ke
 - `AUTOMATIC`: selector P-R-N-D-S-L2-L1 dan shift map custom aktif.
 - `MANUAL`: sequential R-N-1-2 dan seterusnya.
 
-Kendaraan listrik dan scooter CVT selalu memakai automatic walaupun konfigurasi
-global memilih manual. LShift maju dari P menuju L1; LCtrl kembali menuju P.
-Motor non-scooter tetap sequential dan memakai auto-clutch.
+Kendaraan listrik, scooter CVT, dan utility single-speed selalu memakai
+automatic walaupun konfigurasi global memilih manual. LShift maju dari P
+menuju L1; LCtrl kembali menuju P. Faggio tetap sequential; Pizza Boy memakai
+CVT gas-rem.
+
+## Pedal / Keyboard
+
+- `Throttle Attack/Release` membentuk waktu naik dan turun pedal virtual W.
+- `Brake Attack/Release` membentuk pressure virtual tombol S.
+- `Throttle/Brake Curve` mencampur respons linear dan cubic.
+- `Clutch Attack/Release/Curve` membentuk travel digital tombol clutch.
+
+Keyboard tetap menghasilkan target mentah 0/1, tetapi nilai yang dikirim ke
+GTA bergerak kontinu. Tap pendek dapat menghasilkan input parsial, sedangkan
+menahan tombol tetap mencapai 1.0.
 
 ## Engine / Stall
 
@@ -73,9 +85,9 @@ tidak lagi menjadi faktor tunggal.
   mengubah input keyboard 0/1 menjadi permintaan torsi dan pressure bertahap.
 - `S Torque Boost`: nama legacy untuk agresivitas sport pedal map; tidak
   menambah peak power atau memakai cheat-power native.
-- `D Keyboard Pedal`: batas intent throttle tombol W di selector D. Keyboard
-  tidak punya pedal parsial, jadi default `0.62` menjaga D tetap santai;
-  selector S tetap menerima W sebagai full throttle.
+- `D Keyboard Ceiling`: batas maksimum pedal W di selector D. Default `1.00`
+  memberi rentang penuh dan attack/release yang mengatur transisinya. Nilai
+  lebih rendah dapat dipakai sebagai profil cruise pribadi.
 - `Brake Overrides Gas`, `Override Delay`, `Override Cut`: ECU pedal overlap.
 
 ## Gearbox Penalty
@@ -109,15 +121,16 @@ fiturnya mati. Cek `TCSEn`/`ABSEn` untuk konfigurasi dan
 ## Smoke test setelah memasang build
 
 1. Manual N: W harus menaikkan RPM tanpa gerak.
-2. Manual gear 1 + clutch + W: RPM naik; release pelan creep/berangkat, release
-   cepat memberi dump; throttle kecil dapat stall.
+2. Manual gear 1 tanpa gas: release clutch pelan harus mulai bergerak lewat
+   bite point; dump cepat dapat stall. Ulangi di tanjakan untuk memastikan
+   idle drive menyerah dan rollback tetap mungkin.
 3. Manual N ke gear 2 dan low-RPM upshift: gear tetap masuk dan throttle tetap
    aktif, tetapi acceleration berat sesuai torque reserve. Di bawah 1500 RPM,
    `Lug` boleh naik; `Stall` harus turun lagi kalau kendaraan berhasil
    berakselerasi atau clutch diinjak.
 4. Manual R: W mundur, S mengerem dan tidak menaikkan RPM.
-5. Automatic: tahan brake, tekan LShift dari P sampai D, lepas brake untuk
-   creep. L2 hanya memakai gear 1-2 dan L1 mengunci gear 1.
+5. Automatic: tahan brake, tekan LShift dari P sampai D, lepas brake bertahap
+   untuk creep. L2 hanya memakai gear 1-2 dan L1 mengunci gear 1.
 6. Bandingkan D dan S: S harus menahan gear lebih lama, kickdown lebih dini,
    dan memberi respons torsi lebih kuat.
 7. Coba P/R saat masih melaju: selector harus menolak perpindahan.
@@ -143,5 +156,7 @@ menambah `TCC`, `ATF`, `Limp`, `KDPending`, `NeutralDrop`, `BrakeBoost`,
 `AutoTM`, dan `IgnCut`.
 
 `Condition` berasal dari engine health. Nilai upgrade dibaca langsung dari mod
-kendaraan, bukan INI. `LowRec` dan `PowerMul` adalah satu-satunya jalur
-recovery low-RPM pada r20-lowrpm-takeover; tidak ada write runtime drive-force.
+kendaraan, bukan INI. `LowRec` dan `PowerMul` adalah jalur recovery low-RPM;
+tidak ada write runtime drive-force. `IDLE_DRIVE` memisahkan creep virtual,
+hill rollback, dan power multiplier supaya input pemain tidak tertukar dengan
+idle governor.
