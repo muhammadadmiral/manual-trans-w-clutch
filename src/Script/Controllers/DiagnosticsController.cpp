@@ -13,8 +13,9 @@
 #include "../../Vehicle/Clutch/ClutchSystem.h"
 #include "../../Vehicle/Engine/EngineModel.h"
 #include "../../Vehicle/Engine/TractionControl.h"
-#include "../../Vehicle/Gears/AutomaticGearbox.h"
-#include "../../Vehicle/Gears/GearboxSystem.h"
+#include "../../Vehicle/Gearbox/Automatic/AutomaticGearbox.h"
+#include "../../Vehicle/Gearbox/Core/GearboxProfile.h"
+#include "../../Vehicle/Gearbox/Core/GearboxSystem.h"
 #include "../../Vehicle/Engine/FuelSystem.h"
 #include "../../Vehicle/Engine/TurboSystem.h"
 #include "../../Vehicle/TelemetryLogger.h"
@@ -231,6 +232,17 @@ void Update(Vehicle veh, VehicleData& data,
                  static_cast<unsigned>(autoState.synchronizeDurationMs),
                  static_cast<unsigned>(autoState.engageDurationMs));
     }
+    const auto& profileState = GearboxProfile::GetState();
+    LOG_INFO(
+        Gear,
+        "GEARBOX_PROFILE: Type=%s Model=%08X Final=%.3f Custom=%d "
+        "Applied=%d Adaptive=%.3f Predicted=%d Matched=%d",
+        GearboxProfile::GetArchitectureName(), profileState.modelHash,
+        profileState.finalDriveMultiplier,
+        profileState.customRatios ? 1 : 0,
+        profileState.ratiosApplied ? 1 : 0,
+        profileState.learnedAggression, profileState.predictedGear,
+        profileState.predictedShiftMatched ? 1 : 0);
 
     // v1.0: Auto-record faults from system states
     if (gearboxState.moneyShift)

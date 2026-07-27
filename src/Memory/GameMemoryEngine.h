@@ -97,6 +97,7 @@ public:
   float GetThrottlePedal() const;
   float GetTransmissionDriveForce() const;
   float GetTransmissionDriveMaxFlatVel() const;
+  bool CanWriteGearRatios() const;
   uint8_t GetWheelCount() const;
   WheelTelemetry GetWheelTelemetry(uint8_t index) const;
   float GetFuelLevel() const;
@@ -107,6 +108,7 @@ public:
   void SetGear(uint8_t gear);
   void SetNextGear(uint8_t gear);
   void SetTopGear(uint8_t gear);
+  bool SetGearRatio(uint8_t gearIndex, float ratio);
   void SetClutch(float clutch);
   void SetRPM(float rpm);
   void SetThrottle(float throttle);

@@ -9,7 +9,7 @@
 #include "../../Core/InputHandler.h"
 #include "../../Core/ModLogger.h"
 #include "../../Core/Renderer.h"
-#include "../../Vehicle/Gears/AutomaticGearbox.h"
+#include "../../Vehicle/Gearbox/Automatic/AutomaticGearbox.h"
 #include "../../Vehicle/VehicleProfile.h"
 #include "../DrivingEventBus.h"
 #include "../../../sdk/inc/natives.h"

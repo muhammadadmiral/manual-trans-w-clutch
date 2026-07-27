@@ -1,9 +1,10 @@
 #include "GearboxSystem.h"
-#include "../VehicleData.h"
-#include "../VehicleUpgrades.h"
-#include "../../Core/Config.h"
-#include "../../Script/DrivingEventBus.h"
-#include "../../../sdk/inc/natives.h"
+#include "GearboxProfile.h"
+#include "../../VehicleData.h"
+#include "../../VehicleUpgrades.h"
+#include "../../../Core/Config.h"
+#include "../../../Script/DrivingEventBus.h"
+#include "../../../../sdk/inc/natives.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -185,6 +186,9 @@ void NotifyShift(Vehicle vehicle, VehicleData &data, int fromGear, int toGear,
           : (s_state.synchroShift
                  ? 0.18f
                  : upgrades.shiftPenaltyMultiplier);
+  s_state.penaltyMultiplier *=
+      GearboxProfile::GetManualPenaltyMultiplier(
+          fromGear, toGear, clutchless);
   if (s_state.quickShift)
     s_state.shiftAssistCutRemaining = 0.060f;
   else if (s_state.powerShift)

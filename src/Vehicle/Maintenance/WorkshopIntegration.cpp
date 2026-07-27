@@ -2,8 +2,8 @@
 
 #include "MaintenanceSystem.h"
 #include "../Clutch/ClutchSystem.h"
-#include "../Gears/AutomaticGearbox.h"
-#include "../Gears/GearboxSystem.h"
+#include "../Gearbox/Automatic/AutomaticGearbox.h"
+#include "../Gearbox/Core/GearboxSystem.h"
 #include "../../Core/Config.h"
 #include "../../Core/Menu.h"
 #include "../../Core/Renderer.h"

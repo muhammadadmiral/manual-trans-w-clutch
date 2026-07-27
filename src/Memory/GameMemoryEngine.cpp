@@ -5,8 +5,30 @@
 #include <cmath>
 
 namespace GameMemory {
+namespace {
 
+bool IsWritableAddress(uintptr_t address, size_t size) {
+  if (!address || !size)
+    return false;
+  MEMORY_BASIC_INFORMATION info{};
+  if (!VirtualQuery(reinterpret_cast<const void *>(address), &info,
+                    sizeof(info)))
+    return false;
+  const DWORD protection = info.Protect & 0xFF;
+  const bool writable =
+      protection == PAGE_READWRITE || protection == PAGE_WRITECOPY ||
+      protection == PAGE_EXECUTE_READWRITE ||
+      protection == PAGE_EXECUTE_WRITECOPY;
+  if (info.State != MEM_COMMIT || !writable ||
+      (info.Protect & (PAGE_GUARD | PAGE_NOACCESS)))
+    return false;
+  const uintptr_t start =
+      reinterpret_cast<uintptr_t>(info.BaseAddress);
+  const uintptr_t end = start + info.RegionSize;
+  return address >= start && size <= end - address;
+}
 
+} // namespace
 
 // --- CHandlingData Implementation ---
 float CHandlingData::GetDriveForce() const {
@@ -133,6 +155,14 @@ float CVehicle::GetGearRatio(uint8_t gearIndex) const {
   } __except (EXCEPTION_EXECUTE_HANDLER) {
     return 0.0f;
   }
+}
+
+bool CVehicle::CanWriteGearRatios() const {
+  if (!IsValid() || m_offsets->GearRatios == 0 ||
+      m_offsets->GearRatiosInline == 0)
+    return false;
+  return IsWritableAddress(m_address + m_offsets->GearRatios,
+                           sizeof(float) * 17);
 }
 
 float CVehicle::GetClutch() const {
@@ -320,6 +350,22 @@ void CVehicle::SetTopGear(uint8_t gear) {
   __try {
     *reinterpret_cast<uint8_t *>(m_address + m_offsets->TopGear) = gear;
   } __except (EXCEPTION_EXECUTE_HANDLER) {
+  }
+}
+
+bool CVehicle::SetGearRatio(uint8_t gearIndex, float ratio) {
+  if (!CanWriteGearRatios() || gearIndex > 16 || !std::isfinite(ratio))
+    return false;
+  const uintptr_t address =
+      m_address + m_offsets->GearRatios +
+      static_cast<uintptr_t>(gearIndex) * sizeof(float);
+  if (!IsWritableAddress(address, sizeof(float)))
+    return false;
+  __try {
+    *reinterpret_cast<float *>(address) = ratio;
+    return true;
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return false;
   }
 }
 

@@ -16,9 +16,10 @@
 #include "../../Vehicle/Engine/PedalModel.h"
 #include "../../Vehicle/Engine/TractionControl.h"
 #include "../../Vehicle/Engine/TurboSystem.h"
-#include "../../Vehicle/Gears/AutomaticGearbox.h"
-#include "../../Vehicle/Gears/GearboxSystem.h"
-#include "../../Vehicle/Gears/GearLogic.h"
+#include "../../Vehicle/Gearbox/Automatic/AutomaticGearbox.h"
+#include "../../Vehicle/Gearbox/Core/GearboxProfile.h"
+#include "../../Vehicle/Gearbox/Core/GearboxSystem.h"
+#include "../../Vehicle/Gearbox/Manual/ManualGearbox.h"
 #include "../../Vehicle/Maintenance/MaintenanceSystem.h"
 #include "../../Vehicle/Maintenance/RefuelInteraction.h"
 #include "../../Vehicle/Maintenance/ServiceInteraction.h"
@@ -32,9 +33,11 @@
 void VehicleSessionController::Reset() {
     if (m_activeVehicle && ENTITY::DOES_ENTITY_EXIST(m_activeVehicle)) {
         VehicleData previousData(m_activeVehicle);
+        GearboxProfile::RestoreVehicle(previousData);
         previousData.SetClutch(1.0f);
         VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(m_activeVehicle, 1.0f);
     }
+    GearboxProfile::Reset();
     m_activeVehicle = 0;
     m_enterTick     = 0;
     m_justChanged   = false;
@@ -51,9 +54,11 @@ bool VehicleSessionController::CheckAndUpdate(Vehicle current, int maxGear) {
     // Clean up previous vehicle
     if (m_activeVehicle && ENTITY::DOES_ENTITY_EXIST(m_activeVehicle)) {
         VehicleData previousData(m_activeVehicle);
+        GearboxProfile::RestoreVehicle(previousData);
         previousData.SetClutch(1.0f);
         VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(m_activeVehicle, 1.0f);
     }
+    GearboxProfile::Reset();
 
     LOG_INFO(Script, "Entered vehicle handle=%d maxGear=%d", current, maxGear);
     m_activeVehicle = current;
@@ -76,7 +81,7 @@ bool VehicleSessionController::IsInGracePeriod() const {
 }
 
 void VehicleSessionController::ResetSubsystems(Vehicle veh) {
-    GearLogic::Reset(0);
+    ManualGearbox::Reset(0);
     AutomaticGearbox::Reset();
     GearboxSystem::Reset();
     ClutchSystem::Reset();

@@ -1,11 +1,12 @@
 #include "AutomaticGearbox.h"
-#include "GearboxSystem.h"
-#include "../DrivetrainKinematics.h"
-#include "../VehicleData.h"
-#include "../../Core/Config.h"
-#include "../../Core/ModLogger.h"
-#include "../../Script/DrivingEventBus.h"
-#include "../../../sdk/inc/natives.h"
+#include "../Core/GearboxProfile.h"
+#include "../Core/GearboxSystem.h"
+#include "../../DrivetrainKinematics.h"
+#include "../../VehicleData.h"
+#include "../../../Core/Config.h"
+#include "../../../Core/ModLogger.h"
+#include "../../../Script/DrivingEventBus.h"
+#include "../../../../sdk/inc/natives.h"
 #include <algorithm>
 #include <cmath>
 
@@ -93,7 +94,10 @@ static void ConfigureShiftTiming(VehicleData &data, bool upshift,
   const float torqueFactor =
       std::sqrt(std::clamp(driveForce, 0.05f, 1.50f) / 0.30f);
   const float timingScale =
-      std::clamp(torqueFactor / rateFactor, 0.45f, 1.90f);
+      std::clamp(
+          torqueFactor / rateFactor *
+              GearboxProfile::GetAutomaticShiftTimeMultiplier(upshift, sport),
+          0.32f, 1.90f);
 
   const float disengageBase = sport ? 55.0f : 80.0f;
   const float synchronizeBase = sport ? 70.0f : 105.0f;
@@ -257,21 +261,27 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
       RoadRPM(vehicle, data, vehicleMaxGear, s_state.currentGear,
               signedSpeedMps);
   const bool sport = s_state.selector == Selector::Sport;
+  GearboxProfile::UpdateDriverModel(
+      throttle, brake, roadRPM, s_state.currentGear, maxGear, dt);
   const float lowRpmUnlock =
       throttle *
       (1.0f - SmoothStep((roadRPM - 0.22f) / (sport ? 0.30f : 0.36f)));
   const float unlockAmount = lowRpmUnlock * (sport ? 0.16f : 0.30f);
   const float converterCoupling =
-      engineOn ? std::clamp(0.62f + speedCoupling * 0.38f +
-                               throttle * 0.08f - unlockAmount,
-                           sport ? 0.58f : 0.48f, 1.0f)
-               : 0.0f;
+      engineOn
+          ? (GearboxProfile::UsesTorqueConverter()
+                 ? std::clamp(0.62f + speedCoupling * 0.38f +
+                                  throttle * 0.08f - unlockAmount,
+                              sport ? 0.58f : 0.48f, 1.0f)
+                 : 1.0f)
+          : 0.0f;
   // Field clutch GTA bukan torque converter. Kalau nilainya ikut slip
   // hidraulik, Enhanced nggak meneruskan torsi sama sekali saat launch.
   // Carrier native dikunci; slip dan beban converter tetap dihitung terpisah.
   const float nativeCoupling = engineOn ? 1.0f : 0.0f;
   s_state.tccLocked =
-      Config::AutomaticTCC && s_state.currentGear >= 3 &&
+      GearboxProfile::UsesTorqueConverter() && Config::AutomaticTCC &&
+      s_state.currentGear >= 3 &&
       std::fabs(signedSpeedMps) > 14.0f && throttle > 0.05f &&
       throttle < 0.72f && brake < 0.08f &&
       s_state.shiftPhase == ShiftPhase::Engaged &&
@@ -386,17 +396,18 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
                              : Config::AutomaticDUpRPM;
   const float downBase = sport ? Config::AutomaticSDownRPM
                                : Config::AutomaticDDownRPM;
+  const float adaptiveBias = GearboxProfile::GetAdaptiveThresholdBias();
   const float upThreshold =
       std::clamp(sport
-                     ? upBase + throttle * 0.06f
+                     ? upBase + throttle * 0.06f + adaptiveBias
                      : upBase - (1.0f - throttle) * 0.12f +
-                           throttle * 0.16f,
+                           throttle * 0.16f + adaptiveBias,
                  0.35f, 0.99f);
   const float downThreshold =
       std::clamp(sport
-                     ? downBase + throttle * 0.12f
+                     ? downBase + throttle * 0.12f + adaptiveBias * 0.55f
                      : downBase - (1.0f - throttle) * 0.06f +
-                           throttle * 0.14f,
+                           throttle * 0.14f + adaptiveBias * 0.55f,
                  0.10f, upThreshold - 0.08f);
   const bool kickdownRequest =
       throttle >= std::clamp(Config::AutomaticKickdownThrottle, 0.40f, 0.98f) &&
@@ -455,6 +466,14 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
              throttle > 0.04f &&
              std::fabs(signedSpeedMps) >= upshiftMinSpeed) {
     targetGear = s_state.currentGear + 1;
+    if (GearboxProfile::AllowsSkipShift() && !sport &&
+        throttle < 0.20f && s_state.currentGear + 2 <= maxGear) {
+      const float skipRPM =
+          RoadRPM(vehicle, data, vehicleMaxGear,
+                  s_state.currentGear + 2, signedSpeedMps);
+      if (skipRPM > 0.23f)
+        targetGear = s_state.currentGear + 2;
+    }
   } else if ((rpm < downThreshold || (brake > 0.35f && rpm < upThreshold)) &&
              !settlingAfterUpshift &&
              s_state.currentGear > 1 &&
@@ -485,6 +504,7 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
     s_state.shiftPhase = ShiftPhase::Disengaging;
     s_state.phaseStartedAt = now;
     s_state.lastShiftDirection = direction;
+    GearboxProfile::NotifyShiftTarget(targetGear);
     ConfigureShiftTiming(data, direction > 0, sport);
     GearboxSystem::NotifyAutomaticShift(data, previous, targetGear, sport);
     const bool harsh =

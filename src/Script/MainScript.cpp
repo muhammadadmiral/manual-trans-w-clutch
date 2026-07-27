@@ -19,6 +19,7 @@
 #include "../Vehicle/Maintenance/RefuelInteraction.h"
 #include "../Vehicle/Maintenance/ServiceInteraction.h"
 #include "../Vehicle/Maintenance/WorkshopIntegration.h"
+#include "../Vehicle/Gearbox/Core/GearboxProfile.h"
 #include "../Vehicle/VehicleData.h"
 #include "../Vehicle/VehicleProfile.h"
 
@@ -111,6 +112,7 @@ void ScriptMain() {
     LOG_INFO(Script, "VehicleData::Initialize OK. Reading config...");
 
     Config::ReadConfig(g_pluginModule);
+    GearboxProfile::Initialize(g_pluginModule);
     DrivingEventBus::Reset();
     DiagnosticsController::Initialize();
     AudioEngine::Initialize(g_pluginModule);

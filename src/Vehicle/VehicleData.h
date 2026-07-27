@@ -78,11 +78,13 @@ public:
     uint8_t GetLightsVisuallyBroken()    const;
     float   GetHoverTransformRatioLerp() const;
     float   GetGearRatio(uint8_t gear)   const;
+    bool    CanWriteGearRatios()         const;
 
     // Setters — return false when the underlying write would be unsafe
     bool SetGear(uint8_t gear);
     bool SetNextGear(uint8_t gear);
     bool SetTopGear(uint8_t gear);
+    bool SetGearRatio(uint8_t gear, float ratio);
     bool SetClutch(float clutch);
     bool SetRPM(float rpm);
     bool SetThrottle(float throttle);

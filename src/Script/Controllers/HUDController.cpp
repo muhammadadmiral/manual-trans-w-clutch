@@ -15,8 +15,8 @@
 #include "../../Vehicle/Engine/FuelSystem.h"
 #include "../../Vehicle/Engine/PedalModel.h"
 #include "../../Vehicle/Engine/TurboSystem.h"
-#include "../../Vehicle/Gears/AutomaticGearbox.h"
-#include "../../Vehicle/Gears/GearboxSystem.h"
+#include "../../Vehicle/Gearbox/Automatic/AutomaticGearbox.h"
+#include "../../Vehicle/Gearbox/Core/GearboxSystem.h"
 #include "../../Vehicle/Maintenance/MaintenanceSystem.h"
 #include "../../../sdk/inc/natives.h"
 

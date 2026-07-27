@@ -33,7 +33,7 @@ struct ParkingBrakeState {
 void Reset();
 
 // Called every frame. Returns true if parking brake is currently active
-// (so GearLogic can block throttle while parked).
+// (so ManualGearbox can block throttle while parked).
 bool Update(Vehicle vehicle, VehicleData& data, float speedKmH,
             float throttle, int manualGear, bool isEngineOn);
 

@@ -15,6 +15,7 @@
 
 #include "../../sdk/inc/main.h"
 #include "../Core/ModLogger.h"
+#include "../Core/VersionInfo.h"
 #include "../Memory/GearboxPatches.h"
 #include "../Script/MainScript.h"
 
@@ -30,9 +31,8 @@ BOOL APIENTRY DllMain(HMODULE instance, DWORD reason, LPVOID) {
         {
             char modulePath[MAX_PATH]{};
             GetModuleFileNameA(instance, modulePath, MAX_PATH);
-            LOG_INFO(Init,
-        "Runtime=melar-transmission-r25-refine built=%s %s module=%s",
-                     __DATE__, __TIME__,
+            LOG_INFO(Init, "Runtime=%s built=%s %s module=%s",
+                     VersionInfo::kFullLabel, __DATE__, __TIME__,
                      modulePath[0] ? modulePath : "?");
         }
         LOG_INFO(Init, "DLL_PROCESS_ATTACH — registering ScriptMain with ScriptHookV");

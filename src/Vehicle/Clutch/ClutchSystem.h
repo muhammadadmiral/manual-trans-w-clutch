@@ -34,7 +34,7 @@ void ServiceClutch();
 float UpdatePedal(VehicleData &data, float rawPedal, float throttle,
                   float rpm, int gear, int maxGear, bool engineOn);
 
-// Logical gear tetap kepasang; hard-open memakai carrier gear 1 di GearLogic.
+// Logical gear tetap kepasang; hard-open memakai carrier gear 1 di ManualGearbox.
 void ApplyToVehicle(VehicleData &data, int gear, float speedMps);
 
 float GetEngagement();

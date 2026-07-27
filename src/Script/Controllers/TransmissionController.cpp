@@ -18,9 +18,10 @@
 #include "../../Vehicle/Engine/FuelSystem.h"
 #include "../../Vehicle/Engine/PedalModel.h"
 #include "../../Vehicle/Engine/TurboSystem.h"
-#include "../../Vehicle/Gears/AutomaticGearbox.h"
-#include "../../Vehicle/Gears/GearboxSystem.h"
-#include "../../Vehicle/Gears/GearLogic.h"
+#include "../../Vehicle/Gearbox/Automatic/AutomaticGearbox.h"
+#include "../../Vehicle/Gearbox/Core/GearboxProfile.h"
+#include "../../Vehicle/Gearbox/Core/GearboxSystem.h"
+#include "../../Vehicle/Gearbox/Manual/ManualGearbox.h"
 #include "../../Vehicle/LightsLogic.h"
 #include "../../Vehicle/Maintenance/MaintenanceSystem.h"
 #include "../../Vehicle/VehicleUpgrades.h"
@@ -86,7 +87,7 @@ void TransmissionController::Update(
     if (transmissionMode != m_activeMode) {
         if (m_activeMode == 1)
             VEHICLE::SET_VEHICLE_HANDBRAKE(veh, FALSE);
-        GearLogic::Reset(0);
+        ManualGearbox::Reset(0);
         AutomaticGearbox::Reset(
             scooterVehicle ? AutomaticGearbox::Selector::Drive
                            : AutomaticGearbox::Selector::Park);
@@ -126,10 +127,15 @@ void TransmissionController::Update(
 
     if (transmissionMode == 0) {
         GearboxPatches::SetActive(false);
+        GearboxProfile::RestoreVehicle(data);
+        GearboxProfile::Reset();
         data.SetClutch(1.0f);
         VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(veh, 1.0f);
         return;
     }
+
+    GearboxProfile::SelectVehicle(veh, data, maxGear, profile);
+    GearboxProfile::ApplyRatios(data);
 
     // ── Per-frame values ──────────────────────────────────────────────────
     const float speedKmH = vehicleSpeed * 3.6f;
@@ -202,7 +208,7 @@ void TransmissionController::Update(
             veh, data, maxGear, throttle, brake, forwardSpeed, isEngineOn);
         m_simulatedClutch = AutomaticGearbox::GetClutchDisengagement();
     } else {
-        m_manualGear = GearLogic::Update(
+        m_manualGear = ManualGearbox::Update(
             veh, data, maxGear, shiftUpPressed, shiftDownPressed,
             m_simulatedClutch, throttle,
             speedKmH, isEngineOn, m_grindWarningTimer);
@@ -270,7 +276,7 @@ void TransmissionController::Update(
             ? std::pow(std::clamp(assistedThrottle, 0.0f, 1.0f),
                        1.0f - std::clamp(Config::AutomaticSTorqueBoost,
                                          0.0f, 0.50f))
-            : tcsThrottle;
+            : assistedThrottle;
     const float clutchEngagement =
         automaticMode ? AutomaticGearbox::GetCoupling()
                       : ClutchSystem::GetEngagement();
@@ -296,8 +302,9 @@ void TransmissionController::Update(
         AutomaticGearbox::ApplyToMemory(veh, data, m_manualGear,
                                         controlThrottle);
     } else {
-        GearLogic::ApplyToMemory(veh, data, m_manualGear, maxGear,
-                                 m_simulatedClutch, throttle, speedKmH);
+        ManualGearbox::ApplyToMemory(
+            veh, data, m_manualGear, maxGear,
+            m_simulatedClutch, throttle, speedKmH);
         ClutchSystem::ApplyToVehicle(data, m_manualGear, forwardSpeed);
     }
 
@@ -360,8 +367,9 @@ void TransmissionController::Update(
         AutomaticGearbox::ApplyToMemory(veh, data, m_manualGear,
                                         controlThrottle);
     } else {
-        GearLogic::ApplyToMemory(veh, data, m_manualGear, maxGear,
-                                 m_simulatedClutch, throttle, speedKmH);
+        ManualGearbox::ApplyToMemory(
+            veh, data, m_manualGear, maxGear,
+            m_simulatedClutch, throttle, speedKmH);
         ClutchSystem::ApplyToVehicle(data, m_manualGear, forwardSpeed);
     }
 

@@ -1,16 +1,16 @@
-#include "GearLogic.h"
-#include "../../../sdk/inc/natives.h"
-#include "../../Core/ModLogger.h"
-#include "../../Core/Config.h"
-#include "../../Script/DrivingEventBus.h"
-#include "../VehicleData.h"
-#include "GearboxSystem.h"
+#include "ManualGearbox.h"
+#include "../../../../sdk/inc/natives.h"
+#include "../../../Core/ModLogger.h"
+#include "../../../Core/Config.h"
+#include "../../../Script/DrivingEventBus.h"
+#include "../../VehicleData.h"
+#include "../Core/GearboxSystem.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <limits>
 
-namespace GearLogic {
+namespace ManualGearbox {
 
 static int s_manualGear = 0;
 static DWORD s_lastShiftTime = 0;
@@ -185,4 +185,4 @@ void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
   (void)speedKmH;
 }
 
-} // namespace GearLogic
+} // namespace ManualGearbox

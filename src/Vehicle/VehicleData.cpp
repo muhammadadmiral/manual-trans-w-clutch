@@ -591,6 +591,11 @@ float VehicleData::GetGearRatio(uint8_t gear) const {
     return m_vehicle.GetGearRatio(gear);
 }
 
+bool VehicleData::CanWriteGearRatios() const {
+    return m_isValid && resolvedOffsets.GearRatiosInline != 0 &&
+           m_vehicle.CanWriteGearRatios();
+}
+
 // ── Setters ──────────────────────────────────────────────────────────────────
 bool VehicleData::SetGear(uint8_t gear) {
     if (!m_isValid) return false;
@@ -606,6 +611,15 @@ bool VehicleData::SetTopGear(uint8_t gear) {
     if (!m_isValid) return false;
     m_vehicle.SetTopGear(gear);
     return true;
+}
+bool VehicleData::SetGearRatio(uint8_t gear, float ratio) {
+    if (!CanWriteGearRatios() || gear > 16 || !std::isfinite(ratio))
+        return false;
+    const bool reverse = gear == 0;
+    if ((reverse && (ratio > -0.05f || ratio < -20.0f)) ||
+        (!reverse && (ratio < 0.05f || ratio > 20.0f)))
+        return false;
+    return m_vehicle.SetGearRatio(gear, ratio);
 }
 bool VehicleData::SetClutch(float clutch) {
     if (!m_isValid || resolvedOffsets.Clutch == 0 ||

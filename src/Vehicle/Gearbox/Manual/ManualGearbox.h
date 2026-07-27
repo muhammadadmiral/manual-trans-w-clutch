@@ -1,10 +1,10 @@
 #pragma once
-#include "../../../sdk/inc/main.h"
-#include "../../../sdk/inc/types.h"
+#include "../../../../sdk/inc/main.h"
+#include "../../../../sdk/inc/types.h"
 
 class VehicleData; // Forward declaration
 
-namespace GearLogic {
+namespace ManualGearbox {
 
 // Call this when entering a new vehicle to reset logic
 void Reset(int defaultGear = 0);
@@ -20,4 +20,4 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
 void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
                    int maxGear, float clutch, float throttle, float speedKmH);
 
-} // namespace GearLogic
+} // namespace ManualGearbox
