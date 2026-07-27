@@ -1,11 +1,9 @@
 #pragma once
 
-#include <Windows.h>
+#include <array>
+#include <cstddef>
 #include <cstdint>
-#include <initializer_list>
-#include <string>
 
-// Forward declarations
 struct VehicleOffsets;
 
 namespace GameMemory {
@@ -18,50 +16,16 @@ struct WheelTelemetry {
   bool valid = false;
 };
 
-// A robust pointer traversal helper that validates memory at every step.
-// For example, to read: [[[worldPtr] + 0x8] + 0xD28]
-template <typename T>
-bool ReadPointerChain(uintptr_t base,
-                      const std::initializer_list<ptrdiff_t> &offsets,
-                      T &outValue) {
-  if (base == 0)
-    return false;
-  uintptr_t current = base;
-
-  auto it = offsets.begin();
-  while (it != offsets.end()) {
-    ptrdiff_t offset = *it;
-    ++it;
-
-    if (it == offsets.end()) {
-      // Last offset, read the actual value
-      __try {
-        outValue = *reinterpret_cast<T *>(current + offset);
-        return true;
-      } __except (EXCEPTION_EXECUTE_HANDLER) {
-        return false;
-      }
-    } else {
-      // Intermediate offset, read the next pointer
-      __try {
-        current = *reinterpret_cast<uintptr_t *>(current + offset);
-        if (current == 0)
-          return false;
-      } __except (EXCEPTION_EXECUTE_HANDLER) {
-        return false;
-      }
-    }
-  }
-  return false;
-}
-
-// Memory abstraction for CHandlingData
+// A validated view of CHandlingData. Address protection is queried when the
+// owning CVehicle is bound, not from telemetry getters in the frame loop.
 class CHandlingData {
 public:
-  explicit CHandlingData(uintptr_t address, const VehicleOffsets *offsets)
-      : m_address(address), m_offsets(offsets) {}
+  CHandlingData() = default;
 
-  bool IsValid() const { return m_address != 0 && m_offsets != nullptr; }
+  bool IsValid() const {
+    return m_address != 0 && m_offsets != nullptr &&
+           m_address >= m_regionStart && m_address < m_regionEnd;
+  }
 
   float GetDriveForce() const;
   float GetDriveInertia() const;
@@ -72,17 +36,31 @@ public:
   void SetDriveForce(float force);
 
 private:
-  uintptr_t m_address;
-  const VehicleOffsets *m_offsets;
+  friend class CVehicle;
+
+  CHandlingData(uintptr_t address, const VehicleOffsets *offsets,
+                uintptr_t regionStart, uintptr_t regionEnd, bool writable)
+      : m_address(address), m_offsets(offsets), m_regionStart(regionStart),
+        m_regionEnd(regionEnd), m_writable(writable) {}
+
+  bool CanRead(uint32_t offset, size_t size) const;
+  bool CanWrite(uint32_t offset, size_t size) const;
+
+  uintptr_t m_address = 0;
+  const VehicleOffsets *m_offsets = nullptr;
+  uintptr_t m_regionStart = 0;
+  uintptr_t m_regionEnd = 0;
+  bool m_writable = false;
 };
 
-// Memory abstraction for CVehicle
+// CVehicle is rebound when the base pointer/layout changes and periodically
+// revalidated. Per-frame reads and writes only perform cached range checks.
 class CVehicle {
 public:
-  explicit CVehicle(uintptr_t address, const VehicleOffsets *offsets)
-      : m_address(address), m_offsets(offsets) {}
+  explicit CVehicle(uintptr_t address, const VehicleOffsets *offsets,
+                    int identity = 0);
 
-  bool IsValid() const { return m_address != 0 && m_offsets != nullptr; }
+  bool IsValid() const { return m_valid; }
   uintptr_t GetAddress() const { return m_address; }
 
   CHandlingData GetHandlingData() const;
@@ -117,8 +95,30 @@ public:
   void SetLightsVisuallyBroken(uint8_t state);
 
 private:
-  uintptr_t m_address;
-  const VehicleOffsets *m_offsets;
+  bool CanReadVehicle(uint32_t offset, size_t size) const;
+  bool CanWriteVehicle(uint32_t offset, size_t size) const;
+
+  uintptr_t m_address = 0;
+  const VehicleOffsets *m_offsets = nullptr;
+  uintptr_t m_vehicleRegionStart = 0;
+  uintptr_t m_vehicleRegionEnd = 0;
+  bool m_vehicleWritable = false;
+
+  uintptr_t m_handlingAddress = 0;
+  uintptr_t m_handlingRegionStart = 0;
+  uintptr_t m_handlingRegionEnd = 0;
+  bool m_handlingWritable = false;
+
+  uintptr_t m_ratiosAddress = 0;
+  uintptr_t m_ratiosRegionStart = 0;
+  uintptr_t m_ratiosRegionEnd = 0;
+  bool m_ratiosWritable = false;
+
+  std::array<uintptr_t, 16> m_wheelAddresses{};
+  std::array<uintptr_t, 16> m_wheelRegionStarts{};
+  std::array<uintptr_t, 16> m_wheelRegionEnds{};
+  uint8_t m_wheelCount = 0;
+  bool m_valid = false;
 };
 
 } // namespace GameMemory

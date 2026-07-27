@@ -18,7 +18,6 @@
 #include "VehicleData.h"
 
 #include "../../sdk/inc/main.h"
-#include "../Memory/AOBScanner.h"
 #include "../Memory/CalibrationEngine.h"
 #include "../Memory/OffsetResolver.h"
 #include "../Core/ModLogger.h"
@@ -49,31 +48,6 @@ std::string         VehicleData::lastFailureReason = "not initialized";
 // Anonymous helpers
 // =============================================================================
 namespace {
-
-bool IsWritableProtection(DWORD protection) {
-    if ((protection & PAGE_GUARD) || (protection & PAGE_NOACCESS)) return false;
-    const DWORD base = protection & 0xFF;
-    return base == PAGE_READWRITE     || base == PAGE_WRITECOPY ||
-           base == PAGE_EXECUTE_READWRITE || base == PAGE_EXECUTE_WRITECOPY;
-}
-
-bool IsWritableAddress(uintptr_t address, size_t size) {
-    if (!address || !size) return false;
-    MEMORY_BASIC_INFORMATION info{};
-    if (!VirtualQuery(reinterpret_cast<const void*>(address), &info, sizeof(info)))
-        return false;
-    if (info.State != MEM_COMMIT || !IsWritableProtection(info.Protect))
-        return false;
-    const uintptr_t start = reinterpret_cast<uintptr_t>(info.BaseAddress);
-    const uintptr_t end   = start + info.RegionSize;
-    return address >= start && size <= (end - address);
-}
-
-bool TryReadU32(uintptr_t address, uint32_t& value) {
-    if (!AOBScanner::IsReadable(address, sizeof(value))) return false;
-    std::memcpy(&value, reinterpret_cast<const void*>(address), sizeof(value));
-    return true;
-}
 
 // Ambil config baru, lalu fallback sekali ke nama lama buat migrasi.
 bool BuildIniPath(HMODULE pluginModule, char (&path)[MAX_PATH]) {
@@ -453,8 +427,8 @@ const char* VehicleData::GetOffsetSourceName() {
 // =============================================================================
 VehicleData::VehicleData(int vehicleHandle)
     : m_vehicle(reinterpret_cast<uintptr_t>(getScriptHandleBaseAddress(vehicleHandle)),
-                &resolvedOffsets),
-      m_isValid(m_vehicle.IsValid())
+                &resolvedOffsets, vehicleHandle),
+      m_isValid(initialized && m_vehicle.IsValid())
 {
     auto h = m_vehicle.GetHandlingData();
     if (h.IsValid()) {
@@ -566,13 +540,28 @@ float VehicleData::GetInitialDriveMaxFlatVel() const {
 }
 
 uint8_t VehicleData::GetWheelCount() const {
-    return m_isValid ? m_vehicle.GetWheelCount() : 0;
+    EnsureWheelSnapshot();
+    return m_cachedWheelCount;
 }
 
 GameMemory::WheelTelemetry
 VehicleData::GetWheelTelemetry(uint8_t index) const {
-    return m_isValid ? m_vehicle.GetWheelTelemetry(index)
-                     : GameMemory::WheelTelemetry{};
+    EnsureWheelSnapshot();
+    return index < m_cachedWheelCount ? m_cachedWheels[index]
+                                     : GameMemory::WheelTelemetry{};
+}
+
+void VehicleData::EnsureWheelSnapshot() const {
+    if (m_wheelSnapshotReady)
+        return;
+    m_wheelSnapshotReady = true;
+    if (!m_isValid)
+        return;
+
+    m_cachedWheelCount = (std::min)(m_vehicle.GetWheelCount(),
+                                    static_cast<uint8_t>(m_cachedWheels.size()));
+    for (uint8_t index = 0; index < m_cachedWheelCount; ++index)
+        m_cachedWheels[index] = m_vehicle.GetWheelTelemetry(index);
 }
 
 float VehicleData::GetOriginalDriveForce() const {

@@ -147,7 +147,8 @@ void Update(Vehicle veh, VehicleData& data,
              GearboxPatches::IsApplied() ? 1 : 0);
     LOG_INFO(Physics,
              "ENGINE: Owned=%d CtrlRPM=%.3f Target=%.3f WheelRPM=%.3f "
-             "Physical=%.0f Idle=%.0f Redline=%.0f Load=%.3f "
+             "Physical=%.0f Idle=%.0f Redline=%.0f FlatMeta=%.2f "
+             "RedlineSrc=%s Load=%.3f "
              "Reserve=%.3f Lug=%.3f Stall=%.3f LowRec=%.3f "
              "GearLimit=%.1fkm/h Driven=%.1fkm/h WheelData=%d "
              "Burnout=%d Adaptive=%d",
@@ -155,7 +156,10 @@ void Update(Vehicle veh, VehicleData& data,
              engineState.connectedRPMTarget, engineState.wheelRPM,
              engineState.estimatedEngineRPM,
              engineState.estimatedIdlePhysicalRPM,
-             engineState.estimatedRedlineRPM, engineState.load,
+             engineState.estimatedRedlineRPM,
+             engineState.initialDriveMaxFlatVel,
+             engineState.redlineHandlingBacked ? "handling" : "native",
+             engineState.load,
              engineState.torqueReserve, engineState.lugSeverity,
              engineState.stallProgress, engineState.lowRpmRecovery,
              engineState.gearLimitSpeedMps * 3.6f,

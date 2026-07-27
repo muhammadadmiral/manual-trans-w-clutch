@@ -10,6 +10,7 @@
 #include "../../Core/ModLogger.h"
 #include "../../Core/Renderer.h"
 #include "../../Vehicle/Gearbox/Automatic/AutomaticGearbox.h"
+#include "../../Vehicle/VehicleData.h"
 #include "../../Vehicle/VehicleProfile.h"
 #include "../DrivingEventBus.h"
 #include "../../../sdk/inc/natives.h"
@@ -28,6 +29,7 @@ void EngineController::Reset() {
 void EngineController::Initialize(Vehicle veh,
                                    VehicleProfile::Drivetrain profile,
                                    bool coldStart, bool actualEngineOn) {
+    (void)profile;
     m_engineStartTick   = 0;
     m_lastAttemptTick   = 0;
     m_starterRequiredMs = 450;

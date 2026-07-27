@@ -14,6 +14,7 @@
 #include <Windows.h>
 
 #include "../../sdk/inc/main.h"
+#include "../Audio/AudioEngine.h"
 #include "../Core/ModLogger.h"
 #include "../Core/VersionInfo.h"
 #include "../Memory/GearboxPatches.h"
@@ -21,7 +22,7 @@
 
 HMODULE g_pluginModule = nullptr;
 
-BOOL APIENTRY DllMain(HMODULE instance, DWORD reason, LPVOID) {
+BOOL APIENTRY DllMain(HMODULE instance, DWORD reason, LPVOID reserved) {
     switch (reason) {
 
     case DLL_PROCESS_ATTACH:
@@ -40,10 +41,16 @@ BOOL APIENTRY DllMain(HMODULE instance, DWORD reason, LPVOID) {
         break;
 
     case DLL_PROCESS_DETACH:
-        LOG_INFO(Init, "DLL_PROCESS_DETACH — unregistering script, flushing logs");
-        GearboxPatches::Shutdown();
-        scriptUnregister(instance);
-        ModLogger::Shutdown();
+        // A non-null reserved pointer means the whole process is terminating;
+        // Windows will reclaim process resources and loader-lock teardown must
+        // stay minimal. Explicit ASI unload/hot-reload gets full cleanup.
+        if (reserved == nullptr) {
+            LOG_INFO(Init, "DLL_PROCESS_DETACH — unregistering script and releasing resources");
+            scriptUnregister(instance);
+            GearboxPatches::Shutdown();
+            AudioEngine::Shutdown();
+            ModLogger::Shutdown();
+        }
         break;
 
     default:

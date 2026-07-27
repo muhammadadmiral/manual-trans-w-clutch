@@ -65,6 +65,8 @@ void Update(Vehicle veh, VehicleData& data,
         cluster.odometerKm     = MaintenanceSystem::GetState().odometerKm;
         cluster.throttle       = throttle;
         cluster.brake          = brake;
+        cluster.maximumSpeedKmH =
+            VEHICLE::GET_VEHICLE_ESTIMATED_MAX_SPEED(veh) * 3.6f;
         cluster.gear           = manualGear;
         cluster.maxGear        = maxGear;
         cluster.transmissionMode = transmissionMode;
@@ -79,9 +81,13 @@ void Update(Vehicle veh, VehicleData& data,
         cluster.engineOn       = isEngineOn;
         cluster.engineStarting = engineStarting;
         cluster.parkingBrake   = ParkingBrake::IsEngaged();
+        cluster.tcsEnabled     = Config::TcsEnabled;
         cluster.tcsActive      = assist.GetState().tcsActive;
+        cluster.absEnabled     = Config::AbsEnabled;
         cluster.absActive      = assist.GetState().absActive;
+        cluster.escEnabled     = Config::EscEnabled;
         cluster.escActive      = assist.GetState().escActive;
+        cluster.launchEnabled  = Config::LaunchControl;
         cluster.rollWarning    = assist.GetState().rollWarning;
         cluster.launchControl  = assist.GetState().lcArmed;
         cluster.burnout        = engineState.burnoutActive;

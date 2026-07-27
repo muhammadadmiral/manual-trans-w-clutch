@@ -36,6 +36,7 @@
 #include "Controllers/HUDController.h"
 
 #include <Windows.h>
+#include <algorithm>
 #include <unordered_map>
 #include <string>
 
@@ -84,6 +85,15 @@ bool IsValidVehicle(Vehicle vehicle) {
 
 bool IsPlayerDriving(Ped playerPed, Vehicle vehicle) {
     return VEHICLE::GET_PED_IN_VEHICLE_SEAT(vehicle, -1, 0) == playerPed;
+}
+
+int ResolveMaxDriveGear(Vehicle vehicle) {
+    int count = VEHICLE::_GET_VEHICLE_MAX_DRIVE_GEAR_COUNT(vehicle);
+    if (count < 1 || count > 16) {
+        const Hash model = ENTITY::GET_ENTITY_MODEL(vehicle);
+        count = VEHICLE::_GET_VEHICLE_MODEL_NUM_DRIVE_GEARS(model);
+    }
+    return std::clamp(count, 1, 16);
 }
 
 } // namespace
@@ -197,7 +207,7 @@ void ScriptMain() {
         }
 
         // ── In valid vehicle ──────────────────────────────────────────────────
-        const int maxDriveGear = VEHICLE::GET_VEHICLE_HIGH_GEAR(vehicle);
+        const int maxDriveGear = ResolveMaxDriveGear(vehicle);
         
         const bool isEngineOn =
             VEHICLE::GET_IS_VEHICLE_ENGINE_RUNNING(vehicle) != FALSE;

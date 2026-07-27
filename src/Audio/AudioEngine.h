@@ -16,7 +16,9 @@ enum class ShiftCharacter {
 };
 
 bool Initialize(HMODULE module);
-void Shutdown();
+// restoreNativeLayer may only be true on the ScriptHook game thread.
+// DLL detach uses the default to avoid invoking GTA natives under loader lock.
+void Shutdown(bool restoreNativeLayer = false);
 void Update();
 bool IsReady();
 

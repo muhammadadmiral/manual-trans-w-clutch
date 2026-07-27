@@ -219,6 +219,7 @@ CarStyle=0
 BikeStyle=0
 Units=0
 Accent=0
+ShowIcons=1
 Detailed=1
 PosX=0.815
 PosY=0.790
@@ -256,9 +257,16 @@ sama dengan drivetrain frame aktif.
   `TRACK BAR`, dan `AUTO DYNAMIC`.
 - `Units`: km/h atau mph.
 - `Accent`, `Position`, `Scale`, dan `Opacity`: customization live.
+- `ShowIcons`: tampilkan status engine, parking brake, TCS, ABS, ESC,
+  launch control, burnout, dan master warning dengan state
+  disabled/standby/active yang berbeda.
 - `Detailed Telemetry`: fuel, temperatur/life oli, engine/gearbox health,
   clutch heat, boost, odometer, TCS, ABS, launch control, parking brake,
   burnout, dan service warning.
+
+Dial analog memakai skala angka dan numeric inset, layout analog/hybrid punya
+progressive shift lights, dan batas speed dial dibulatkan dari estimated max
+speed kendaraan alih-alih selalu memakai 320 km/h.
 
 ## Los Santos Customs integration
 

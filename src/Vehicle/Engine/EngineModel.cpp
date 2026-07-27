@@ -27,18 +27,47 @@ static float SmoothStep(float value) {
 struct PhysicalRPMRange {
   float idle;
   float redline;
+  float initialFlatVelocity;
+  bool handlingBacked;
 };
 
-static PhysicalRPMRange ResolvePhysicalRPMRange(Vehicle vehicle) {
-  const int vehicleClass = VEHICLE::GET_VEHICLE_CLASS(vehicle);
-  if (vehicleClass == 8)
-    return {1200.0f, 10500.0f};
-  if (vehicleClass == 6 || vehicleClass == 7)
-    return {900.0f, 7800.0f};
-  if (vehicleClass == 10 || vehicleClass == 11 ||
-      vehicleClass == 12 || vehicleClass == 20)
-    return {750.0f, 4800.0f};
-  return {800.0f, 6800.0f};
+static PhysicalRPMRange ResolvePhysicalRPMRange(Vehicle vehicle,
+                                                VehicleData &data) {
+  // GTA exposes normalized RPM and the driveline velocity at normalized
+  // redline, but not a physical redline-RPM field. Derive the display/load
+  // scale from the vehicle's own handling instead of a vehicle-class table.
+  const float initialFlat =
+      std::fabs(data.GetInitialDriveMaxFlatVel());
+  const bool handlingBacked =
+      std::isfinite(initialFlat) && initialFlat > 2.0f &&
+      initialFlat < 250.0f;
+  const float nativeTopSpeed =
+      std::max(8.0f, VEHICLE::GET_VEHICLE_ESTIMATED_MAX_SPEED(vehicle));
+  const float drivelineVelocity =
+      handlingBacked ? initialFlat : nativeTopSpeed * 0.85f;
+
+  const float initialDriveForce = data.GetInitialDriveForce();
+  const float finalReductionEstimate =
+      std::clamp(3.50f +
+                     (std::isfinite(initialDriveForce)
+                          ? initialDriveForce
+                          : 0.30f) *
+                         3.0f,
+                 3.50f, 5.40f);
+  const float rollingRadius =
+      std::clamp(s_state.rollingRadius, 0.24f, 0.55f);
+  constexpr float kRadiansPerSecondToRPM =
+      60.0f / (2.0f * 3.14159265358979323846f);
+  const float redline =
+      std::clamp(drivelineVelocity / rollingRadius *
+                     finalReductionEstimate * kRadiansPerSecondToRPM,
+                 3500.0f, 12000.0f);
+  const float idle =
+      std::clamp(redline *
+                     std::clamp(s_state.idleRPM * 0.62f, 0.10f, 0.18f),
+                 650.0f, 1600.0f);
+  return {idle, redline, handlingBacked ? initialFlat : 0.0f,
+          handlingBacked};
 }
 
 static float ToPhysicalRPM(float normalizedRPM, float idleNormalized,
@@ -327,9 +356,12 @@ static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
           : 0.0f;
   s_state.load = engagement * speedGap;
 
-  const PhysicalRPMRange rpmRange = ResolvePhysicalRPMRange(vehicle);
+  const PhysicalRPMRange rpmRange =
+      ResolvePhysicalRPMRange(vehicle, data);
   s_state.estimatedIdlePhysicalRPM = rpmRange.idle;
   s_state.estimatedRedlineRPM = rpmRange.redline;
+  s_state.initialDriveMaxFlatVel = rpmRange.initialFlatVelocity;
+  s_state.redlineHandlingBacked = rpmRange.handlingBacked;
   // Torque converter memindahkan torsi tanpa menyamakan putaran poros.
   // Mencampur RPM roda di sini bikin mesin matic terbaca 300-400 RPM saat
   // diam, lalu model torsinya sendiri menganggap mesin lug parah.

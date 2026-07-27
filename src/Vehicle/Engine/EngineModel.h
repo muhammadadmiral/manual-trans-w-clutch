@@ -30,6 +30,7 @@ struct State {
   float estimatedEngineRPM = 800.0f;
   float estimatedIdlePhysicalRPM = 800.0f;
   float estimatedRedlineRPM = 6800.0f;
+  float initialDriveMaxFlatVel = 0.0f;
   float engineCondition = 1.0f;
   float lugSeverity = 0.0f;
   float waterIngestion = 0.0f;
@@ -41,6 +42,7 @@ struct State {
   bool rpmOwned = false;
   bool nativeCutRecovered = false;
   bool redlineCut = false;
+  bool redlineHandlingBacked = false;
   bool handlingBacked = false;
   bool adaptiveGearing = false;
   bool speedSampleValid = false;

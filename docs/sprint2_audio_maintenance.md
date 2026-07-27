@@ -28,6 +28,12 @@ lebih dari satu varian. Pitch dan level mendapat variasi kecil. Saat load,
 peak setiap WAV dibatasi ke `LimiterCeiling`; mastering voice menyisakan
 headroom tambahan agar beberapa event yang berdekatan tidak clipping.
 
+Pada explicit ASI unload/hot-reload, script dihentikan lebih dulu lalu
+`AudioEngine::Shutdown()` menghentikan XAudio engine, flush/destroy seluruh
+source voice, menghancurkan mastering voice, release interface XAudio2, dan
+melepas semua buffer PCM bank. Shutdown idempotent; process-exit biasa
+diserahkan ke Windows supaya tidak menjalankan teardown berat di loader lock.
+
 Perpindahan internal D1-D2-D3 tidak memakai bunyi selector. Shift D yang ringan
 memilih bank slow, shift biasa memilih bank normal, sedangkan kickdown,
 limiter-pressure, power shift, dan quickshifter memilih karakter harsh.

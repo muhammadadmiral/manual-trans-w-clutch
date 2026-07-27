@@ -174,6 +174,7 @@ int   SpeedometerCarStyle = 0;
 int   SpeedometerBikeStyle = 0;
 int   SpeedometerUnits = 0;
 int   SpeedometerAccent = 0;
+bool  SpeedometerShowIcons = true;
 bool  SpeedometerDetailed = true;
 float SpeedometerPosX = 0.815f;
 float SpeedometerPosY = 0.790f;
@@ -604,6 +605,8 @@ void ReadConfig(HMODULE module) {
         static_cast<int>(
             GetPrivateProfileIntA("Speedometer", "Accent", 0, ini)),
         0, 4);
+    SpeedometerShowIcons =
+        GetPrivateProfileIntA("Speedometer", "ShowIcons", 1, ini) != 0;
     SpeedometerDetailed =
         GetPrivateProfileIntA("Speedometer", "Detailed", 1, ini) != 0;
     SpeedometerPosX =
@@ -828,6 +831,8 @@ void SaveConfig(HMODULE module) {
     WriteInt("Speedometer", "BikeStyle", SpeedometerBikeStyle, ini);
     WriteInt("Speedometer", "Units", SpeedometerUnits, ini);
     WriteInt("Speedometer", "Accent", SpeedometerAccent, ini);
+    WriteInt("Speedometer", "ShowIcons",
+             SpeedometerShowIcons ? 1 : 0, ini);
     WriteInt("Speedometer", "Detailed", SpeedometerDetailed ? 1 : 0, ini);
     WriteFloat("Speedometer", "PosX", SpeedometerPosX, ini);
     WriteFloat("Speedometer", "PosY", SpeedometerPosY, ini);

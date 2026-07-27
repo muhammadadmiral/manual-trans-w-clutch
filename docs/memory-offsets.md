@@ -52,3 +52,16 @@ direstore ketika mode Off, keluar kendaraan, atau unload.
 RPM saat clutch tersambung dihitung dari road speed, runtime flat velocity, dan
 rasio kendaraan aktif. RPM ini bukan pengganti kecepatan: wheel angular
 velocity dan vehicle velocity tidak pernah ditulis.
+
+## Runtime binding
+
+`CVehicle`, handling, ratio table, dan pointer roda divalidasi ketika base
+vehicle/layout berubah, lalu direvalidasi berkala setiap dua detik. Getter dan
+setter yang jalan di frame loop hanya memakai cached memory-region bounds;
+tidak ada `VirtualQuery`, `AOBScanner::IsReadable`, atau blok SEH per field.
+Telemetry seluruh roda juga di-snapshot sekali per `VehicleData` frame lalu
+dipakai bersama oleh engine model, TCS, dan ABS.
+
+SEH tetap dibatasi ke scanner/kalibrasi/patch transaction yang bukan hot path.
+Kalau binding periodik gagal, memory facade fail closed sampai binding valid
+lagi dan tidak melakukan raw write.

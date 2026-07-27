@@ -185,6 +185,7 @@ extern int   SpeedometerCarStyle;
 extern int   SpeedometerBikeStyle;
 extern int   SpeedometerUnits;
 extern int   SpeedometerAccent;
+extern bool  SpeedometerShowIcons;
 extern bool  SpeedometerDetailed;
 extern float SpeedometerPosX;
 extern float SpeedometerPosY;

@@ -56,6 +56,7 @@ enum class Category : int {
     Script  = 9,  // Main script loop lifecycle
     General = 10, // Catch-all
     Audio   = 11, // XAudio2 dan event audio mekanikal
+    Diag    = 12, // Telemetry sessions and structured diagnostics
 };
 
 // ── Public API ────────────────────────────────────────────────────────────────

@@ -27,25 +27,37 @@ void DrawPower(float x, float y, bool on, const Colour &accent,
                       r, g, b, alpha, 0);
 }
 
-void DrawStateBadge(const char *label, float x, float y, bool on,
+void DrawStateBadge(const char *label, float x, float y, bool enabled,
+                    bool active,
                     const Colour &onColour, int opacity, float scale) {
-  const float width = 0.031f * scale;
+  const float width = 0.030f * scale;
   const float height = 0.018f * scale;
-  const int r = on ? onColour.r : 54;
-  const int g = on ? onColour.g : 59;
-  const int b = on ? onColour.b : 66;
+  const int r = active ? onColour.r : (enabled ? 44 : 28);
+  const int g = active ? onColour.g : (enabled ? 51 : 31);
+  const int b = active ? onColour.b : (enabled ? 59 : 35);
   GRAPHICS::DRAW_RECT(x, y, width, height, r, g, b,
-                      on ? opacity : opacity / 3, 0);
-  if (!on) {
+                      active ? opacity : opacity / 2, 0);
+  if (!active) {
     GRAPHICS::DRAW_RECT(x, y - height * 0.5f, width,
-                        0.0014f * scale, 92, 99, 108, opacity / 2, 0);
+                        0.0012f * scale,
+                        enabled ? 98 : 58, enabled ? 108 : 62,
+                        enabled ? 118 : 68, opacity / 2, 0);
     GRAPHICS::DRAW_RECT(x, y + height * 0.5f, width,
-                        0.0014f * scale, 92, 99, 108, opacity / 2, 0);
+                        0.0012f * scale,
+                        enabled ? 98 : 58, enabled ? 108 : 62,
+                        enabled ? 118 : 68, opacity / 2, 0);
+  }
+  if (!enabled) {
+    GRAPHICS::DRAW_RECT(x, y, width * 0.72f,
+                        0.0015f * scale, 115, 52, 52,
+                        opacity / 2, 0);
   }
   Renderer::DrawTextOverlay(
       label, x, y - 0.0090f * scale, 0.185f * scale,
-      on ? 8 : 135, on ? 12 : 140, on ? 16 : 148,
-      on ? opacity : opacity / 2, 0, false, true);
+      active ? 8 : (enabled ? 165 : 92),
+      active ? 12 : (enabled ? 174 : 96),
+      active ? 16 : (enabled ? 184 : 102),
+      active ? opacity : opacity / 2, 0, false, true);
 }
 
 void DrawWarningTriangle(float x, float y, bool on, int opacity, float scale) {

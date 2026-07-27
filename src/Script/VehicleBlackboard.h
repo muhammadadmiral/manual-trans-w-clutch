@@ -6,9 +6,14 @@
 
 #include "../Vehicle/VehicleProfile.h"
 #include "../Vehicle/VehicleData.h"
-#include "../../sdk/inc/types.h"
+#include "../../sdk/inc/natives.h"
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <Windows.h>
+
+#include <algorithm>
 
 struct VehicleBlackboard {
     // ── Identity ──────────────────────────────────────────────────────────────

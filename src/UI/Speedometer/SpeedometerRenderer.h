@@ -19,6 +19,7 @@ struct Data {
   float odometerKm = 0.0f;
   float throttle = 0.0f;
   float brake = 0.0f;
+  float maximumSpeedKmH = 320.0f;
   int gear = 0;
   int maxGear = 0;
   int transmissionMode = 0;
@@ -28,9 +29,13 @@ struct Data {
   bool engineOn = false;
   bool engineStarting = false;
   bool parkingBrake = false;
+  bool tcsEnabled = false;
   bool tcsActive = false;
+  bool absEnabled = false;
   bool absActive = false;
+  bool escEnabled = false;
   bool escActive = false;
+  bool launchEnabled = false;
   bool rollWarning = false;
   bool launchControl = false;
   bool burnout = false;

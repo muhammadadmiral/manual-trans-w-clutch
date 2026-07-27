@@ -99,21 +99,6 @@ float GeometricGearFraction(int gear, int maxGear,
            rawFraction * (1.0f - params.firstGearFraction);
 }
 
-// Legacy fallback — dipertahankan untuk kasus edge.
-float CurveExponent(VehicleProfile::Drivetrain profile) {
-    switch (profile) {
-    case VehicleProfile::Drivetrain::MotorcycleSequential:
-    case VehicleProfile::Drivetrain::ScooterCVT:
-        return 0.70f;
-    case VehicleProfile::Drivetrain::UtilitySingleSpeed:
-        return 0.82f;
-    case VehicleProfile::Drivetrain::Electric:
-        return 0.88f;
-    default:
-        return 0.96f;
-    }
-}
-
 bool HasCoherentRatios(VehicleData &data, int maxGear) {
     if (maxGear < 1 || maxGear > 16)
         return false;
@@ -172,7 +157,14 @@ Calibration Resolve(Vehicle vehicle, VehicleData &data, int gear, int maxGear) {
     const float topRatio =
         std::fabs(data.GetGearRatio(static_cast<uint8_t>(maxGear)));
 
-    const float memoryFlat = std::fabs(data.GetDriveMaxFlatVel());
+    const float initialHandlingFlat =
+        std::fabs(data.GetInitialDriveMaxFlatVel());
+    const float runtimeFlat = std::fabs(data.GetDriveMaxFlatVel());
+    const bool initialHandlingFlatValid =
+        std::isfinite(initialHandlingFlat) &&
+        initialHandlingFlat > 2.0f && initialHandlingFlat < 250.0f;
+    const float memoryFlat =
+        initialHandlingFlatValid ? initialHandlingFlat : runtimeFlat;
     if (result.ratioSetValid && std::isfinite(memoryFlat) &&
         memoryFlat > 2.0f && memoryFlat < 250.0f && topRatio > 0.03f) {
         const float predictedTop = memoryFlat / topRatio;

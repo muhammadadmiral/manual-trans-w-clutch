@@ -512,6 +512,9 @@ void Menu::Initialize() {
       "Accent", MenuItem::IntChoice, &Config::SpeedometerAccent,
       0, 4, {"CYAN", "RED", "GREEN", "AMBER", "WHITE"}));
   speedometer.items.push_back(
+      MenuItem("Status Icons", MenuItem::Bool,
+               &Config::SpeedometerShowIcons));
+  speedometer.items.push_back(
       MenuItem("Detailed Telemetry", MenuItem::Bool,
                &Config::SpeedometerDetailed));
   speedometer.items.push_back(MenuItem(

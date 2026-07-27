@@ -51,6 +51,7 @@ const char* CategoryToStr(Category c) {
         case Category::Script:  return "SCRIPT ";
         case Category::General: return "GENERAL";
         case Category::Audio:   return "AUDIO  ";
+        case Category::Diag:    return "DIAG   ";
         default:                return "???    ";
     }
 }

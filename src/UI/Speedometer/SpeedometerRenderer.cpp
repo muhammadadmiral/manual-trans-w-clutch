@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <string>
 
 namespace Speedometer {
@@ -130,15 +131,24 @@ void DrawDial(float cx, float cy, float radiusX, float radiusY,
   GRAPHICS::DRAW_RECT(cx, cy, radiusX * 2.32f, radiusY * 2.18f,
                       5, 7, 9, opacity, 0);
   DrawArc(cx, cy, radiusX, radiusY, fraction, accent, opacity, scale);
+  const float maximum = std::strtof(maxMark, nullptr);
+  constexpr float start = 2.443461f;
+  constexpr float sweep = 4.537856f;
+  for (int mark = 0; mark <= 4; ++mark) {
+    const float t = static_cast<float>(mark) / 4.0f;
+    const float angle = start + sweep * t;
+    char markText[12]{};
+    sprintf_s(markText, "%.0f", maximum * t);
+    Renderer::DrawTextOverlay(
+        markText,
+        cx + std::cos(angle) * radiusX * 0.73f,
+        cy + std::sin(angle) * radiusY * 0.73f - 0.006f * scale,
+        0.135f * scale, 132, 142, 151, opacity,
+        0, false, true);
+  }
   Renderer::DrawTextOverlay(label, cx, cy + radiusY * 0.34f,
                             0.225f * scale, 165, 174, 182, opacity,
                             0, false, true);
-  Renderer::DrawTextOverlay("0", cx - radiusX * 0.72f,
-                            cy + radiusY * 0.64f, 0.19f * scale,
-                            125, 132, 140, opacity, 0, false, true);
-  Renderer::DrawTextOverlay(maxMark, cx + radiusX * 0.72f,
-                            cy + radiusY * 0.64f, 0.19f * scale,
-                            125, 132, 140, opacity, 0, false, true);
 }
 
 void DrawTachBar(float left, float y, float width, float rpm, int segments,
@@ -162,28 +172,63 @@ void DrawTachBar(float left, float y, float width, float rpm, int segments,
   }
 }
 
+void DrawShiftLights(float x, float y, float width, float rpm,
+                     int opacity, float scale) {
+  constexpr int count = 10;
+  const float gap = width / static_cast<float>(count);
+  for (int index = 0; index < count; ++index) {
+    const float threshold = 0.52f + static_cast<float>(index) * 0.048f;
+    const bool lit = rpm >= threshold;
+    const bool red = index >= 8;
+    const bool amber = index >= 5 && index < 8;
+    const int r = lit ? (red ? 255 : (amber ? 255 : 70)) : 35;
+    const int g = lit ? (red ? 52 : (amber ? 176 : 225)) : 40;
+    const int b = lit ? (red ? 42 : (amber ? 38 : 112)) : 46;
+    GRAPHICS::DRAW_RECT(
+        x - width * 0.5f + gap * (static_cast<float>(index) + 0.5f),
+        y, 0.0060f * scale, 0.0060f * scale,
+        r, g, b, lit ? opacity : opacity / 2, 0);
+  }
+}
+
 void DrawStatusIcons(const Data &data, float x, float y, float width,
                      const Colour &accent, int opacity, float scale) {
-  const float gap = 0.036f * scale;
-  float cursor = x - width * 0.5f + 0.020f * scale;
+  const float slot = width / 8.0f;
+  float cursor = x - width * 0.5f + slot * 0.5f;
   SpeedometerIcons::DrawPower(
       cursor, y, data.engineOn || data.engineStarting,
       accent, opacity, scale);
-  cursor += 0.025f * scale;
+  cursor += slot;
   SpeedometerIcons::DrawStateBadge(
-      "TCS", cursor, y, data.tcsActive, {255, 190, 45}, opacity, scale);
-  cursor += gap;
+      "P", cursor, y, true, data.parkingBrake,
+      {255, 68, 58}, opacity, scale);
+  cursor += slot;
   SpeedometerIcons::DrawStateBadge(
-      "ABS", cursor, y, data.absActive, {255, 190, 45}, opacity, scale);
-  cursor += gap;
+      "TCS", cursor, y, data.tcsEnabled, data.tcsActive,
+      {255, 190, 45}, opacity, scale);
+  cursor += slot;
   SpeedometerIcons::DrawStateBadge(
-      "ESC", cursor, y, data.escActive, {255, 190, 45}, opacity, scale);
-  cursor += gap;
+      "ABS", cursor, y, data.absEnabled, data.absActive,
+      {255, 190, 45}, opacity, scale);
+  cursor += slot;
   SpeedometerIcons::DrawStateBadge(
-      "LC", cursor, y, data.launchControl, {55, 205, 255}, opacity, scale);
+      "ESC", cursor, y, data.escEnabled, data.escActive,
+      {255, 190, 45}, opacity, scale);
+  cursor += slot;
+  SpeedometerIcons::DrawStateBadge(
+      "LC", cursor, y, data.launchEnabled, data.launchControl,
+      {55, 205, 255}, opacity, scale);
+  cursor += slot;
+  SpeedometerIcons::DrawStateBadge(
+      "BURN", cursor, y, true, data.burnout,
+      {255, 112, 40}, opacity, scale);
+  const bool masterWarning =
+      data.rollWarning || data.fuel < 0.12f ||
+      data.oilTemperature > 0.92f || data.oilLife < 0.12f ||
+      data.engineHealth < 0.25f || data.gearboxHealth < 0.20f;
   SpeedometerIcons::DrawWarningTriangle(
-      x + width * 0.5f - 0.020f * scale, y,
-      data.rollWarning, opacity, scale);
+      x + width * 0.5f - slot * 0.5f, y,
+      masterWarning, opacity, scale);
 }
 
 } // namespace
@@ -235,8 +280,10 @@ void Draw(const Data &data) {
   }
   if (data.motorcycle)
     baseWidth -= 0.018f;
+  const float statusHeight =
+      Config::SpeedometerShowIcons ? 0.030f : 0.006f;
   const float telemetryHeight =
-      Config::SpeedometerDetailed ? 0.089f : 0.030f;
+      statusHeight + (Config::SpeedometerDetailed ? 0.059f : 0.0f);
   const float width = baseWidth * scale;
   const float height = (mainHeight + telemetryHeight) * scale;
   const float x = std::clamp(
@@ -265,8 +312,15 @@ void Draw(const Data &data) {
       Config::SpeedometerUnits == 1 ? data.speedKmH * 0.621371f
                                     : data.speedKmH;
   const char *unit = Config::SpeedometerUnits == 1 ? "MPH" : "KM/H";
+  const float requestedMaximumKmH =
+      std::clamp(data.maximumSpeedKmH * 1.15f, 140.0f, 440.0f);
+  const float requestedMaximum =
+      Config::SpeedometerUnits == 1
+          ? requestedMaximumKmH * 0.621371f
+          : requestedMaximumKmH;
+  const float gaugeStep = Config::SpeedometerUnits == 1 ? 20.0f : 40.0f;
   const float maximumSpeed =
-      Config::SpeedometerUnits == 1 ? 200.0f : 320.0f;
+      std::ceil(requestedMaximum / gaugeStep) * gaugeStep;
   const float speedFraction =
       std::clamp(shownSpeed / maximumSpeed, 0.0f, 1.0f);
   char speedText[24]{};
@@ -344,6 +398,15 @@ void Draw(const Data &data) {
                               top + 0.126f * scale, 0.42f * scale,
                               accent.r, accent.g, accent.b, opacity,
                               2, true, true);
+    Renderer::DrawTextOverlay(speedText, left + width * 0.29f,
+                              dialY - 0.020f * scale, 0.34f * scale,
+                              235, 240, 245, opacity, 2, true, true);
+    char analogRpm[16]{};
+    sprintf_s(analogRpm, "%.1f",
+              std::max(0.0f, data.physicalRPM) / 1000.0f);
+    Renderer::DrawTextOverlay(analogRpm, left + width * 0.71f,
+                              dialY - 0.020f * scale, 0.32f * scale,
+                              235, 240, 245, opacity, 2, true, true);
   } else if (style == 2) {
     Renderer::DrawTextOverlay(
         data.motorcycle ? "SPORT BIKE" : "SPORT HYBRID",
@@ -484,15 +547,27 @@ void Draw(const Data &data) {
         145, 160, 175, opacity, 0, false, true);
   }
 
+  if (style == 1 || style == 2 || style == 3 ||
+      style == 5 || style == 7) {
+    DrawShiftLights(x, top + (mainHeight - 0.012f) * scale,
+                    (data.motorcycle ? 0.105f : 0.125f) * scale,
+                    rpm, opacity, scale);
+  }
+
   const float iconY = top + (mainHeight + 0.015f) * scale;
-  GRAPHICS::DRAW_RECT(x, iconY - 0.012f * scale, width,
-                      0.002f * scale, 45, 53, 62, opacity, 0);
-  DrawStatusIcons(data, x, iconY, width, accent, opacity, scale);
+  if (Config::SpeedometerShowIcons) {
+    GRAPHICS::DRAW_RECT(x, iconY - 0.012f * scale, width,
+                        0.002f * scale, 45, 53, 62, opacity, 0);
+    DrawStatusIcons(data, x, iconY, width, accent, opacity, scale);
+  }
 
   if (!Config::SpeedometerDetailed)
     return;
 
-  const float detailTop = iconY + 0.022f * scale;
+  const float detailTop =
+      Config::SpeedometerShowIcons
+          ? iconY + 0.022f * scale
+          : top + (mainHeight + 0.010f) * scale;
   char conditionLine[160]{};
   sprintf_s(conditionLine,
             "FUEL %02d%%  OIL %02d%%/%02d%%  ENG %02d%%  GBX %02d%%",

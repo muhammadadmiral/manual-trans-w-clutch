@@ -5,6 +5,10 @@
 #pragma once
 
 #include "../../Vehicle/VehicleProfile.h"
+
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <Windows.h>
 
 using Vehicle = int;

@@ -8,6 +8,7 @@
 #define NOMINMAX
 #include <Windows.h>
 
+#include <array>
 #include <cstdint>
 #include <string>
 
@@ -99,6 +100,7 @@ private:
 
     bool CanRead (uint32_t offset, size_t size) const;
     bool CanWrite(uint32_t offset, size_t size) const;
+    void EnsureWheelSnapshot() const;
 
     // ── Shared static state ──────────────────────────────────────────────────
     static VehicleOffsets      resolvedOffsets;
@@ -109,6 +111,9 @@ private:
     // ── Private helpers ───────────────────────────────────────────────────────
     // Cache for original handling values
     float m_originalDriveForce = -1.0f;
+    mutable bool m_wheelSnapshotReady = false;
+    mutable uint8_t m_cachedWheelCount = 0;
+    mutable std::array<GameMemory::WheelTelemetry, 16> m_cachedWheels{};
 
     // Helpers
     static bool ResolveOffsetsByPattern(VehicleOffsets& result);

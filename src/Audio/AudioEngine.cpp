@@ -161,6 +161,20 @@ void LoadBank(const std::filesystem::path &root, Bank &bank,
   }
 }
 
+void ReleaseBanks() {
+  Bank *banks[] = {
+      &s_carShift,         &s_carSoft,          &s_carPower,
+      &s_bikeUp,           &s_bikeDown,         &s_bikeUpSoft,
+      &s_bikeDownSoft,     &s_bikeError,        &s_parkApply,
+      &s_parkRelease,      &s_autoSelector,     &s_turboBlowoff,
+      &s_turboFlutter,     &s_clutchSlip,       &s_transmissionClunk,
+      &s_engineLug,        &s_absPulse,         &s_tcsCut,
+      &s_launchCut,        &s_drivetrainFlex,
+  };
+  for (Bank *bank : banks)
+    *bank = Bank{};
+}
+
 IXAudio2SourceVoice *AcquireVoice() {
   for (auto *voice : s_voices) {
     XAUDIO2_VOICE_STATE state{};
@@ -243,6 +257,7 @@ bool Initialize(HMODULE module) {
   if (FAILED(hr) || !s_audio) {
     LOG_ERROR(Audio, "XAudio2Create failed hr=0x%08X",
               static_cast<unsigned>(hr));
+    Shutdown();
     return false;
   }
   if (FAILED(s_audio->CreateMasteringVoice(&s_master))) {
@@ -536,14 +551,19 @@ bool Initialize(HMODULE module) {
   return true;
 }
 
-void Shutdown() {
-  if (s_nativePopVehicle && ENTITY::DOES_ENTITY_EXIST(s_nativePopVehicle))
+void Shutdown(bool restoreNativeLayer) {
+  if (restoreNativeLayer && s_nativePopVehicle &&
+      ENTITY::DOES_ENTITY_EXIST(s_nativePopVehicle))
     AUDIO::ENABLE_VEHICLE_EXHAUST_POPS(s_nativePopVehicle, FALSE);
   s_nativePopVehicle = 0;
   s_nativePopUntil = 0;
   s_ready = false;
+  if (s_audio)
+    s_audio->StopEngine();
   for (auto &voice : s_voices) {
     if (voice) {
+      voice->Stop();
+      voice->FlushSourceBuffers();
       voice->DestroyVoice();
       voice = nullptr;
     }
@@ -556,6 +576,8 @@ void Shutdown() {
     s_audio->Release();
     s_audio = nullptr;
   }
+  ReleaseBanks();
+  LOG_INFO(Audio, "Audio engine shutdown complete");
 }
 
 void Update() {

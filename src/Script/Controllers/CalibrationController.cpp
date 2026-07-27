@@ -47,6 +47,7 @@ void CalibrationController::CheckLayout(VehicleData& data, int maxGear) {
 bool CalibrationController::Update(Vehicle veh, bool isEngineOn,
                                     float smoothThrottle, int maxGear,
                                     VehicleData& data) {
+    (void)data;
     const bool isRevving = smoothThrottle > 0.5f;
 
     VehicleData::UpdateCalibration(g_pluginModule, veh, isEngineOn,
@@ -70,16 +71,17 @@ bool CalibrationController::Update(Vehicle veh, bool isEngineOn,
     }
 
     if (VehicleData::IsInitialized()) {
-        // Just succeeded!
+        // The current VehicleData object was bound before calibration filled
+        // the offsets. Validate a freshly bound object on the next frame.
         const VehicleOffsets& off = VehicleData::GetResolvedOffsets();
         LOG_INFO(Calib,
                  "Calibration done — RPM=0x%X CLT=0x%X G=0x%X N=0x%X TG=0x%X",
                  off.RPM, off.Clutch, off.Gear, off.NextGear, off.TopGear);
-        m_layoutValid = data.HasPlausibleLayout(maxGear > 0 ? maxGear : 6);
-        m_layoutChecked = true;
+        m_layoutValid = false;
+        m_layoutChecked = false;
         Renderer::ShowNotification(
             "~g~Calibration complete! Manual transmission active.");
-        return true;
+        return false;
     }
 
     DrawHUD(state, smoothThrottle);

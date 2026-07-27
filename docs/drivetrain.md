@@ -168,13 +168,17 @@ native, bukan lewat write velocity. Ia hanya aktif saat throttle terbuka,
 brake lepas, clutch cukup terkunci, dan RPM berada di band bawah; ketika
 kendaraan sudah merespons atau pedal dilepas nilainya turun cepat.
 
-`wheelRPM` tidak lagi dipaksa minimum ke idle. Nilai mentah ini dipetakan ke
-RPM fisik estimasi dengan idle/redline berbeda untuk mobil biasa, performance,
-heavy vehicle, dan motor. Torque curve masih menghasilkan gaya di bawah 1500
-RPM. Bila akselerasi pulih, stall timer dilepas; bila clutch tetap terkunci dan
-defisit torsi/deceleration bertahan, timer naik sampai mesin mati. Partial
-clutch mengurangi load sehingga start dari gear 2 tetap mungkin, tetapi lebih
-lama dan lebih panas.
+`wheelRPM` tidak lagi dipaksa minimum ke idle. Limiter per-gigi memakai
+`fInitialDriveMaxFlatVel` dari handling kendaraan sebagai baseline normalized
+redline, bersama ratio aktif. GTA tidak mengekspos physical redline RPM;
+angka RPM fisik untuk tach/load diturunkan dari flat velocity tersebut,
+rolling radius yang dipelajari, dan initial drive force. Tidak ada lagi tabel
+RPM berdasarkan vehicle class. Jika handling pointer opsional tidak tersedia,
+fallback memakai estimated max speed native kendaraan yang aktif. Torque
+curve masih menghasilkan gaya di bawah 1500 RPM. Bila akselerasi pulih, stall
+timer dilepas; bila clutch tetap terkunci dan defisit torsi/deceleration
+bertahan, timer naik sampai mesin mati. Partial clutch mengurangi load sehingga
+start dari gear 2 tetap mungkin, tetapi lebih lama dan lebih panas.
 
 Build r15-safe hanya memakai native `SET_VEHICLE_CHEAT_POWER_INCREASE` untuk
 recovery. Attack recovery diperbesar secara adaptif sampai batas aman saat
