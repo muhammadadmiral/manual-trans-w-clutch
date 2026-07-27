@@ -1,7 +1,7 @@
 #include "ManualGearbox.h"
 #include "../../../../sdk/inc/natives.h"
-#include "../../../Core/ModLogger.h"
 #include "../../../Core/Config.h"
+#include "../../../Core/ModLogger.h"
 #include "../../../Script/DrivingEventBus.h"
 #include "../../VehicleData.h"
 #include "../Core/GearboxSystem.h"
@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+
 
 namespace ManualGearbox {
 
@@ -23,25 +24,23 @@ void PlayGearGrindSound(Vehicle vehicle) {
   DrivingEventBus::Publish(DrivingEventBus::Event::GearGrind, event);
 }
 
-void PlayGearShiftSound(Vehicle vehicle, int fromGear, int toGear,
-                        float clutch, float throttle) {
+void PlayGearShiftSound(Vehicle vehicle, int fromGear, int toGear, float clutch,
+                        float throttle) {
   const bool upshift = toGear > fromGear;
   const auto &shift = GearboxSystem::GetState();
   const bool harsh = shift.quickShift || shift.powerShift ||
                      shift.clashSeverity > 0.35f || shift.moneyShift ||
                      (throttle > 0.82f && clutch < 0.42f);
-  const bool slow = !harsh &&
-                    (clutch > 0.70f || throttle < 0.22f);
+  const bool slow = !harsh && (clutch > 0.70f || throttle < 0.22f);
   DrivingEventBus::EventData event{};
   event.vehicle = vehicle;
   event.fromGear = fromGear;
   event.toGear = toGear;
   event.severity = harsh ? 0.90f : (slow ? 0.15f : 0.45f);
   event.quickShift = shift.quickShift;
-  DrivingEventBus::Publish(
-      upshift ? DrivingEventBus::Event::GearShiftUp
-              : DrivingEventBus::Event::GearShiftDown,
-      event);
+  DrivingEventBus::Publish(upshift ? DrivingEventBus::Event::GearShiftUp
+                                   : DrivingEventBus::Event::GearShiftDown,
+                           event);
 }
 
 void Reset(int defaultGear) {
@@ -55,9 +54,7 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
            bool isDown, float clutch, float throttle, float speedKmH,
            bool &isEngineOn, int &grindWarningTimer) {
   const DWORD currentTime = GetTickCount();
-  const bool canShift =
-      (currentTime - s_lastShiftTime) > 80; // permit quick multi-gear selection
-
+  const bool canShift = (currentTime - s_lastShiftTime) > 250;
   if (s_pendingAt != 0 && currentTime >= s_pendingAt) {
     const int fromGear = s_manualGear;
     const int toGear = s_pendingGear;
@@ -89,9 +86,8 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
         PlayGearGrindSound(vehicle);
         grindWarningTimer = 60;
         s_lastShiftTime = currentTime;
-        LOG_WARN(Gear, "Synchro menolak shift %d -> %d wear=%.3f",
-                 fromGear, toGear,
-                 GearboxSystem::GetState().selectedSynchroWear);
+        LOG_WARN(Gear, "Synchro menolak shift %d -> %d wear=%.3f", fromGear,
+                 toGear, GearboxSystem::GetState().selectedSynchroWear);
         return s_manualGear;
       }
       if (resistance > 0) {
@@ -117,8 +113,8 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
               (std::max)(0.0f, Config::ReverseLockoutSpeedKmH)) {
         PlayGearGrindSound(vehicle);
         grindWarningTimer = 45;
-        LOG_WARN(Gear, "Reverse lockout: speed=%.1fkm/h limit=%.1f",
-                 speedKmH, Config::ReverseLockoutSpeedKmH);
+        LOG_WARN(Gear, "Reverse lockout: speed=%.1fkm/h limit=%.1f", speedKmH,
+                 Config::ReverseLockoutSpeedKmH);
         s_lastShiftTime = currentTime;
         return s_manualGear;
       }
@@ -131,9 +127,8 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
         PlayGearGrindSound(vehicle);
         grindWarningTimer = 60;
         s_lastShiftTime = currentTime;
-        LOG_WARN(Gear, "Synchro menolak shift %d -> %d wear=%.3f",
-                 fromGear, toGear,
-                 GearboxSystem::GetState().selectedSynchroWear);
+        LOG_WARN(Gear, "Synchro menolak shift %d -> %d wear=%.3f", fromGear,
+                 toGear, GearboxSystem::GetState().selectedSynchroWear);
         return s_manualGear;
       }
       if (resistance > 0) {
