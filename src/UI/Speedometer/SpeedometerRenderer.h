@@ -8,7 +8,8 @@ struct Data {
   float speedKmH = 0.0f;
   float normalizedRPM = 0.0f;
   float physicalRPM = 0.0f;
-  float redlineRPM = 7000.0f;
+  // Zero means CVehicle only supplied normalized rev ratio.
+  float redlineRPM = 0.0f;
   float fuel = 0.0f;
   float oilTemperature = 0.0f;
   float oilLife = 0.0f;

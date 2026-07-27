@@ -24,7 +24,6 @@
 #include "../../Vehicle/Gearbox/Manual/ManualGearbox.h"
 #include "../../Vehicle/LightsLogic.h"
 #include "../../Vehicle/Maintenance/MaintenanceSystem.h"
-#include "../../Vehicle/Physics/VehicleDynamics.h"
 #include "../../Vehicle/VehicleUpgrades.h"
 #include "../../../sdk/inc/natives.h"
 
@@ -72,9 +71,12 @@ void TransmissionController::Update(
         profile == VehicleProfile::Drivetrain::UtilitySingleSpeed;
     const int transmissionMode =
         VehicleProfile::ForcesAutomatic(profile) ? 1 : requestedMode;
+    // Native automatic must remain untouched. Only manual mode blocks GTA's
+    // autonomous up/downshift writers.
+    const bool manualTakeover = transmissionMode == 2;
     const bool nativePatchReady =
-        GearboxPatches::SetActive(transmissionMode != 0);
-    if (transmissionMode != 0 && !nativePatchReady && !m_patchFailureShown) {
+        GearboxPatches::SetActive(manualTakeover);
+    if (manualTakeover && !nativePatchReady && !m_patchFailureShown) {
         m_patchFailureShown = true;
         const std::string reason = GearboxPatches::GetFailureReason();
         Renderer::ShowNotification(
@@ -86,6 +88,7 @@ void TransmissionController::Update(
 
     // ── Mode change ───────────────────────────────────────────────────────
     if (transmissionMode != m_activeMode) {
+        const int previousMode = m_activeMode;
         if (m_activeMode == 1)
             VEHICLE::SET_VEHICLE_HANDBRAKE(veh, FALSE);
         ManualGearbox::Reset(0);
@@ -95,13 +98,14 @@ void TransmissionController::Update(
         GearboxSystem::Reset();
         ClutchSystem::Reset();
         EngineModel::Reset();
-        VehicleDynamics::Reset();
-        VehicleDynamics::SelectVehicle(veh);
         PedalModel::Reset();
         assist.Reset();
         m_manualGear = 0;
         m_automaticClutchUntil = 0;
-        data.SetClutch(1.0f);
+        if (manualTakeover)
+            data.SetClutch(1.0f);
+        else if (previousMode == 2)
+            data.SetClutch(1.0f);
         VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(veh, 1.0f);
         m_activeMode = transmissionMode;
         m_firstFrameTrace = true;
@@ -120,7 +124,7 @@ void TransmissionController::Update(
                 transmissionMode == 0
                     ? "Transmission mod: ~c~OFF"
                     : (transmissionMode == 1
-                           ? "Transmission: ~b~AUTOMATIC P-R-N-D-S-L2-L1"
+                           ? "Transmission: ~b~NATIVE AUTOMATIC P-R-N-D"
                            : "Transmission: ~g~MANUAL SEQUENTIAL"));
         }
         LOG_INFO(Gear, "Transmission mode=%d requested=%d profile=%s",
@@ -132,14 +136,10 @@ void TransmissionController::Update(
         GearboxPatches::SetActive(false);
         GearboxProfile::RestoreVehicle(data);
         GearboxProfile::Reset();
-        data.SetClutch(1.0f);
-        VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(veh, 1.0f);
         return;
     }
 
     GearboxProfile::SelectVehicle(veh, data, maxGear, profile);
-    GearboxProfile::ApplyRatios(data);
-
     // ── Per-frame values ──────────────────────────────────────────────────
     const float speedKmH = vehicleSpeed * 3.6f;
     const bool automaticMode = transmissionMode == 1;
@@ -177,16 +177,6 @@ void TransmissionController::Update(
         LOG_INFO(Script, "TRACE v1 stage=frame-begin gear=%d rpm=%.3f",
                  m_manualGear, rpm);
         m_wasFirstFrame = true;
-    }
-
-    if (automaticMode &&
-        AutomaticGearbox::GetSelector() ==
-            AutomaticGearbox::Selector::Drive &&
-        InputHandler::IsKeyboardThrottle()) {
-        rawThrottle =
-            std::min(rawThrottle,
-                     std::clamp(Config::AutomaticDKeyboardThrottle,
-                                0.30f, 1.00f));
     }
 
     // ── Subsystem updates ─────────────────────────────────────────────────
@@ -240,12 +230,6 @@ void TransmissionController::Update(
                   automaticMode);
     m_absBrake =
         std::max(m_absBrake, GearboxSystem::GetWheelLockBrake());
-    if (Config::FuelCutoffEngineBrake && m_manualGear > 0 &&
-        m_simulatedClutch < 0.20f && throttle < 0.01f && rpm > 0.30f) {
-        m_absBrake = std::max(
-            m_absBrake,
-            std::clamp(EngineModel::GetEngineBrake() * 0.18f, 0.0f, 0.18f));
-    }
     if (automaticMode)
         AutomaticGearbox::SetTorqueManagement(
             assist.GetState().torqueIntervention);
@@ -275,18 +259,10 @@ void TransmissionController::Update(
                     TurboSystem::GetBoostPressure());
     }
 
-    m_driveThrottle =
-        automaticMode && AutomaticGearbox::IsSport()
-            ? std::pow(std::clamp(assistedThrottle, 0.0f, 1.0f),
-                       1.0f - std::clamp(Config::AutomaticSTorqueBoost,
-                                         0.0f, 0.50f))
-            : assistedThrottle;
+    m_driveThrottle = assistedThrottle;
     const float clutchEngagement =
         automaticMode ? AutomaticGearbox::GetCoupling()
                       : ClutchSystem::GetEngagement();
-    VehicleDynamics::Update(
-        veh, data, m_manualGear, m_driveThrottle, m_absBrake,
-        clutchEngagement, forwardSpeed);
     const bool gentleClutchRelease =
         automaticMode || !ClutchSystem::IsDumpActive();
     const float idleDrive =
@@ -304,19 +280,6 @@ void TransmissionController::Update(
     if (traceFrame)
         LOG_INFO(Script, "TRACE v1 stage=controls-applied");
 
-    // ── Memory writes ─────────────────────────────────────────────────────
-    if (automaticMode) {
-        AutomaticGearbox::ApplyToMemory(veh, data, m_manualGear,
-                                        controlThrottle);
-    } else {
-        ManualGearbox::ApplyToMemory(
-            veh, data, m_manualGear, maxGear,
-            m_simulatedClutch, throttle, speedKmH);
-        ClutchSystem::ApplyToVehicle(data, m_manualGear, forwardSpeed);
-    }
-
-    // v1.1: Gunakan controlThrottle (sudah termasuk idle creep) agar
-    // EngineModel melihat tenaga creep dan menjaga RPM di atas idle.
     const bool engineStall = EngineModel::Update(
         veh, data, m_manualGear, maxGear, m_simulatedClutch,
         clutchEngagement, controlThrottle, m_absBrake, forwardSpeed, isEngineOn,
@@ -327,18 +290,11 @@ void TransmissionController::Update(
                  data.GetRPM(), EngineModel::GetDriveTorqueFactor(),
                  engineStall ? 1 : 0);
 
-    const float sportTorque =
-        automaticMode && AutomaticGearbox::IsSport()
-            ? 1.0f + std::clamp(Config::AutomaticSTorqueBoost, 0.0f, 0.50f)
-            : 1.0f;
     MaintenanceSystem::Update(
         rpm, throttle, speedKmH, FuelSystem::GetOilTemperature(), isEngineOn);
-    m_powerMultiplier =
-        std::clamp(EngineModel::GetDriveTorqueFactor() * sportTorque *
-                       MaintenanceSystem::GetPowerFactor() *
-                       VehicleDynamics::GetTorqueTransfer(),
-                   0.0f, 4.50f);
-    VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(veh, m_powerMultiplier);
+    // handling.meta and native upgrades own engine output. No low-RPM boost,
+    // class torque curve, sport multiplier or synthetic top-end limiter.
+    m_powerMultiplier = 1.0f;
 
     // ── Stall detection ───────────────────────────────────────────────────
     const bool shiftStall = GearboxSystem::ConsumeStallRequest();
@@ -371,7 +327,7 @@ void TransmissionController::Update(
     LightsLogic::Update(veh, data, m_manualGear,
                         InputHandler::GetSmoothedBrake(), throttle);
 
-    // ── Second memory write (ensures final state is consistent) ───────────
+    // ── Single final memory commit ────────────────────────────────────────
     if (automaticMode) {
         AutomaticGearbox::ApplyToMemory(veh, data, m_manualGear,
                                         controlThrottle);

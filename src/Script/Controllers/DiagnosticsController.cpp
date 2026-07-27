@@ -16,8 +16,6 @@
 #include "../../Vehicle/Gearbox/Automatic/AutomaticGearbox.h"
 #include "../../Vehicle/Gearbox/Core/GearboxProfile.h"
 #include "../../Vehicle/Gearbox/Core/GearboxSystem.h"
-#include "../../Vehicle/Maintenance/WorkshopTuning.h"
-#include "../../Vehicle/Physics/VehicleDynamics.h"
 #include "../../Vehicle/Engine/FuelSystem.h"
 #include "../../Vehicle/Engine/TurboSystem.h"
 #include "../../Vehicle/TelemetryLogger.h"
@@ -146,27 +144,18 @@ void Update(Vehicle veh, VehicleData& data,
              engineStarting ? 1 : 0,
              GearboxPatches::IsApplied() ? 1 : 0);
     LOG_INFO(Physics,
-             "ENGINE: Owned=%d CtrlRPM=%.3f Target=%.3f WheelRPM=%.3f "
-             "Physical=%.0f Idle=%.0f Redline=%.0f FlatMeta=%.2f "
-             "RedlineSrc=%s Load=%.3f "
-             "Reserve=%.3f Lug=%.3f Stall=%.3f LowRec=%.3f "
-             "GearLimit=%.1fkm/h Driven=%.1fkm/h WheelData=%d "
-             "Burnout=%d Adaptive=%d",
+             "NATIVE_ENGINE: Owned=%d NativeRPM=%.3f ShaftRPM=%.3f "
+             "IdleNorm=%.3f MinNorm=%.3f IdleReady=%d "
+             "FlatMeta=%.2f NativeGearSpeed=%.1fkm/h "
+             "Load=%.3f Reserve=%.3f Lug=%.3f Stall=%.3f",
              engineState.rpmOwned ? 1 : 0, engineState.controlledRPM,
-             engineState.connectedRPMTarget, engineState.wheelRPM,
-             engineState.estimatedEngineRPM,
-             engineState.estimatedIdlePhysicalRPM,
-             engineState.estimatedRedlineRPM,
+             engineState.wheelRPM, engineState.idleRPM,
+             engineState.minimumRunningRPM,
+             engineState.idleCalibrated ? 1 : 0,
              engineState.initialDriveMaxFlatVel,
-             engineState.redlineHandlingBacked ? "handling" : "native",
-             engineState.load,
+             engineState.gearLimitSpeedMps * 3.6f, engineState.load,
              engineState.torqueReserve, engineState.lugSeverity,
-             engineState.stallProgress, engineState.lowRpmRecovery,
-             engineState.gearLimitSpeedMps * 3.6f,
-             engineState.drivenWheelSpeedMps * 3.6f,
-             engineState.wheelTelemetryValid ? 1 : 0,
-             engineState.burnoutActive ? 1 : 0,
-             engineState.adaptiveGearing ? 1 : 0);
+             engineState.stallProgress);
     LOG_INFO(Physics,
              "IDLE_DRIVE: Creep=%.3f HillRollback=%d Power=%.3f "
              "Profile=%s",
@@ -249,27 +238,6 @@ void Update(Vehicle veh, VehicleData& data,
         profileState.ratiosApplied ? 1 : 0,
         profileState.learnedAggression, profileState.predictedGear,
         profileState.predictedShiftMatched ? 1 : 0);
-    const auto& dynamicsState = VehicleDynamics::GetState();
-    LOG_INFO(
-        Physics,
-        "WORKSHOP_DYNAMICS: Pedal=%s Clutch=%s Flywheel=%s Trans=%s "
-        "Creep=%s Cruise=%s Mounts=%s Mass=%.0fkg Accel=%.2f "
-        "Twist=%.3f Pitch=%.4f Transfer=%.3f",
-        WorkshopTuning::GetLabel(WorkshopTuning::Option::PedalMap),
-        WorkshopTuning::GetLabel(WorkshopTuning::Option::ClutchPackage),
-        WorkshopTuning::GetLabel(WorkshopTuning::Option::Flywheel),
-        WorkshopTuning::GetLabel(WorkshopTuning::Option::Transmission),
-        WorkshopTuning::GetLabel(
-            WorkshopTuning::Option::CreepCalibration),
-        WorkshopTuning::GetLabel(
-            WorkshopTuning::Option::CruiseCalibration),
-        WorkshopTuning::GetLabel(
-            WorkshopTuning::Option::DrivetrainMounts),
-        dynamicsState.estimatedMassKg,
-        dynamicsState.longitudinalAcceleration,
-        dynamicsState.drivelineTwist,
-        dynamicsState.suspensionPitchMoment,
-        dynamicsState.torqueTransfer);
     // Auto-record faults from system states.
     if (gearboxState.moneyShift)
         RecordFault("money_shift");

@@ -328,13 +328,22 @@ void Draw(const Data &data) {
             static_cast<int>(std::clamp(shownSpeed, 0.0f, 999.0f) + 0.5f));
   char maximumSpeedText[12]{};
   sprintf_s(maximumSpeedText, "%d", static_cast<int>(maximumSpeed));
+  const bool physicalRpmAvailable =
+      data.physicalRPM > 0.0f && data.redlineRPM > 0.0f;
   char maximumRpmText[12]{};
-  sprintf_s(maximumRpmText, "%.0f",
-            std::max(6.0f, data.redlineRPM / 1000.0f));
+  if (physicalRpmAvailable)
+    sprintf_s(maximumRpmText, "%.0f", data.redlineRPM / 1000.0f);
+  else
+    sprintf_s(maximumRpmText, "%d", 100);
+  const char *rpmLabel =
+      data.electric ? "POWER" :
+      (physicalRpmAvailable ? "RPM x1000" : "RPM %");
   char rpmText[32]{};
-  sprintf_s(rpmText, "%s %.1f", data.electric ? "POWER" : "RPM x1000",
-            data.electric ? rpm * 100.0f
-                          : std::max(0.0f, data.physicalRPM) / 1000.0f);
+  if (data.electric || !physicalRpmAvailable)
+    sprintf_s(rpmText, "%s %.0f%%", rpmLabel, rpm * 100.0f);
+  else
+    sprintf_s(rpmText, "%s %.1f", rpmLabel,
+              data.physicalRPM / 1000.0f);
   const std::string gearText = FormatGear(data);
 
   if (style == 0 || style == 4 || style == 8) {
@@ -367,8 +376,7 @@ void Draw(const Data &data) {
     const float radiusY = 0.064f * scale;
     DrawDial(x, top + 0.079f * scale, radiusY / safe.aspect,
              radiusY, std::clamp(rpm, 0.0f, 1.0f),
-             data.electric ? "POWER" : "RPM x1000",
-             data.electric ? "100" : maximumRpmText,
+             rpmLabel, maximumRpmText,
              accent, opacity, scale);
     Renderer::DrawTextOverlay(
         speedText, x, top + 0.054f * scale, 0.58f * scale,
@@ -388,8 +396,7 @@ void Draw(const Data &data) {
              accent, opacity, scale);
     DrawDial(left + width * 0.71f, dialY, radiusX, radiusY,
              std::clamp(rpm, 0.0f, 1.0f),
-             data.electric ? "POWER" : "RPM x1000",
-             data.electric ? "100" : maximumRpmText,
+             rpmLabel, maximumRpmText,
              accent, opacity, scale);
     GRAPHICS::DRAW_RECT(x, top + 0.139f * scale,
                         0.052f * scale, 0.025f * scale,
@@ -402,8 +409,10 @@ void Draw(const Data &data) {
                               dialY - 0.020f * scale, 0.34f * scale,
                               235, 240, 245, opacity, 2, true, true);
     char analogRpm[16]{};
-    sprintf_s(analogRpm, "%.1f",
-              std::max(0.0f, data.physicalRPM) / 1000.0f);
+    if (physicalRpmAvailable)
+      sprintf_s(analogRpm, "%.1f", data.physicalRPM / 1000.0f);
+    else
+      sprintf_s(analogRpm, "%.0f%%", rpm * 100.0f);
     Renderer::DrawTextOverlay(analogRpm, left + width * 0.71f,
                               dialY - 0.020f * scale, 0.32f * scale,
                               235, 240, 245, opacity, 2, true, true);
@@ -426,8 +435,7 @@ void Draw(const Data &data) {
     DrawDial(left + width * 0.78f, top + 0.078f * scale,
              radiusY / safe.aspect, radiusY,
              std::clamp(rpm, 0.0f, 1.0f),
-             data.electric ? "POWER" : "RPM",
-             data.electric ? "100" : maximumRpmText,
+             rpmLabel, maximumRpmText,
              accent, opacity, scale);
   } else if (style == 3) {
     Renderer::DrawTextOverlay(
@@ -513,8 +521,7 @@ void Draw(const Data &data) {
     DrawDial(left + width * 0.76f, top + 0.082f * scale,
              radiusY / safe.aspect, radiusY,
              std::clamp(rpm, 0.0f, 1.0f),
-             data.electric ? "POWER" : "RPM",
-             data.electric ? "100" : maximumRpmText,
+             rpmLabel, maximumRpmText,
              accent, opacity, scale);
     GRAPHICS::DRAW_RECT(x, top + 0.083f * scale,
                         0.078f * scale, 0.064f * scale,

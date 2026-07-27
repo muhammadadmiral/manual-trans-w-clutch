@@ -15,9 +15,9 @@ struct Calibration {
   bool usedAdaptiveCurve = false;
 };
 
-// Menghasilkan kecepatan limiter per gigi. Rasio handling tetap menjadi
-// sumber utama, tetapi add-on vehicle dengan ratio/flat-velocity yang tidak
-// koheren mendapat kurva fallback berdasarkan top speed native.
+// Mengamati hubungan rasio/kecepatan dari CTransmission dan handling.meta.
+// Jika datanya tidak koheren, hasil dibiarkan invalid; tidak ada kurva kelas,
+// perkiraan rasio, atau limiter kecepatan buatan.
 Calibration Resolve(Vehicle vehicle, VehicleData &data, int gear, int maxGear);
 
 float ResolveRoadRPM(Vehicle vehicle, VehicleData &data, int gear, int maxGear,

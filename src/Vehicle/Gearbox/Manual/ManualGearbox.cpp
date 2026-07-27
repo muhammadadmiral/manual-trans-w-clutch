@@ -159,10 +159,12 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, bool isUp,
 
 void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
                    int maxGear, float clutch, float throttle, float speedKmH) {
-  // Gear 1 dipakai sebagai carrier saat drivetrain terbuka karena GTA bisa
-  // menganggap 0xFF sebagai permintaan auto-forward. Clutch signed yang
-  // benar-benar memutus roda; logical gear tetap tidak berubah.
-  if (manualGear == 0 || clutch >= 0.88f) {
+  // Neutral tidak punya representasi forward khusus di CVehicle, jadi gear 1
+  // hanya menjadi carrier ketika logical gear memang N. Saat pedal kopling
+  // diinjak di gear 2+, pertahankan gear pilihan pengemudi: menulis gear 1 di
+  // sini membuat GTA melakukan satu shift tersembunyi lalu satu shift lagi
+  // ketika kopling dilepas.
+  if (manualGear == 0) {
     data.SetGear(1);
     data.SetNextGear(1);
   } else if (manualGear == -1) {
@@ -175,9 +177,9 @@ void ApplyToMemory(Vehicle vehicle, VehicleData &data, int manualGear,
   }
   (void)vehicle;
   (void)maxGear;
-  (void)clutch;
   (void)throttle;
   (void)speedKmH;
+  (void)clutch;
 }
 
 } // namespace ManualGearbox

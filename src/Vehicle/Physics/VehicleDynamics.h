@@ -7,8 +7,8 @@ namespace VehicleDynamics {
 
 struct State {
   Vehicle vehicle = 0;
-  float estimatedMassKg = 1500.0f;
-  float wheelbaseM = 2.6f;
+  float estimatedMassKg = 0.0f;
+  float wheelbaseM = 0.0f;
   float longitudinalAcceleration = 0.0f;
   float drivelineTwist = 0.0f;
   float twistVelocity = 0.0f;

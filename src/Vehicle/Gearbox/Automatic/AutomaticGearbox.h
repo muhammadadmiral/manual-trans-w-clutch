@@ -71,6 +71,8 @@ void UpdateSelector(Vehicle vehicle, bool selectorUp, bool selectorDown,
                     float brake, float signedSpeedMps, float engineRPM);
 int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
            float brake, float signedSpeedMps, bool engineOn);
+// P/N/R require selector writes; D is a read-only observer so GTA keeps
+// ownership of forward gears, clutch timing, RPM and throttle internals.
 void ApplyToMemory(Vehicle vehicle, VehicleData &data, int activeGear,
                    float driveThrottle);
 

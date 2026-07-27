@@ -160,17 +160,9 @@ void NotifyShift(Vehicle vehicle, VehicleData &data, int fromGear, int toGear,
           0.08f + std::clamp(s_state.moneyShiftSeverity, 0.0f, 1.0f) * 0.14f;
     }
   }
-  if (fromGear != 0 && toGear != 0 &&
-      (fromRatio <= 0.01f || toRatio <= 0.01f)) {
-    const float ratioApprox =
-        static_cast<float>((std::max)(1, std::abs(fromGear))) /
-        static_cast<float>((std::max)(1, std::abs(toGear)));
-    const float rawTarget = rpm * ratioApprox;
-    s_state.moneyShift = toGear > 0 && toGear < fromGear && rawTarget > 1.0f;
-    s_state.moneyShiftSeverity =
-        std::clamp(rawTarget - 1.0f, 0.0f, 2.0f);
-    s_state.shiftTargetRPM = std::clamp(rawTarget, 0.15f, 1.0f);
-  }
+  // If the native ratio table is unavailable, do not approximate it from the
+  // gear number. The shift is still allowed, but over-rev prediction remains
+  // disabled instead of inventing a drivetrain.
   s_state.syncError = std::fabs(s_state.shiftTargetRPM - rpm);
 
   const bool clutchless = clutchDisengagement < 0.35f;

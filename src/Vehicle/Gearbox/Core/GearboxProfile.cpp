@@ -105,9 +105,10 @@ Architecture DeriveArchitecture(Vehicle vehicle,
   if (upgrades.raceTransmission)
     return upgrades.quickshifter ? Architecture::DualClutch
                                  : Architecture::DogBox;
-  const int vehicleClass = VEHICLE::GET_VEHICLE_CLASS(vehicle);
-  if (vehicleClass == 6 || vehicleClass == 7)
-    return Architecture::DualClutch;
+  // handling.meta/CVehicle does not expose whether a conventional vehicle is
+  // DCT, torque-converter or manual. Vehicle class is not a transmission type,
+  // so leave it native unless the user supplied an explicit per-model profile.
+  (void)vehicle;
   return Architecture::HandlingNative;
 }
 
@@ -199,14 +200,15 @@ void SelectVehicle(Vehicle vehicle, VehicleData &data, int maxGear,
               std::fabs(validated - original) > 0.0005f;
   }
 
-  s_state.customRatios = changed && data.CanWriteGearRatios();
-  if (changed && !s_state.customRatios) {
+  // Per-model metadata may still describe architecture, but native handling
+  // remains authoritative for every ratio and final drive.
+  s_state.customRatios = false;
+  if (changed) {
     LOG_WARN(Gear,
-             "Custom ratios ignored for model=%08X: ratio table is not "
-             "validated as per-vehicle inline memory",
+             "Custom ratio/final-drive request ignored for model=%08X: "
+             "native handling ownership is enabled",
              s_state.modelHash);
   }
-  ApplyRatios(data);
   LOG_INFO(
       Gear,
       "Gearbox profile model=%08X type=%s gears=%d force=%.3f "

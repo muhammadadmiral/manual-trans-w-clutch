@@ -81,6 +81,7 @@ void EngineController::Update(Vehicle veh,
                 // Try to start
                 if (profile == VehicleProfile::Drivetrain::Electric) {
                     m_state = State::Running;
+                    VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(veh, 1.0f);
                     VEHICLE::SET_VEHICLE_ENGINE_ON(veh, TRUE, TRUE, TRUE);
                     DrivingEventBus::EventData event{};
                     event.vehicle = veh;
@@ -114,6 +115,7 @@ void EngineController::Update(Vehicle veh,
         const ULONGLONG crankMs = GetTickCount64() - m_engineStartTick;
         if (actualEngineOn && crankMs >= m_starterRequiredMs) {
             m_state = State::Running;
+            VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(veh, 1.0f);
             DrivingEventBus::EventData event{};
             event.vehicle = veh;
             DrivingEventBus::Publish(
