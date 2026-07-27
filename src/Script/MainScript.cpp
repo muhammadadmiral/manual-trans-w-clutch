@@ -1,6 +1,7 @@
 // Orkestrator per-frame. Rumus fisika jangan ditaruh di sini, cuy.
 #define NOMINMAX
 #include "MainScript.h"
+#include "../Core/VersionInfo.h"
 
 #include "../../sdk/inc/main.h"
 #include "../../sdk/inc/natives.h"
@@ -269,7 +270,8 @@ void ScriptMain() {
       const VehicleOffsets &off = VehicleData::GetResolvedOffsets();
       const std::string bv = VehicleData::GetGameBuildVersion();
       char notify[256]{};
-      sprintf_s(notify, "Melar Transmission r25: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
+      sprintf_s(notify, "%s: %s | build %s | G:%X N:%X RPM:%X CLT:%X",
+                VersionInfo::kNotifyPrefix,
                 VehicleData::GetOffsetSourceName(),
                 bv.empty() ? "?" : bv.c_str(), off.Gear, off.NextGear, off.RPM,
                 off.Clutch);
@@ -682,7 +684,7 @@ void ScriptMain() {
     VehicleUpgrades::Refresh(vehicle);
     const bool traceFrame = firstControlledFrameTrace;
     if (traceFrame)
-      LOG_INFO(Script, "TRACE r18 stage=frame-begin gear=%d rpm=%.3f",
+      LOG_INFO(Script, "TRACE v1 stage=frame-begin gear=%d rpm=%.3f",
                manualGear, rpm);
 
     if (automaticMode &&
@@ -722,7 +724,7 @@ void ScriptMain() {
           speedKmH, isEngineOn, grindWarningTimer);
     }
     if (traceFrame)
-      LOG_INFO(Script, "TRACE r18 stage=shift-model gear=%d clutch=%.3f",
+      LOG_INFO(Script, "TRACE v1 stage=shift-model gear=%d clutch=%.3f",
                manualGear, simulatedClutch);
 
     const bool parkingBrakeOn = ParkingBrake::Update(
@@ -756,7 +758,7 @@ void ScriptMain() {
       AutomaticGearbox::SetTorqueManagement(
           TractionControl::GetState().cutLevel);
     if (traceFrame)
-      LOG_INFO(Script, "TRACE r18 stage=assists throttle=%.3f brake=%.3f",
+      LOG_INFO(Script, "TRACE v1 stage=assists throttle=%.3f brake=%.3f",
                tcsThrottle, absBrake);
 
     if (TractionControl::IsTCSActive())
@@ -797,7 +799,7 @@ void ScriptMain() {
                                     controlThrottle, absBrake, maxGear,
                                     forwardSpeed);
     if (traceFrame)
-      LOG_INFO(Script, "TRACE r18 stage=controls-applied");
+      LOG_INFO(Script, "TRACE v1 stage=controls-applied");
 
     if (automaticMode) {
       AutomaticGearbox::ApplyToMemory(vehicle, data, manualGear,
@@ -813,7 +815,7 @@ void ScriptMain() {
         automaticMode);
     if (traceFrame)
       LOG_INFO(Script,
-               "TRACE r18 stage=engine-model rpm=%.3f power=%.3f stall=%d",
+               "TRACE v1 stage=engine-model rpm=%.3f power=%.3f stall=%d",
                data.GetRPM(), EngineModel::GetDriveTorqueFactor(),
                engineStall ? 1 : 0);
     const float sportTorque =
@@ -849,7 +851,7 @@ void ScriptMain() {
         FuelSystem::Update(vehicle, data, throttle, rpm, isEngineOn, speedKmH,
                            manualGear, clutchEngagement);
     if (traceFrame)
-      LOG_INFO(Script, "TRACE r18 stage=fuel fuel=%.3f stall=%d",
+      LOG_INFO(Script, "TRACE v1 stage=fuel fuel=%.3f stall=%d",
                FuelSystem::GetFuelLevel(), fuelStall ? 1 : 0);
 
     if (fuelStall && isEngineOn) {
@@ -873,7 +875,7 @@ void ScriptMain() {
     }
     if (traceFrame) {
       LOG_INFO(Script,
-               "TRACE r18 stage=frame-complete memGear=%u next=%u "
+               "TRACE v1 stage=frame-complete memGear=%u next=%u "
                "rpm=%.3f clutch=%.3f",
                static_cast<unsigned>(data.GetGear()),
                static_cast<unsigned>(data.GetNextGear()), data.GetRPM(),

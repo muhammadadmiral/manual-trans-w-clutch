@@ -136,7 +136,11 @@ float PrepareIdleDrive(Vehicle vehicle, VehicleData &data, int gear,
   s_state.creepThrottle = 0.0f;
   s_state.hillRollback = false;
   const float throttleGate = automaticMode ? 0.12f : 0.025f;
-  if (!Config::IdleCreep || !engineOn || std::abs(gear) != 1 ||
+
+  // v1.0: Creep sekarang aktif di semua forward gear (bukan cuma gear 1).
+  // Di gear tinggi, creep otomatis lemah karena speedGap kecil (mobil sudah jalan).
+  // Gear 0 (Neutral) tetap tidak ada creep.
+  if (!Config::IdleCreep || !engineOn || gear == 0 ||
       throttle >= throttleGate || engagement <= 0.08f)
     return 0.0f;
 
@@ -145,13 +149,13 @@ float PrepareIdleDrive(Vehicle vehicle, VehicleData &data, int gear,
   const float gearLimitSpeed = calibration.gearLimitSpeedMps;
   const bool drivetrainEstimateValid =
       std::isfinite(gearLimitSpeed) && gearLimitSpeed > 1.0f;
-  // Memory handling beberapa add-on vehicle nggak punya flat velocity yang
-  // layak. Creep tetap boleh hidup; fallback ini cuma target jalan idle,
-  // bukan pemaksa kecepatan kendaraan.
+
+  // v1.0: Creep target speed naik sedikit untuk automatic, memastikan mobil
+  // benar-benar merayap maju saat brake dilepas di D.
   const float idleRoadSpeed =
       drivetrainEstimateValid
-          ? std::clamp(s_state.idleRPM * gearLimitSpeed, 1.5f, 4.5f)
-          : (automaticMode ? 2.6f : 2.0f);
+          ? std::clamp(s_state.idleRPM * gearLimitSpeed, 1.5f, 5.5f)
+          : (automaticMode ? 3.2f : 2.0f);
   const float directionalSpeed = gear < 0 ? -speedMps : speedMps;
   const float speedGap =
       idleRoadSpeed > 0.01f
@@ -173,26 +177,44 @@ float PrepareIdleDrive(Vehicle vehicle, VehicleData &data, int gear,
 
   const float base = Clamp01(Config::IdleCreepThrottle);
   if (automaticMode) {
+    // v1.0: Creep diperkuat. Brake release curve lebih agresif (0.18 bukan 0.25)
+    // sehingga mobil mulai merayap lebih cepat saat brake diangkat.
+    // Converter transfer di standstill diset lebih tinggi (0.82 base)
+    // mensimulasikan torque converter stall ratio yang meneruskan torsi
+    // bahkan saat turbine diam.
     const float brakeRelease =
-        1.0f - SmoothStep(Clamp01(brake / 0.25f));
+        1.0f - SmoothStep(Clamp01(brake / 0.18f));
     const float pedalRelease =
         1.0f - SmoothStep(Clamp01(throttle / throttleGate));
+
+    // v1.0: Torque converter transfer model yang lebih realistis.
+    // Di standstill: stall ratio ~2.0x → transfer 0.82 base.
+    // Saat mulai bergerak: coupling naik → transfer mendekati 1.0.
+    const float standstillTransfer = 0.82f;
+    const float movingTransfer = 0.95f;
+    const float speedRatio = Clamp01(std::fabs(speedMps) / idleRoadSpeed);
     const float converterTransfer =
-        0.68f + Clamp01(engagement) * 0.32f;
+        standstillTransfer + speedRatio * (movingTransfer - standstillTransfer);
+
+    // v1.0: Base creep throttle minimum 0.14 (naik dari 0.075) agar
+    // cukup kuat mendorong mobil dari diam.
     s_state.creepThrottle =
-        std::max(0.075f, base) * speedGap * brakeRelease *
+        std::max(0.14f, base * 1.5f) * speedGap * brakeRelease *
         converterTransfer * pedalRelease;
   } else if (gentleClutchRelease && brake < 0.05f) {
+    // Manual mode: creep halus saat kopling dilepas perlahan di gear rendah.
     const float biteTransfer =
         SmoothStep((Clamp01(engagement) - 0.12f) / 0.78f);
     const float idleGovernor =
-        0.08f * biteTransfer * speedGap;
+        0.10f * biteTransfer * speedGap;
     s_state.creepThrottle =
         (base + idleGovernor) * speedGap * biteTransfer;
   }
 
+  // v1.0: Max creep throttle sedikit dinaikkan (0.38 dari 0.32) agar cukup
+  // kuat untuk menjaga kendaraan merayap di tanjakan ringan.
   s_state.creepThrottle =
-      std::clamp(s_state.creepThrottle, 0.0f, 0.32f);
+      std::clamp(s_state.creepThrottle, 0.0f, 0.38f);
   return s_state.creepThrottle;
 }
 
