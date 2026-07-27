@@ -22,6 +22,9 @@ extern int KeySignalLeft;
 extern int KeySignalRight;
 extern int KeySignalHazard;    // H by default (0x48)
 extern int KeyParkingBrake;    // P by default
+extern int KeyRefuel;
+extern int KeyOilService;
+extern int KeyWorkshop;
 
 // Automatically cancel the active turn signal when the steering wheel returns
 // through centre (raw steer crosses 0 in the opposite direction of the signal).
@@ -50,6 +53,7 @@ extern float StallRate;
 extern float StallClutchThreshold;
 extern float IdleTorqueFraction;
 extern float LugStallRPM;
+extern float StallCutoffRPM;
 extern float LugStallDelay;
 extern float WaterStallDelay;
 extern float RolloverStallDelay;
@@ -107,6 +111,20 @@ extern float BrakeCoolRate;
 extern float BrakeFadeStart;
 extern float BrakeFadeStrength;
 
+// Audio mekanikal. Suara mesin, ban, turbo dan angin tetap punya GTA.
+extern bool AudioEnabled;
+extern float AudioMasterVolume;
+extern float AudioPitchRandomness;
+extern float AudioLimiterCeiling;
+extern bool AudioNativeLayers;
+
+// Fuel dan maintenance.
+extern bool FuelEnabled;
+extern bool FuelBlipsEnabled;
+extern float RefuelRatePerSecond;
+extern bool MaintenanceEnabled;
+extern float OilWearMultiplier;
+
 // ── Analog smoothing — time constants τ in seconds ────────────────────────────
 // See header comment above for interpretation.
 // Recommended starting defaults (set in Config.cpp):
@@ -131,6 +149,11 @@ extern float SteerDeadzonePct;   // 0.0-0.15 recommended
 extern float ThrottleExpo;
 extern float BrakeExpo;
 extern float ClutchExpo;
+extern int PedalPreset;
+
+// 0 default, 1 responsive, 2 smooth, 3 sim-racing, 4 custom.
+void ApplyPedalPreset(int preset);
+void ResetPedalsToDefault();
 
 // ── Excluded vehicle classes ──────────────────────────────────────────────────
 // VEHICLE::GET_VEHICLE_CLASS() ids to treat as automatic-only.
@@ -139,10 +162,31 @@ extern std::vector<int> ExcludedVehicleClasses;
 
 // ── HUD Overlay ───────────────────────────────────────────────────────────────
 extern bool  OverlayBars;
+extern bool  GearHudEnabled;
+extern bool  SpeedometerEnabled;
+extern int   SpeedometerCarStyle;
+extern int   SpeedometerBikeStyle;
+extern int   SpeedometerUnits;
+extern int   SpeedometerAccent;
+extern bool  SpeedometerDetailed;
+extern float SpeedometerPosX;
+extern float SpeedometerPosY;
+extern float SpeedometerScale;
+extern float SpeedometerOpacity;
 extern float OverlayPosX;
 extern float OverlayPosY;
 extern float OverlayBarWidth;
 extern float OverlayBarHeight;
+extern float GearHudPosX;
+extern float GearHudPosY;
+extern float GearHudScale;
+extern float MenuPosX;
+extern float MenuPosY;
+extern float MenuScale;
+
+// Integrasi service bay pada lokasi Los Santos Customs/Benny's.
+extern bool  WorkshopEnabled;
+extern float WorkshopRadius;
 
 // ── Functions ─────────────────────────────────────────────────────────────────
 void ReadConfig(HMODULE module);

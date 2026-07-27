@@ -39,6 +39,7 @@ struct State {
 };
 
 void Reset();
+void ServiceGearbox();
 void Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
             float clutchDisengagement, float throttle, bool engineOn);
 void NotifyGrind();

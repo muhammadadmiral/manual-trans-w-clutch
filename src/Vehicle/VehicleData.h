@@ -15,7 +15,7 @@
 enum class VehicleOffsetSource {
     Uninitialized,
     PatternScan, // AOB scan succeeded
-    IniFallback, // Loaded from manual-trans.ini
+    IniFallback, // Loaded from melar-transmission.ini
     Calibration, // Interactive calibration
 };
 

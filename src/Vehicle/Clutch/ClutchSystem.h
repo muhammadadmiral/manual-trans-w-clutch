@@ -24,6 +24,7 @@ struct State {
 };
 
 void Reset();
+void ServiceClutch();
 
 // rawPedal: 0 dilepas, 1 diinjak penuh.
 float UpdatePedal(float rawPedal, float throttle, float rpm, int gear,

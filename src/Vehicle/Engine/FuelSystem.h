@@ -47,6 +47,7 @@ struct FuelState {
 
 // Reset fuel state (use saved fuel level or default full tank).
 void Reset(float savedFuelLevel = 1.0f);
+void SelectVehicle(Vehicle vehicle);
 
 // Called every frame when player is in a valid vehicle with engine running.
 // Returns true if engine ran out of fuel this frame (trigger stall).
@@ -57,6 +58,7 @@ bool Update(Vehicle vehicle, VehicleData& data, float throttle, float rpm,
 // Trigger a refuel event (call when player is near a gas station).
 void StartRefuel();
 void StopRefuel();
+void AddFuel(float normalizedAmount);
 
 // Query current state for HUD / saving
 float GetFuelLevel();

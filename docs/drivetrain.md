@@ -44,7 +44,7 @@ memakai `GET_VEHICLE_ESTIMATED_MAX_SPEED` dan
 Stall progress hanya naik bila:
 
 - clutch sudah menggigit kuat;
-- RPM jatuh ke idle;
+- RPM mesin aktual jatuh di bawah `StallCutoffRPM` (default 950);
 - kecepatan aktual masih di bawah kecepatan idle gear tersebut.
 
 Cadangan torsi memperhitungkan throttle, leverage gear, brake load, dan pitch.
@@ -136,7 +136,10 @@ Gas+rem yang ditahan bersamaan memicu brake-throttle override setelah delay,
 kecuali clutch manual sedang terbuka untuk heel-toe/rev-match atau launch
 control sedang berada di launch window. Gear 1 pada kecepatan rendah juga
 dikecualikan supaya power-brake/burnout tidak memotong throttle dan memicu
-stall palsu. ABS tetap fail-open bila telemetry roda tidak valid. Temperatur
+stall palsu. Stall load dan hard-brake stall memakai pengecualian yang sama.
+Saat roda penggerak mulai spin, RPM poros memakai angular velocity roda dan
+rolling radius terpelajar, bukan body speed yang masih nol. ABS tetap fail-open
+bila telemetry roda tidak valid. Temperatur
 rem tetap dihitung dari brake input dan road speed; setelah ambang fade,
 tekanan maksimum berkurang sampai rem kembali dingin.
 

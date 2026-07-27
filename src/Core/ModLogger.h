@@ -1,7 +1,7 @@
 // =============================================================================
-// ModLogger.h  —  Centralized structured logger for manual-trans-w-clutch
+// ModLogger.h  —  Centralized structured logger for melar-transmission
 //
-// Writes categorized, severity-tagged lines to "manual-trans.log" next to
+// Writes categorized, severity-tagged lines to "melar-transmission.log" next to
 // the .asi.  Also calls OutputDebugStringA() so output appears in DebugView.
 //
 // ──────────────────────────────────────────────────────────────────────────────
@@ -55,6 +55,7 @@ enum class Category : int {
     Sig     = 8,  // Turn signals (sein / indicator)
     Script  = 9,  // Main script loop lifecycle
     General = 10, // Catch-all
+    Audio   = 11, // XAudio2 dan event audio mekanikal
 };
 
 // ── Public API ────────────────────────────────────────────────────────────────

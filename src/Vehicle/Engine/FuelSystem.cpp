@@ -5,11 +5,31 @@
 #include "../../../sdk/inc/natives.h"
 #include <cmath>
 #include <cstdlib>
+#include <string>
+#include <unordered_map>
 #include <Windows.h>
 
 namespace FuelSystem {
 
 static FuelState s_state;
+static std::unordered_map<std::uint64_t, FuelState> s_vehicleStates;
+static std::uint64_t s_activeVehicleKey = 0;
+
+static std::uint64_t VehicleKey(Vehicle vehicle) {
+  const std::uint64_t model =
+      static_cast<std::uint32_t>(ENTITY::GET_ENTITY_MODEL(vehicle));
+  const char *plate = VEHICLE::GET_VEHICLE_NUMBER_PLATE_TEXT(vehicle);
+  std::uint64_t hash = 1469598103934665603ull;
+  if (plate) {
+    for (const unsigned char *p =
+             reinterpret_cast<const unsigned char *>(plate);
+         *p; ++p) {
+      hash ^= *p;
+      hash *= 1099511628211ull;
+    }
+  }
+  return (model << 32) ^ hash;
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 static inline float Clamp01(float v) { return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v); }
@@ -29,20 +49,28 @@ void Reset(float savedFuelLevel) {
   s_state.oilTemperature = kColdOilTemp;
 }
 
+void SelectVehicle(Vehicle vehicle) {
+  if (!vehicle || !ENTITY::DOES_ENTITY_EXIST(vehicle))
+    return;
+  if (s_activeVehicleKey)
+    s_vehicleStates[s_activeVehicleKey] = s_state;
+  s_activeVehicleKey = VehicleKey(vehicle);
+  const auto it = s_vehicleStates.find(s_activeVehicleKey);
+  if (it != s_vehicleStates.end()) {
+    s_state = it->second;
+  } else {
+    Reset(1.0f);
+    s_vehicleStates.emplace(s_activeVehicleKey, s_state);
+  }
+}
+
 bool Update(Vehicle vehicle, VehicleData &data, float throttle, float rpm,
             bool isEngineOn, float speedKmH, int gear,
             float clutchEngagement) {
+  if (!Config::FuelEnabled)
+    return false;
   const float dt = std::fminf(MISC::GET_FRAME_TIME(), 0.05f);
   const float frameScale = dt * 60.0f;
-
-  // Sync with game's fuel if it changed externally (cheats, etc)
-  float memFuel = data.GetFuelLevel();
-  if (memFuel > 0.0f && memFuel <= 1.0f) {
-    if ((s_state.fuelLevel - memFuel > 0.05f) ||
-        (memFuel - s_state.fuelLevel > 0.05f)) {
-      s_state.fuelLevel = memFuel;
-    }
-  }
 
   if (s_state.isRefueling) {
     s_state.fuelLevel += kRefuelRate * frameScale;
@@ -101,11 +129,24 @@ bool Update(Vehicle vehicle, VehicleData &data, float throttle, float rpm,
   }
 
   (void)vehicle;
+  (void)data;
   return false;
 }
 
 void StartRefuel() { if (s_state.fuelLevel < 1.0f) s_state.isRefueling = true; }
 void StopRefuel()  { s_state.isRefueling = false; }
+void AddFuel(float normalizedAmount) {
+  if (normalizedAmount <= 0.0f)
+    return;
+  s_state.fuelLevel = Clamp01(s_state.fuelLevel + normalizedAmount);
+  if (s_state.fuelLevel >= 1.0f) {
+    s_state.lowFuelNotified = false;
+    s_state.criticalFuelNotified = false;
+    s_state.distanceSinceRefuel = 0.0f;
+  }
+  if (s_activeVehicleKey)
+    s_vehicleStates[s_activeVehicleKey] = s_state;
+}
 
 float GetFuelLevel()          { return s_state.fuelLevel;      }
 float GetOilTemperature()     { return s_state.oilTemperature; }

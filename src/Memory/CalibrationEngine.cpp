@@ -535,7 +535,7 @@ bool Update(int vehicleHandle, bool isEngineOn, bool isRevving, uint8_t maxGear,
             "RPM field located but Gear/NextGear/TopGear layout "
             "was not recognised around ANY of the RPM candidates. "
             "The struct may have shifted in this GTA V build. "
-            "Try enabling DebugOverlay=1 and checking manual-trans.log "
+            "Try enabling DebugOverlay=1 and checking melar-transmission.log "
             "for [SearchGear] output, then recalibrate.";
         LOG_ERROR(Calib,
             "Calibration FAILED — %zu RPM candidates tried, none passed gear search.",

@@ -1,4 +1,4 @@
-# Manual Transmission with Clutch — GTA V
+# Melar Transmission — GTA V
 
 Plugin ScriptHookV open-source untuk mengganti perilaku transmisi GTA V dengan
 mode Off, automatic P-R-N-D-S-L2-L1, atau manual sequential. Simulasi mencakup clutch,
@@ -42,13 +42,25 @@ Sprint drivetrain aktif. Fokus saat ini:
 - launch control opsional memakai soft throttle cut tanpa menulis RPM;
 - temperatur rem, brake fade, clutch heat, dan brake-throttle override dapat
   dituning lewat GUI.
+- stall manual memakai RPM mesin aktual dan cutoff terpisah; gas+rem di gear 1
+  tidak lagi dianggap stall selama power-brake/burnout aktif;
+- kalibrasi rasio memvalidasi seluruh ratio set dan flat velocity. Add-on
+  vehicle yang datanya tidak koheren memakai kurva adaptif dari top speed
+  native, dengan baseline mobil enam gigi sekitar 43-45 km/h di gigi 1 dan
+  84-89 km/h di gigi 2 untuk mobil 240-250 km/h;
+- speedometer assetless native memiliki tiga layout mobil dan tiga layout
+  motor, pilihan unit/accent/posisi/scale, serta telemetry drivetrain lengkap;
+- service bay Los Santos Customs, Beeker's, dan Benny's dapat melakukan servis
+  oli, rebuild gearbox/clutch/ATF, dan tuning drivetrain/pedal/assist.
 
-Audio kustom belum menjadi bagian sprint ini.
+Sprint 2 menambahkan audio mekanikal randomized berbasis XAudio2, limiter dan
+headroom, refuel native dengan pom/jerigen, serta oil-life dan servis beranimasi.
 
 ## Struktur
 
 ```text
 src/
+├─ Audio/                loader WAV, random bank, limiter/headroom XAudio2
 ├─ Core/                 input, config, menu, renderer, logger
 ├─ Memory/               AOB scanner, resolver, wrapper memory, kalibrasi
 ├─ Script/               orkestrasi per-frame
@@ -57,6 +69,7 @@ src/
    ├─ Gears/             manual sequential, automatic PRNDS, gearbox health
    ├─ Clutch/            kurva pedal, slip/heat, actuator drivetrain
    ├─ Brakes/            ABS berbasis roda dan parking brake
+   ├─ Maintenance/       refuel, oil life, dan interaksi servis
    ├─ VehicleData.*      facade memory per kendaraan
    ├─ VehicleProfile.*   EV, utility, scooter CVT, dan motor sequential
    ├─ LightsLogic.*
@@ -71,20 +84,19 @@ dijelaskan di [docs/configuration.md](docs/configuration.md).
 ## Build
 
 1. Siapkan Visual Studio dengan workload Desktop development with C++.
-2. Buka `manual-trans-w-clutch.vcxproj`.
+2. Buka `melar-transmission.vcxproj`.
 3. Pilih `Release | x64`.
 4. Build project.
-5. Salin `x64/Release/manual-trans-w-clutch.asi` ke folder GTA V yang sudah
-   memuat ScriptHookV.
+5. Salin seluruh isi `bundle/` ke folder GTA V yang sudah memuat ScriptHookV.
 
-Sesudah mengganti ASI, cek awal `manual-trans.log`. Build sprint ini wajib
-mencetak `Runtime=driveline-r22-final-clutch-rc` dan path file yang benar-benar dimuat. Kalau
+Sesudah mengganti ASI, cek awal `melar-transmission.log`. Build sprint ini wajib
+mencetak `Runtime=melar-transmission-r25-refine` dan path file yang benar-benar dimuat. Kalau
 baris itu tidak ada, GTA masih memakai salinan ASI lama.
 
 Artefak yang sudah diverifikasi pada sprint ini:
 
 ```text
-x64/Release/manual-trans-w-clutch.asi
+x64/Release/melar-transmission.asi
 ```
 
 ## Konfigurasi penting
@@ -99,6 +111,7 @@ ShiftDown=162
 ClutchKey=88
 
 [Analog]
+Preset=0
 ThrottleAttack=0.080
 ThrottleRelease=0.280
 BrakeAttack=0.070
@@ -112,6 +125,7 @@ LaunchControlRPM=0.72
 IdleCreep=1
 StallEnabled=1
 LugStallRPM=1500
+StallCutoffRPM=950
 LugStallDelay=2.20
 WaterStallDelay=2.50
 RolloverStallDelay=7.00
@@ -131,6 +145,26 @@ TCC=1
 FluidOverheat=1
 NeutralDropDamage=1
 BrakeBoostStall=1
+
+[Audio]
+Enabled=1
+NativeLayers=1
+
+[Maintenance]
+FuelEnabled=1
+FuelBlips=1
+
+[Speedometer]
+Enabled=1
+CarStyle=0
+BikeStyle=0
+Units=0
+Accent=0
+Detailed=1
+
+[Workshop]
+Enabled=1
+Radius=14.0
 ```
 
 `Mode=0` melepas kontrol drivetrain ke GTA, `Mode=1` mengaktifkan automatic
@@ -143,6 +177,10 @@ berasal dari rasio dan road speed; throttle hanya memengaruhi seberapa cepat
 kendaraan mencapai road RPM itu. Roda dan vehicle speed tidak pernah ditulis.
 `ClutchAttack` dan `ClutchRelease` membentuk travel clutch digital. S di gear
 maju/netral diblok dari reverse axis GTA sehingga fungsinya tetap rem.
+
+Suara tuas automatic hanya diputar ketika selector berpindah P-R-N-D-S-L.
+D1-D2-D3 memakai bank shift slow, normal, atau harsh berdasarkan load/RPM.
+Pom bensin tersedia sebagai blip short-range dan dapat dimatikan dari menu.
 
 ## Batas keselamatan memory
 

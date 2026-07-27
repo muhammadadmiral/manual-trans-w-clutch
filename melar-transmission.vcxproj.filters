@@ -40,6 +40,12 @@
     <Filter Include="Source Files\Vehicle\Brakes">
       <UniqueIdentifier>{8DD8809D-B98D-43F6-B942-3D37A3CFF08C}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Audio">
+      <UniqueIdentifier>{6E778BD6-C994-45C8-A8E9-11DB853030C2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Vehicle\Maintenance">
+      <UniqueIdentifier>{79A42323-F2CC-4E63-A9DD-61C1FC05F9D2}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Header Files\Script">
       <UniqueIdentifier>{A6F7B8C9-D0E1-2345-F012-345678901235}</UniqueIdentifier>
     </Filter>
@@ -64,8 +70,17 @@
     <Filter Include="Header Files\Vehicle\Brakes">
       <UniqueIdentifier>{DA39F761-866F-4ED6-9731-9C63B3CF263F}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Audio">
+      <UniqueIdentifier>{E0A284C0-F22B-4C41-BE0A-7706C4219DA8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Vehicle\Maintenance">
+      <UniqueIdentifier>{D11D7776-F8BF-4706-BD57-B56FD81290EE}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\Audio\AudioEngine.cpp">
+      <Filter>Source Files\Audio</Filter>
+    </ClCompile>
     <ClCompile Include="src\Mod\DllMain.cpp">
       <Filter>Source Files\Mod</Filter>
     </ClCompile>
@@ -103,6 +118,9 @@
       <Filter>Source Files\Vehicle</Filter>
     </ClCompile>
     <ClCompile Include="src\Vehicle\VehicleProfile.cpp">
+      <Filter>Source Files\Vehicle</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Vehicle\DrivetrainKinematics.cpp">
       <Filter>Source Files\Vehicle</Filter>
     </ClCompile>
     <ClCompile Include="src\Vehicle\Engine\FuelSystem.cpp">
@@ -147,8 +165,23 @@
     <ClCompile Include="src\Vehicle\TelemetryLogger.cpp">
       <Filter>Source Files\Vehicle</Filter>
     </ClCompile>
+    <ClCompile Include="src\Vehicle\Maintenance\RefuelInteraction.cpp">
+      <Filter>Source Files\Vehicle\Maintenance</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Vehicle\Maintenance\MaintenanceSystem.cpp">
+      <Filter>Source Files\Vehicle\Maintenance</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Vehicle\Maintenance\ServiceInteraction.cpp">
+      <Filter>Source Files\Vehicle\Maintenance</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Vehicle\Maintenance\WorkshopIntegration.cpp">
+      <Filter>Source Files\Vehicle\Maintenance</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\Audio\AudioEngine.h">
+      <Filter>Header Files\Audio</Filter>
+    </ClInclude>
     <ClInclude Include="src\Script\MainScript.h">
       <Filter>Header Files\Script</Filter>
     </ClInclude>
@@ -183,6 +216,9 @@
       <Filter>Header Files\Vehicle</Filter>
     </ClInclude>
     <ClInclude Include="src\Vehicle\VehicleProfile.h">
+      <Filter>Header Files\Vehicle</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vehicle\DrivetrainKinematics.h">
       <Filter>Header Files\Vehicle</Filter>
     </ClInclude>
     <ClInclude Include="src\Vehicle\Engine\FuelSystem.h">
@@ -226,6 +262,18 @@
     </ClInclude>
     <ClInclude Include="src\Vehicle\TelemetryLogger.h">
       <Filter>Header Files\Vehicle</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vehicle\Maintenance\RefuelInteraction.h">
+      <Filter>Header Files\Vehicle\Maintenance</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vehicle\Maintenance\MaintenanceSystem.h">
+      <Filter>Header Files\Vehicle\Maintenance</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vehicle\Maintenance\ServiceInteraction.h">
+      <Filter>Header Files\Vehicle\Maintenance</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vehicle\Maintenance\WorkshopIntegration.h">
+      <Filter>Header Files\Vehicle\Maintenance</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

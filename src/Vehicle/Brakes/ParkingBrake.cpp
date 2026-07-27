@@ -4,6 +4,7 @@
 #include "ParkingBrake.h"
 #include "../VehicleData.h"
 #include "../../Core/Config.h"
+#include "../../Audio/AudioEngine.h"
 #include "../../../sdk/inc/natives.h"
 #include <Windows.h>
 
@@ -35,6 +36,7 @@ bool Update(Vehicle vehicle, VehicleData &data, float speedKmH,
         s_state.hillHoldActive = false;
         s_state.engageDelay    = 0;
         VEHICLE::SET_VEHICLE_HANDBRAKE(vehicle, FALSE);
+        AudioEngine::PlayParkingBrake(false);
 
         HUD::BEGIN_TEXT_COMMAND_THEFEED_POST("STRING");
         HUD::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME("~g~Parking Brake Released");
@@ -43,6 +45,7 @@ bool Update(Vehicle vehicle, VehicleData &data, float speedKmH,
     } else {
       s_state.isEngaged   = true;
       s_state.engageDelay = kEngageDelayFrames;
+      AudioEngine::PlayParkingBrake(true);
 
       HUD::BEGIN_TEXT_COMMAND_THEFEED_POST("STRING");
       HUD::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME("~o~Parking Brake Engaged");
@@ -56,6 +59,7 @@ bool Update(Vehicle vehicle, VehicleData &data, float speedKmH,
   if (s_state.isEngaged && speedKmH > kAutoReleaseSpeedKmH && throttle > 0.3f) {
     s_state.isEngaged = false;
     VEHICLE::SET_VEHICLE_HANDBRAKE(vehicle, FALSE);
+    AudioEngine::PlayParkingBrake(false);
     HUD::BEGIN_TEXT_COMMAND_THEFEED_POST("STRING");
     HUD::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME("~r~Parking Brake Auto-Released");
     HUD::END_TEXT_COMMAND_THEFEED_POST_TICKER(false, false);
