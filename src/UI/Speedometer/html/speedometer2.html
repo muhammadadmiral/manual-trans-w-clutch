@@ -1,0 +1,872 @@
+<!doctype html>
+<html lang="id">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>MT Dash — Analog</title>
+    <style>
+        :root {
+            --bg-0: #050506;
+            --bg-1: #101114;
+            --bezel-hi: #5a5e66;
+            --bezel-lo: #101114;
+            --face: #131316;
+            --face-edge: #000;
+            --ink: #eae6dd;
+            --ink-dim: #8b877e;
+            --tick: #cfcabd;
+            --cool: #4fb8e0;
+            --warn: #ffb020;
+            --danger: #ff3b30;
+            --ok: #59d18a;
+            --font-num: ui-monospace, 'SFMono-Regular', Consolas, 'Roboto Mono', monospace;
+            --font-lbl: 'Segoe UI', -apple-system, Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            color: var(--ink);
+            font-family: var(--font-lbl);
+            background:
+                radial-gradient(ellipse at 50% 30%, #1b1c20 0%, #08090a 70%);
+        }
+
+        .dash {
+            width: min(1180px, 96vw);
+            padding: 28px 34px 22px;
+            background: linear-gradient(180deg, #121316, #08090a);
+            border: 1px solid #232428;
+            border-radius: 20px;
+            box-shadow: 0 40px 90px rgba(0, 0, 0, .65), inset 0 1px 0 rgba(255, 255, 255, .05);
+            position: relative;
+        }
+
+        .dash::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: 20px;
+            pointer-events: none;
+            background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, .012) 0 2px, transparent 2px 4px);
+            opacity: .5;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: var(--font-num);
+            font-size: 12px;
+            letter-spacing: .14em;
+            color: var(--ink-dim);
+            text-transform: uppercase;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #1f2023;
+            margin-bottom: 18px;
+        }
+
+        .topbar b {
+            color: var(--ink);
+            font-weight: 600;
+        }
+
+        .topbar .dot {
+            margin: 0 8px;
+            opacity: .4;
+        }
+
+        .tag {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 1px 7px;
+            border-radius: 3px;
+            border: 1px solid #33343a;
+            font-size: 10px;
+            color: var(--cool);
+        }
+
+        .cluster {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        /* ---- big radial gauge ---- */
+        .gauge-big {
+            width: 266px;
+            height: 266px;
+            position: relative;
+            flex: 0 0 auto;
+        }
+
+        .gauge-big svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+            filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .5));
+        }
+
+        .bezel {
+            fill: none;
+            stroke: url(#bezelGrad);
+            stroke-width: 10;
+        }
+
+        .facebg {
+            fill: var(--face);
+            stroke: var(--face-edge);
+            stroke-width: 2;
+        }
+
+        .track {
+            fill: none;
+            stroke: #232427;
+            stroke-width: 12;
+            stroke-linecap: round;
+        }
+
+        .redzone {
+            fill: none;
+            stroke: var(--danger);
+            stroke-width: 12;
+            stroke-linecap: butt;
+            opacity: .55;
+        }
+
+        .value {
+            fill: none;
+            stroke: var(--cool);
+            stroke-width: 12;
+            stroke-linecap: round;
+            transition: stroke-dasharray .08s linear, stroke .15s linear;
+        }
+
+        .value.rpm {
+            stroke: var(--warn);
+        }
+
+        .value.rpm.redline {
+            stroke: var(--danger);
+        }
+
+        .tickmaj {
+            stroke: var(--tick);
+            stroke-width: 2.4;
+        }
+
+        .tickmin {
+            stroke: #5c584f;
+            stroke-width: 1.4;
+        }
+
+        .ticklbl {
+            fill: var(--ink-dim);
+            font-family: var(--font-num);
+            font-size: 11px;
+            text-anchor: middle;
+        }
+
+        .needle {
+            stroke: var(--danger);
+            stroke-width: 3.4;
+            stroke-linecap: round;
+            transform-origin: 120px 120px;
+            transition: transform .08s linear;
+            filter: drop-shadow(0 0 3px rgba(255, 59, 48, .6));
+        }
+
+        .needle.speed {
+            stroke: #f4f1ea;
+            filter: drop-shadow(0 0 3px rgba(244, 241, 234, .5));
+        }
+
+        .hub {
+            fill: #2b2c30;
+            stroke: #0a0a0b;
+            stroke-width: 2;
+        }
+
+        .hub-dot {
+            fill: #050506;
+        }
+
+        .center-readout {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            top: 26px;
+        }
+
+        .gear {
+            font-family: var(--font-num);
+            font-size: 44px;
+            font-weight: 700;
+            line-height: 1;
+            color: var(--ink);
+            text-shadow: 0 0 14px rgba(79, 184, 224, .35);
+        }
+
+        .mode-badge {
+            margin-top: 4px;
+            font-size: 10px;
+            letter-spacing: .16em;
+            color: var(--ink-dim);
+            border: 1px solid #2c2d31;
+            border-radius: 3px;
+            padding: 1px 6px;
+        }
+
+        .speed-val {
+            font-family: var(--font-num);
+            font-size: 40px;
+            font-weight: 700;
+            color: var(--ink);
+        }
+
+        .speed-unit {
+            font-size: 10px;
+            letter-spacing: .2em;
+            color: var(--ink-dim);
+            margin-top: 2px;
+        }
+
+        .gauge-name {
+            position: absolute;
+            bottom: 38px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 10px;
+            letter-spacing: .22em;
+            color: var(--ink-dim);
+        }
+
+        /* ---- mini gauges ---- */
+        .mini-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .mini-gauge {
+            width: 104px;
+            height: 104px;
+            position: relative;
+        }
+
+        .mini-gauge svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .mini-track {
+            fill: none;
+            stroke: #232427;
+            stroke-width: 9;
+            stroke-linecap: round;
+        }
+
+        .mini-value {
+            fill: none;
+            stroke: var(--ok);
+            stroke-width: 9;
+            stroke-linecap: round;
+            transition: stroke-dasharray .2s linear, stroke .2s linear;
+        }
+
+        .mini-center {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mini-num {
+            font-family: var(--font-num);
+            font-size: 17px;
+            font-weight: 600;
+        }
+
+        .mini-lbl {
+            font-size: 8.5px;
+            letter-spacing: .14em;
+            color: var(--ink-dim);
+            margin-top: 1px;
+        }
+
+        /* ---- health bars ---- */
+        .bars-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1.3fr;
+            gap: 18px;
+            align-items: end;
+            margin-top: 22px;
+            padding-top: 16px;
+            border-top: 1px solid #1f2023;
+        }
+
+        .bar-block {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .bar-head {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            letter-spacing: .12em;
+            color: var(--ink-dim);
+        }
+
+        .bar-head span.v {
+            font-family: var(--font-num);
+            color: var(--ink);
+        }
+
+        .bar-track {
+            height: 7px;
+            border-radius: 4px;
+            background: #1c1d20;
+            overflow: hidden;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, .6);
+        }
+
+        .bar-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: 4px;
+            background: var(--ok);
+            transition: width .2s linear, background .2s linear;
+        }
+
+        .pedals {
+            display: flex;
+            gap: 10px;
+        }
+
+        .pedal {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .pedal-track {
+            height: 44px;
+            border-radius: 4px;
+            background: #1c1d20;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, .6);
+        }
+
+        .pedal-fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 0%;
+            background: var(--cool);
+            transition: height .06s linear;
+        }
+
+        .pedal-fill.brake {
+            background: var(--danger);
+        }
+
+        .pedal-lbl {
+            font-size: 9px;
+            letter-spacing: .14em;
+            color: var(--ink-dim);
+            text-align: center;
+        }
+
+        /* ---- tell-tale lights ---- */
+        .tell-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 16px;
+        }
+
+        .tell {
+            font-family: var(--font-num);
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: .06em;
+            padding: 5px 9px;
+            border-radius: 4px;
+            border: 1px solid #2a2b2f;
+            color: #4c4c50;
+            background: #151517;
+            transition: all .15s ease;
+        }
+
+        .tell.on {
+            color: #cfd0d3;
+            border-color: #3a3b40;
+        }
+
+        .tell.active {
+            background: var(--warn);
+            color: #1a1200;
+            border-color: var(--warn);
+            box-shadow: 0 0 10px rgba(255, 176, 32, .5);
+        }
+
+        .tell.active.danger {
+            background: var(--danger);
+            color: #2a0000;
+            border-color: var(--danger);
+            box-shadow: 0 0 10px rgba(255, 59, 48, .55);
+        }
+
+        .tell.active.ok {
+            background: var(--ok);
+            color: #04220f;
+            border-color: var(--ok);
+        }
+
+        .footer-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 14px;
+            font-family: var(--font-num);
+            font-size: 10px;
+            color: var(--ink-dim);
+            letter-spacing: .1em;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="dash" id="dash">
+
+        <div class="topbar">
+            <div>
+                <b id="vClass">SPORTS</b><span class="dot">•</span><span id="vTags"></span>
+            </div>
+            <div>MODEL <span id="vHash" style="color:var(--ink)">0x00000000</span></div>
+        </div>
+
+        <div class="cluster">
+            <div class="mini-stack">
+                <div class="mini-gauge" id="g-fuel">
+                    <svg viewBox="0 0 100 100">
+                        <circle class="mini-track" cx="50" cy="50" r="41" />
+                        <circle class="mini-value" cx="50" cy="50" r="41" />
+                    </svg>
+                    <div class="mini-center">
+                        <div class="mini-num" id="v-fuel">0</div>
+                        <div class="mini-lbl">FUEL %</div>
+                    </div>
+                </div>
+                <div class="mini-gauge" id="g-oiltemp">
+                    <svg viewBox="0 0 100 100">
+                        <circle class="mini-track" cx="50" cy="50" r="41" />
+                        <circle class="mini-value" cx="50" cy="50" r="41" />
+                    </svg>
+                    <div class="mini-center">
+                        <div class="mini-num" id="v-oiltemp">0</div>
+                        <div class="mini-lbl">OIL °C</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="gauge-big" id="tachWrap">
+                <svg viewBox="0 0 240 240">
+                    <defs>
+                        <linearGradient id="bezelGrad" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0" stop-color="#6a6e76" />
+                            <stop offset=".5" stop-color="#232428" />
+                            <stop offset="1" stop-color="#0a0a0b" />
+                        </linearGradient>
+                    </defs>
+                    <circle class="bezel" cx="120" cy="120" r="112" />
+                    <circle class="facebg" cx="120" cy="120" r="104" />
+                    <circle class="track" cx="120" cy="120" r="90" />
+                    <circle class="redzone" id="tachRedzone" cx="120" cy="120" r="90" />
+                    <circle class="value rpm" id="tachValue" cx="120" cy="120" r="90" />
+                    <g id="tachTicks"></g>
+                    <line class="needle" id="tachNeedle" x1="120" y1="120" x2="120" y2="42" />
+                    <circle class="hub" cx="120" cy="120" r="9" />
+                    <circle class="hub-dot" cx="120" cy="120" r="2.4" />
+                </svg>
+                <div class="center-readout">
+                    <div class="gear" id="gearVal">N</div>
+                    <div class="mode-badge" id="modeBadge">MANUAL</div>
+                </div>
+                <div class="gauge-name">×1000 RPM</div>
+            </div>
+
+            <div class="gauge-big" id="speedoWrap">
+                <svg viewBox="0 0 240 240">
+                    <circle class="bezel" cx="120" cy="120" r="112" />
+                    <circle class="facebg" cx="120" cy="120" r="104" />
+                    <circle class="track" cx="120" cy="120" r="90" />
+                    <circle class="value" id="spdValue" cx="120" cy="120" r="90" />
+                    <g id="spdTicks"></g>
+                    <line class="needle speed" id="spdNeedle" x1="120" y1="120" x2="120" y2="42" />
+                    <circle class="hub" cx="120" cy="120" r="9" />
+                    <circle class="hub-dot" cx="120" cy="120" r="2.4" />
+                </svg>
+                <div class="center-readout">
+                    <div class="speed-val" id="speedVal">0</div>
+                    <div class="speed-unit">KM/H</div>
+                </div>
+                <div class="gauge-name">SPEED</div>
+            </div>
+
+            <div class="mini-stack">
+                <div class="mini-gauge" id="g-boost">
+                    <svg viewBox="0 0 100 100">
+                        <circle class="mini-track" cx="50" cy="50" r="41" />
+                        <circle class="mini-value" cx="50" cy="50" r="41" style="stroke:var(--cool)" />
+                    </svg>
+                    <div class="mini-center">
+                        <div class="mini-num" id="v-boost">0.0</div>
+                        <div class="mini-lbl">BOOST BAR</div>
+                    </div>
+                </div>
+                <div class="mini-gauge" id="g-oillife">
+                    <svg viewBox="0 0 100 100">
+                        <circle class="mini-track" cx="50" cy="50" r="41" />
+                        <circle class="mini-value" cx="50" cy="50" r="41" />
+                    </svg>
+                    <div class="mini-center">
+                        <div class="mini-num" id="v-oillife">0</div>
+                        <div class="mini-lbl">OIL LIFE</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bars-row">
+            <div class="bar-block">
+                <div class="bar-head"><span>ENGINE</span><span class="v" id="v-engine">100%</span></div>
+                <div class="bar-track">
+                    <div class="bar-fill" id="b-engine"></div>
+                </div>
+            </div>
+            <div class="bar-block">
+                <div class="bar-head"><span>GEARBOX</span><span class="v" id="v-gearbox">100%</span></div>
+                <div class="bar-track">
+                    <div class="bar-fill" id="b-gearbox"></div>
+                </div>
+            </div>
+            <div class="bar-block">
+                <div class="bar-head"><span>CLUTCH</span><span class="v" id="v-clutch">0%</span></div>
+                <div class="bar-track">
+                    <div class="bar-fill" id="b-clutch"></div>
+                </div>
+            </div>
+            <div class="pedals">
+                <div class="pedal">
+                    <div class="pedal-track">
+                        <div class="pedal-fill" id="p-throttle"></div>
+                    </div>
+                    <div class="pedal-lbl">THR</div>
+                </div>
+                <div class="pedal">
+                    <div class="pedal-track">
+                        <div class="pedal-fill brake" id="p-brake"></div>
+                    </div>
+                    <div class="pedal-lbl">BRK</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tell-row" id="tellRow"></div>
+
+        <div class="footer-row">
+            <div>ODO <span id="odo" style="color:var(--ink)">000000</span> KM</div>
+            <div id="selectorRow">SELECTOR — <span id="selVal" style="color:var(--ink)">—</span></div>
+        </div>
+    </div>
+
+    <script>
+        /* =========================================================================
+           DATA CONTRACT — mirrors your C++ struct field-for-field. Call:
+             window.updateDashboard({ speedKmH: 123, normalizedRPM: 0.6, ... })
+           with any subset of fields; missing fields keep their last value.
+           A live demo simulator is running below — call stopDemo() to kill it
+           once you're feeding real telemetry.
+           ========================================================================= */
+
+        const CONFIG = {
+            // Adjust these to match how YOUR mod actually scales these fields.
+            oilTemp: { min: 0, max: 140 },   // °C
+            boost: { min: -1, max: 2 },   // bar (negative = vacuum)
+            engineHealthMax: 1000,              // GTA native max is 1000
+            gearboxHealthMax: 1000,
+            vehicleClasses: ['Compact', 'Sedan', 'SUV', 'Coupe', 'Muscle', 'Sports Classic', 'Sports', 'Super',
+                'Motorcycle', 'Off-Road', 'Industrial', 'Utility', 'Van', 'Cycle', 'Boat', 'Helicopter', 'Plane',
+                'Service', 'Emergency', 'Military', 'Commercial', 'Train'],
+            transModes: ['AUTO', 'MANUAL']
+        };
+
+        const state = {
+            speedKmH: 0, normalizedRPM: 0, physicalRPM: 0, redlineRPM: 7000, fuel: 0, oilTemperature: 0,
+            oilLife: 0, engineHealth: 1000, gearboxHealth: 1000, clutchHeat: 0, boost: 0, odometerKm: 0,
+            throttle: 0, brake: 0, maximumSpeedKmH: 320, gear: 0, maxGear: 6, transmissionMode: 1,
+            automaticSelector: null, motorcycle: false, electric: false, engineOn: true, engineStarting: false,
+            parkingBrake: false, tcsEnabled: true, tcsActive: false, absEnabled: true, absActive: false,
+            escEnabled: true, escActive: false, launchEnabled: false, rollWarning: false, launchControl: false,
+            burnout: false, vehicleClass: 6, modelHash: 0
+        };
+
+        const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+        function niceStep(rough) {
+            const mag = Math.pow(10, Math.floor(Math.log10(Math.max(rough, 1e-6))));
+            const n = rough / mag; let s; if (n < 1.5) s = 1; else if (n < 3) s = 2; else if (n < 7) s = 5; else s = 10;
+            return s * mag;
+        }
+
+        /* ---- polar gauge geometry: 270° sweep, gap at bottom ---- */
+        const R_BIG = 90, R_MINI = 41;
+        const SWEEP = 270, START_FROM_TOP = 225; // clockwise from 12 o'clock
+        const ROT = START_FROM_TOP - 90;
+        const C_BIG = 2 * Math.PI * R_BIG, ARC_BIG = C_BIG * (SWEEP / 360);
+        const C_MINI = 2 * Math.PI * R_MINI, ARC_MINI = C_MINI * (SWEEP / 360);
+
+        function initCircle(el, C, ARC) {
+            el.setAttribute('transform', `rotate(${ROT} ${el.dataset.cx || 50} ${el.dataset.cy || 50})`);
+        }
+        [...document.querySelectorAll('#tachValue,#tachRedzone,#spdValue,.track')].forEach(el => {
+            const cx = el.getAttribute('cx'), cy = el.getAttribute('cy');
+            el.setAttribute('transform', `rotate(${ROT} ${cx} ${cy})`);
+        });
+        document.querySelectorAll('.mini-track,.mini-value').forEach(el => {
+            el.setAttribute('transform', `rotate(${ROT} 50 50)`);
+        });
+        // static tracks: full 270 arc
+        document.querySelectorAll('.track').forEach(el => {
+            el.setAttribute('stroke-dasharray', `${ARC_BIG} ${C_BIG - ARC_BIG}`);
+        });
+        document.querySelectorAll('.mini-track').forEach(el => {
+            el.setAttribute('stroke-dasharray', `${ARC_MINI} ${C_MINI - ARC_MINI}`);
+        });
+
+        function setArc(el, frac, ARC, C) {
+            frac = clamp(frac, 0, 1);
+            el.setAttribute('stroke-dasharray', `${frac * ARC} ${C - frac * ARC}`);
+        }
+        function setNeedle(el, frac, cx, cy) {
+            frac = clamp(frac, 0, 1);
+            const ang = START_FROM_TOP + frac * SWEEP;
+            el.style.transform = `rotate(${ang}deg)`;
+        }
+
+        function buildTicks(groupEl, count, radiusOuter, radiusInner, labelFn, cx, cy) {
+            groupEl.innerHTML = '';
+            for (let i = 0; i <= count; i++) {
+                const frac = i / count;
+                const ang = (START_FROM_TOP + frac * SWEEP - 90) * Math.PI / 180;
+                const x1 = cx + radiusOuter * Math.cos(ang), y1 = cy + radiusOuter * Math.sin(ang);
+                const x2 = cx + radiusInner * Math.cos(ang), y2 = cy + radiusInner * Math.sin(ang);
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', x1); line.setAttribute('y1', y1); line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+                line.setAttribute('class', 'tickmaj');
+                groupEl.appendChild(line);
+                if (labelFn) {
+                    const lx = cx + (radiusInner - 14) * Math.cos(ang), ly = cy + (radiusInner - 14) * Math.sin(ang);
+                    const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    t.setAttribute('x', lx); t.setAttribute('y', ly + 4); t.setAttribute('class', 'ticklbl');
+                    t.textContent = labelFn(frac);
+                    groupEl.appendChild(t);
+                }
+            }
+        }
+
+        const tachTicks = document.getElementById('tachTicks');
+        const spdTicks = document.getElementById('spdTicks');
+
+        function rebuildStaticGauges() {
+            const redlineFrac = clamp(state.redlineRPM / (state.redlineRPM * 1.15), 0, 1);
+            buildTicks(tachTicks, 7, 88, 74, f => Math.round(f * (state.redlineRPM * 1.15) / 1000), 120, 120);
+            const spdMax = niceStep(state.maximumSpeedKmH / 6) * 6 >= state.maximumSpeedKmH ? niceStep(state.maximumSpeedKmH / 6) * 6 : niceStep(state.maximumSpeedKmH / 6) * 7;
+            buildTicks(spdTicks, 6, 88, 74, f => Math.round(f * spdMax), 120, 120);
+            // redzone arc: from redline to max
+            const rz = document.getElementById('tachRedzone');
+            const startFrac = clamp(state.redlineRPM / (state.redlineRPM * 1.15), 0, 1);
+            const zoneLen = (1 - startFrac) * ARC_BIG;
+            rz.setAttribute('stroke-dasharray', `${zoneLen} ${C_BIG - zoneLen}`);
+            rz.setAttribute('stroke-dashoffset', -(startFrac * ARC_BIG));
+        }
+        rebuildStaticGauges();
+
+        function gearLabel(g) {
+            if (g === 0) return 'N';
+            if (g < 0) return 'R';
+            return String(g);
+        }
+
+        function render() {
+            const tachMax = state.redlineRPM * 1.15;
+            const rpmFrac = clamp(state.physicalRPM > 0 ? state.physicalRPM / tachMax : state.normalizedRPM / 1.15, 0, 1);
+            setArc(document.getElementById('tachValue'), rpmFrac, ARC_BIG, C_BIG);
+            setNeedle(document.getElementById('tachNeedle'), rpmFrac, 120, 120);
+            const tv = document.getElementById('tachValue');
+            tv.classList.toggle('redline', state.physicalRPM >= state.redlineRPM * 0.97 || state.normalizedRPM >= 0.97);
+
+            const spdFrac = clamp(state.speedKmH / Math.max(1, state.maximumSpeedKmH), 0, 1);
+            setArc(document.getElementById('spdValue'), spdFrac, ARC_BIG, C_BIG);
+            setNeedle(document.getElementById('spdNeedle'), spdFrac, 120, 120);
+            document.getElementById('speedVal').textContent = Math.round(state.speedKmH);
+
+            document.getElementById('gearVal').textContent = gearLabel(state.gear);
+            document.getElementById('modeBadge').textContent = CONFIG.transModes[state.transmissionMode] || 'MANUAL';
+
+            const fuelFrac = clamp(state.fuel, 0, 1);
+            setArc(document.querySelector('#g-fuel .mini-value'), fuelFrac, ARC_MINI, C_MINI);
+            document.getElementById('v-fuel').textContent = Math.round(fuelFrac * 100);
+
+            const otFrac = clamp((state.oilTemperature - CONFIG.oilTemp.min) / (CONFIG.oilTemp.max - CONFIG.oilTemp.min), 0, 1);
+            const otEl = document.querySelector('#g-oiltemp .mini-value');
+            setArc(otEl, otFrac, ARC_MINI, C_MINI);
+            otEl.style.stroke = otFrac > 0.85 ? 'var(--danger)' : otFrac > 0.65 ? 'var(--warn)' : 'var(--ok)';
+            document.getElementById('v-oiltemp').textContent = Math.round(state.oilTemperature);
+
+            const boostFrac = clamp((state.boost - CONFIG.boost.min) / (CONFIG.boost.max - CONFIG.boost.min), 0, 1);
+            setArc(document.querySelector('#g-boost .mini-value'), boostFrac, ARC_MINI, C_MINI);
+            document.getElementById('v-boost').textContent = state.boost.toFixed(1);
+
+            const olFrac = clamp(state.oilLife, 0, 1);
+            const olEl = document.querySelector('#g-oillife .mini-value');
+            setArc(olEl, olFrac, ARC_MINI, C_MINI);
+            olEl.style.stroke = olFrac < 0.2 ? 'var(--danger)' : olFrac < 0.4 ? 'var(--warn)' : 'var(--ok)';
+            document.getElementById('v-oillife').textContent = Math.round(olFrac * 100);
+
+            const engFrac = clamp(state.engineHealth / CONFIG.engineHealthMax, 0, 1);
+            document.getElementById('b-engine').style.width = (engFrac * 100) + '%';
+            document.getElementById('b-engine').style.background = engFrac < 0.3 ? 'var(--danger)' : engFrac < 0.6 ? 'var(--warn)' : 'var(--ok)';
+            document.getElementById('v-engine').textContent = Math.round(engFrac * 100) + '%';
+
+            const gbxFrac = clamp(state.gearboxHealth / CONFIG.gearboxHealthMax, 0, 1);
+            document.getElementById('b-gearbox').style.width = (gbxFrac * 100) + '%';
+            document.getElementById('b-gearbox').style.background = gbxFrac < 0.3 ? 'var(--danger)' : gbxFrac < 0.6 ? 'var(--warn)' : 'var(--ok)';
+            document.getElementById('v-gearbox').textContent = Math.round(gbxFrac * 100) + '%';
+
+            const clFrac = clamp(state.clutchHeat, 0, 1);
+            document.getElementById('b-clutch').style.width = (clFrac * 100) + '%';
+            document.getElementById('b-clutch').style.background = clFrac > 0.75 ? 'var(--danger)' : clFrac > 0.45 ? 'var(--warn)' : 'var(--ok)';
+            document.getElementById('v-clutch').textContent = Math.round(clFrac * 100) + '%';
+
+            document.getElementById('p-throttle').style.height = (clamp(state.throttle, 0, 1) * 100) + '%';
+            document.getElementById('p-brake').style.height = (clamp(state.brake, 0, 1) * 100) + '%';
+
+            document.getElementById('odo').textContent = Math.round(state.odometerKm).toString().padStart(6, '0');
+            document.getElementById('vClass').textContent = (CONFIG.vehicleClasses[state.vehicleClass] || '—').toUpperCase();
+            document.getElementById('vHash').textContent = '0x' + (state.modelHash >>> 0).toString(16).toUpperCase().padStart(8, '0');
+            const tags = []; if (state.motorcycle) tags.push('MOTORCYCLE'); if (state.electric) tags.push('ELECTRIC');
+            document.getElementById('vTags').textContent = tags.join(' · ');
+
+            const selRow = document.getElementById('selectorRow');
+            if (state.automaticSelector) { selRow.style.display = ''; document.getElementById('selVal').textContent = state.automaticSelector; }
+            else { selRow.style.display = 'none'; }
+
+            renderTells();
+        }
+
+        const TELLS = [
+            { k: 'engineOn', lbl: 'ENG', mode: 'ok' },
+            { k: 'parkingBrake', lbl: 'PARK', mode: 'danger' },
+            { k: 'tcsActive', enabledKey: 'tcsEnabled', lbl: 'TCS', mode: 'warn' },
+            { k: 'absActive', enabledKey: 'absEnabled', lbl: 'ABS', mode: 'warn' },
+            { k: 'escActive', enabledKey: 'escEnabled', lbl: 'ESC', mode: 'warn' },
+            { k: 'launchControl', enabledKey: 'launchEnabled', lbl: 'LAUNCH', mode: 'ok' },
+            { k: 'burnout', lbl: 'BURNOUT', mode: 'danger' },
+            { k: 'rollWarning', lbl: 'ROLL', mode: 'danger' },
+        ];
+        const tellRow = document.getElementById('tellRow');
+        TELLS.forEach(t => {
+            const d = document.createElement('div'); d.className = 'tell'; d.id = 'tell-' + t.k; d.textContent = t.lbl;
+            tellRow.appendChild(d);
+        });
+        function renderTells() {
+            TELLS.forEach(t => {
+                const el = document.getElementById('tell-' + t.k);
+                const active = !!state[t.k];
+                const enabled = t.enabledKey ? !!state[t.enabledKey] : true;
+                el.classList.toggle('on', enabled && !active);
+                el.classList.toggle('active', active);
+                el.classList.toggle('danger', active && t.mode === 'danger');
+                el.classList.toggle('ok', active && t.mode === 'ok');
+            });
+        }
+
+        function updateDashboard(data) {
+            Object.assign(state, data);
+            if (data && (data.redlineRPM !== undefined || data.maximumSpeedKmH !== undefined)) rebuildStaticGauges();
+            render();
+        }
+        window.updateDashboard = updateDashboard;
+
+        /* Optional: wire this up to your telemetry bridge, e.g.:
+           const ws = new WebSocket('ws://127.0.0.1:PORT');
+           ws.onmessage = (e) => updateDashboard(JSON.parse(e.data));
+        */
+
+        /* ---------------- demo simulator (safe to delete) ---------------- */
+        let demoOn = true, simT = 0;
+        window.stopDemo = () => { demoOn = false; };
+        function demoTick() {
+            if (!demoOn) return;
+            simT += 0.1;
+            const cycle = 26, p = simT % cycle;
+            let speedFrac, throttle = 0, brake = 0, parkingBrake = false;
+            if (p < 14) { speedFrac = Math.min(0.95, p / 14); throttle = clamp(0.55 + 0.35 * Math.sin(p * 2.3), 0, 1); }
+            else if (p < 20) { const bp = (p - 14) / 6; speedFrac = 0.95 * (1 - bp) + 0.05 * bp; brake = 0.7; }
+            else if (p < 22) { speedFrac = 0.02; brake = 0.9; parkingBrake = p > 21; }
+            else { speedFrac = -0.05 * ((p - 22) / 4); throttle = 0.2; }
+            const speed = speedFrac * state.maximumSpeedKmH;
+            const absF = Math.abs(speedFrac);
+            const maxGear = state.maxGear || 6;
+            let gear = Math.abs(speedFrac) < 0.015 ? 0 : (speedFrac < 0 ? -1 : clamp(1 + Math.floor(absF * (maxGear + 0.2)), 1, maxGear));
+            const gearSpan = 1 / (maxGear + 0.2);
+            const posInGear = gear > 0 ? ((absF % gearSpan) / gearSpan) : (gear < 0 ? Math.min(1, absF * 8) : 0);
+            const rpmFrac = gear === 0 ? 0.14 + 0.03 * Math.sin(simT * 3) : clamp(0.22 + posInGear * 0.8, 0, 1.05);
+            updateDashboard({
+                speedKmH: speed, normalizedRPM: clamp(rpmFrac, 0, 1.05), physicalRPM: rpmFrac * state.redlineRPM,
+                gear, throttle, brake, parkingBrake,
+                fuel: clamp(0.82 - simT / 500, 0, 1),
+                oilTemperature: clamp(72 + absF * 32, 20, 118),
+                oilLife: 0.86, engineHealth: 1000, gearboxHealth: 990,
+                clutchHeat: clamp(gear > 0 && posInGear < 0.25 ? throttle * 0.7 : 0.08, 0, 1),
+                boost: gear > 0 ? clamp((throttle - 0.5) * 2.4, -1, 2) : 0,
+                odometerKm: state.odometerKm + speed / 36000,
+                tcsActive: throttle > 0.85 && absF < 0.25 && Math.random() < 0.2,
+                absActive: brake > 0.55 && Math.random() < 0.25,
+                engineOn: true
+            });
+        }
+        setInterval(demoTick, 100);
+        demoTick();
+    </script>
+</body>
+
+</html>

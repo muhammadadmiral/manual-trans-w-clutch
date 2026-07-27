@@ -1,0 +1,96 @@
+
+<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MT HUD — Moto Halo</title>
+<style>
+:root{--scale:1;--fg:#f4fbff;--muted:#7e98a7;--cyan:#44ecff;--sky:#79b8ff;--lime:#8dff95;--amber:#ffbc49;--red:#ff5362;}
+*{box-sizing:border-box} html,body{margin:0;width:100%;height:100%;background:transparent;overflow:hidden;font-family:Inter,Segoe UI,Arial,sans-serif;color:var(--fg)} body{display:grid;place-items:end center;padding:0 0 22px} #hud{position:relative;width:920px;height:300px;transform:scale(var(--scale));transform-origin:bottom center;transition:.18s;filter:drop-shadow(0 10px 28px rgba(0,0,0,.42))} #hud.hidden{opacity:0;transform:translateY(20px) scale(.96)}
+.panel{position:absolute;border:1px solid rgba(255,255,255,.09);background:linear-gradient(180deg,rgba(10,17,23,.72),rgba(6,10,14,.6));backdrop-filter:blur(10px);border-radius:18px;box-shadow:inset 0 1px rgba(255,255,255,.08)}
+.ring-wrap{position:absolute;left:250px;top:0;width:420px;height:300px;display:grid;place-items:center}
+.ring{position:relative;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle at 50% 50%,rgba(6,12,16,.35) 0 43%,rgba(8,14,18,.82) 44% 46%,transparent 47%),conic-gradient(from 220deg,rgba(68,236,255,.08),rgba(68,236,255,.9),rgba(141,255,149,.7),rgba(255,188,73,.8),rgba(255,83,98,.9),rgba(255,83,98,.15),rgba(68,236,255,.08));mask:radial-gradient(circle at center,transparent 0 58%,#000 59%);-webkit-mask:radial-gradient(circle at center,transparent 0 58%,#000 59%);filter:drop-shadow(0 0 20px rgba(68,236,255,.16))}
+.ring::after{content:"";position:absolute;inset:32px;border-radius:50%;background:radial-gradient(circle at 50% 30%,rgba(25,40,48,.82),rgba(5,8,11,.85));border:1px solid rgba(255,255,255,.08)}
+.needle{position:absolute;width:4px;height:118px;background:linear-gradient(180deg,var(--sky),#fff);left:50%;top:50%;transform-origin:50% calc(100% - 12px);translate:-50% -100%;border-radius:10px;box-shadow:0 0 12px rgba(121,184,255,.55)} .hub{position:absolute;width:20px;height:20px;border-radius:50%;background:#eef7ff;border:4px solid #0e171c;left:50%;top:50%;translate:-50% -50%;box-shadow:0 0 0 4px rgba(68,236,255,.18)}
+.speed-block{position:absolute;left:50%;top:50%;translate:-50% -50%;text-align:center;z-index:2} .speed-block .big{font:900 86px/.9 "Arial Narrow",Inter,sans-serif;letter-spacing:1px;text-shadow:0 0 18px rgba(68,236,255,.18)} .speed-block .unit{font-size:12px;letter-spacing:4px;color:var(--muted);font-weight:800} .speed-block .mode{margin-top:8px;font-size:11px;letter-spacing:2px;color:var(--cyan);font-weight:800} .speed-block .odo{margin-top:8px;font:700 12px/1.2 "Roboto Mono",Consolas,monospace;color:#cbd9df}
+.gear-pill{position:absolute;right:118px;top:24px;min-width:84px;padding:10px 16px;border-radius:18px;border:1px solid rgba(255,255,255,.09);background:linear-gradient(180deg,rgba(14,24,31,.82),rgba(6,10,14,.66));text-align:center} .gear-pill b{display:block;font:900 44px/.9 "Arial Narrow",Inter,sans-serif} .gear-pill span{font-size:10px;color:var(--muted);letter-spacing:2px;font-weight:700}
+.left-stack{position:absolute;left:0;top:20px;width:210px;display:grid;gap:12px} .right-stack{position:absolute;right:0;top:20px;width:210px;display:grid;gap:12px} .card{padding:12px 14px} .card .head{display:flex;justify-content:space-between;align-items:center;font-size:10px;letter-spacing:2px;color:var(--muted);font-weight:800} .card .value{margin-top:8px;font:800 24px/1 "Roboto Mono",Consolas,monospace} .card .sub{margin-top:6px;font-size:11px;color:#bdd3dc} .bar{height:7px;border-radius:8px;background:rgba(255,255,255,.06);overflow:hidden;margin-top:8px} .bar i{display:block;height:100%;width:0;border-radius:inherit;transition:width .12s} .aqua i{background:linear-gradient(90deg,#1ec9ff,var(--cyan))} .amber i{background:linear-gradient(90deg,#ff8f2c,var(--amber))} .green i{background:linear-gradient(90deg,#43d96f,var(--lime))} .red i{background:linear-gradient(90deg,#ff7f54,var(--red))}
+.dual{display:grid;grid-template-columns:1fr 1fr;gap:10px} .mini{padding:12px;border-radius:16px} .mini .k{font-size:9px;letter-spacing:1.5px;color:var(--muted);font-weight:800} .mini .v{margin-top:5px;font:800 19px/1 "Roboto Mono",Consolas,monospace}
+.inputs{position:absolute;left:218px;right:218px;bottom:18px;display:grid;grid-template-columns:1fr 1fr;gap:12px} .input{padding:12px 14px} .input .top{display:flex;justify-content:space-between;font-size:10px;letter-spacing:2px;color:var(--muted);font-weight:800} .track{height:9px;background:rgba(255,255,255,.06);overflow:hidden;border-radius:10px;margin-top:10px} .track i{display:block;height:100%;width:0;border-radius:inherit} #thrBar{background:linear-gradient(90deg,#00b7ff,var(--cyan))} #brkBar{background:linear-gradient(90deg,#ff7e5b,var(--red))}
+.lamps{position:absolute;left:0;right:0;bottom:76px;display:flex;justify-content:center;gap:8px} .lamp{min-width:56px;padding:9px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.1);background:rgba(11,18,23,.58);text-align:center;font-size:10px;letter-spacing:1px;color:#586e79;font-weight:900;backdrop-filter:blur(8px)} .lamp.enabled{color:#8da2ac} .lamp.active{color:#031116;background:rgba(68,236,255,.95);border-color:transparent;box-shadow:0 0 14px rgba(68,236,255,.36)} .lamp.warn.active{background:rgba(255,188,73,.95)} .lamp.danger.active{background:rgba(255,83,98,.95);color:white}
+.overlay{position:absolute;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.5);backdrop-filter:blur(6px);border-radius:24px;opacity:0;pointer-events:none;transition:.2s} .overlay.on{opacity:1} .overlay b{font-size:15px;letter-spacing:5px;color:#ddeef6} .overlay b.starting{color:var(--amber);animation:pulse .7s infinite alternate} @keyframes pulse{to{opacity:.3}}
+.demo-panel{position:fixed;top:10px;right:10px;width:275px;max-height:calc(100vh - 20px);overflow:auto;padding:10px;border-radius:12px;background:rgba(5,8,10,.94);color:#d7e7ee;border:1px solid #2a4048;font:11px Consolas,monospace;z-index:10} .demo-panel h4{margin:8px 0 4px;color:var(--cyan);font-size:11px} .demo-panel label{display:grid;grid-template-columns:86px 1fr 42px;gap:6px;align-items:center;margin:4px 0} .demo-panel button{margin:2px;border:1px solid #34505b;background:#0d161b;color:#99b8c4;border-radius:6px;padding:4px 6px;font:10px Consolas;cursor:pointer} .demo-panel button.on{background:var(--cyan);color:#051015;border-color:transparent} body.game .demo-panel{display:none}
+@media (max-width:1000px){:root{--scale:.82}} @media (max-width:840px){:root{--scale:.68}}
+</style></head><body>
+<div id="hud">
+  <div class="left-stack">
+    <div class="panel card aqua"><div class="head"><span>FUEL RESERVE</span><b id="fuelPct">61%</b></div><div class="value"><span id="fuelNum">61</span><small>%</small></div><div class="bar"><i id="fuelBar"></i></div></div>
+    <div class="panel card amber"><div class="head"><span>OIL TEMP</span><b>SAFE</b></div><div class="value"><span id="oilTemp">95</span><small>°C</small></div><div class="bar"><i id="oilTempBar"></i></div></div>
+    <div class="panel card green"><div class="head"><span>CLUTCH HEAT</span><b id="clutchPct">34%</b></div><div class="value"><span id="clutch">34</span><small>%</small></div><div class="bar"><i id="clutchBar"></i></div></div>
+  </div>
+  <div class="ring-wrap">
+    <div class="ring"></div><div class="needle" id="needle"></div><div class="hub"></div>
+    <div class="speed-block"><div class="big" id="speed">118</div><div class="unit" id="unit">KM/H</div><div class="mode" id="mode">MANUAL</div><div class="odo" id="odo">18,426.3 km</div></div>
+  </div>
+  <div class="gear-pill"><b id="gear">3</b><span id="selector">SPORT</span></div>
+  <div class="right-stack">
+    <div class="panel card aqua"><div class="head"><span>BOOST</span><b id="boostState">0.6 BAR</b></div><div class="value"><span id="boost">0.6</span><small> bar</small></div><div class="bar"><i id="boostBar"></i></div></div>
+    <div class="panel dual"><div class="panel mini"><div class="k">ENGINE</div><div class="v"><span id="engineHealth">91</span>%</div></div><div class="panel mini"><div class="k">GEARBOX</div><div class="v"><span id="gearboxHealth">88</span>%</div></div></div>
+    <div class="panel dual"><div class="panel mini"><div class="k">MAX SPEED</div><div class="v"><span id="maxSpeed">299</span></div></div><div class="panel mini"><div class="k">VEHICLE</div><div class="v" id="vehicle">MOTO</div></div></div>
+  </div>
+  <div class="lamps"><div class="lamp" id="lABS">ABS</div><div class="lamp" id="lTCS">TCS</div><div class="lamp" id="lESC">ESC</div><div class="lamp warn" id="lPB">PARK</div><div class="lamp" id="lLC">LC</div><div class="lamp danger" id="lBurn">BURN</div><div class="lamp danger" id="lRoll">ROLL</div></div>
+  <div class="inputs"><div class="panel input"><div class="top"><span>THROTTLE</span><b id="thrPct">52%</b></div><div class="track"><i id="thrBar"></i></div></div><div class="panel input"><div class="top"><span>BRAKE</span><b id="brkPct">4%</b></div><div class="track"><i id="brkBar"></i></div></div></div>
+  <div class="overlay" id="overlay"><b id="overlayText">ENGINE OFF</b></div>
+</div>
+<div class="demo-panel"><h4>DEMO</h4>
+<label>Speed <input data-key="speedKmH" type="range" min="0" max="360" value="118"><output>118</output></label>
+<label>RPM <input data-key="physicalRPM" type="range" min="0" max="18000" value="7420"><output>7420</output></label>
+<label>Norm RPM <input data-key="normalizedRPM" type="range" min="0" max="1.2" step="0.01" value="0.58"><output>0.58</output></label>
+<label>Gear <input data-key="gear" type="range" min="-1" max="8" value="3"><output>3</output></label>
+<label>Fuel <input data-key="fuel" type="range" min="0" max="100" value="61"><output>61</output></label>
+<label>Oil Temp <input data-key="oilTemperature" type="range" min="0" max="160" value="95"><output>95</output></label>
+<label>Oil Life <input data-key="oilLife" type="range" min="0" max="100" value="82"><output>82</output></label>
+<label>Clutch <input data-key="clutchHeat" type="range" min="0" max="100" value="34"><output>34</output></label>
+<label>Boost <input data-key="boost" type="range" min="-1" max="3" step="0.1" value="0.6"><output>0.6</output></label>
+<label>Throttle <input data-key="throttle" type="range" min="0" max="1" step="0.01" value="0.52"><output>0.52</output></label>
+<label>Brake <input data-key="brake" type="range" min="0" max="1" step="0.01" value="0.04"><output>0.04</output></label>
+<label>Eng Health <input data-key="engineHealth" type="range" min="0" max="100" value="91"><output>91</output></label>
+<label>GB Health <input data-key="gearboxHealth" type="range" min="0" max="100" value="88"><output>88</output></label>
+<h4>TOGGLES</h4><div id="demoButtons"></div>
+<h4>PRESET</h4><button data-preset="moto">MOTO</button><button data-preset="superbike">SUPERBIKE</button><button data-preset="touring">TOURING</button><button data-preset="scooter">SCOOTER</button><button data-preset="ev">E-MOTO</button><button id="unitBtn">KM/H ↔ MPH</button></div>
+<script>
+(()=>{'use strict';
+
+const K=.621371,$=id=>document.getElementById(id),clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,Number(v)||0)),toPct=v=>Math.round(v<=1?clamp(v)*100:clamp(v,0,100));
+const state={speedKmH:118,normalizedRPM:.58,physicalRPM:7420,redlineRPM:14000,fuel:61,oilTemperature:95,oilLife:82,engineHealth:91,gearboxHealth:88,clutchHeat:34,boost:.6,odometerKm:18426.3,throttle:.52,brake:.04,maximumSpeedKmH:299,gear:3,maxGear:6,transmissionMode:0,automaticSelector:null,motorcycle:true,electric:false,engineOn:true,engineStarting:false,parkingBrake:false,tcsEnabled:true,tcsActive:false,absEnabled:true,absActive:false,escEnabled:true,escActive:false,launchEnabled:true,rollWarning:false,launchControl:false,burnout:false,vehicleClass:8,modelHash:0x6F5B6A5C};
+let unit='kmh';
+function gearLabel(){if(state.transmissionMode===1&&state.automaticSelector)return String(state.automaticSelector);return state.gear<0?'R':state.gear===0?'N':String(state.gear)}
+function speedValue(){return state.speedKmH*(unit==='mph'?K:1)}
+function odoValue(){return state.odometerKm*(unit==='mph'?K:1)}
+function modeLabel(){return ['MANUAL','AUTO','SEQ'][state.transmissionMode]||`MODE ${state.transmissionMode}`}
+function vehicleLabel(){if(state.electric) return state.motorcycle?'E-MOTO':'EV'; return state.motorcycle?'MOTO':'CAR';}
+function rangePct(v,max){return clamp((Number(v)||0)/(Number(max)||1),0,1)}
+function lamp(id,en,on){const e=$(id); if(!e) return; e.classList.toggle('enabled',!!en); e.classList.toggle('active',!!on)}
+function setText(id,val){const e=$(id); if(e) e.textContent=val}
+function setWidth(id,p){const e=$(id); if(e) e.style.width=clamp(p,0,100)+'%'}
+function setHeight(id,p){const e=$(id); if(e) e.style.height=clamp(p,0,100)+'%'}
+function setRotate(id,deg){const e=$(id); if(e) e.style.transform=`rotate(${deg}deg)`}
+function setVar(name,val){document.documentElement.style.setProperty(name,val)}
+const Dash={update(p={}){Object.assign(state,p);render()},setVehicle(p={}){Object.assign(state,p);render()},setUnit(u){unit=String(u).toLowerCase()==='mph'?'mph':'kmh';render()},setVisible(v){$('hud').classList.toggle('hidden',!v)},getState(){return{...state,unit}}};
+window.Dash=Dash; window.addEventListener('message',e=>{const m=e.data||{}; if(m.type==='updateHud') Dash.update(m.data||{}); else if(m.type==='setVehicle') Dash.setVehicle(m.data||{}); else if(m.type==='setUnit') Dash.setUnit(m.data?.unit); else if(m.type==='setVisible') Dash.setVisible(m.visible ?? m.data?.visible);});
+function initDemo(){document.querySelectorAll('[data-key]').forEach(i=>{const out=i.nextElementSibling; if(out&&out.tagName==='OUTPUT') out.value=i.value; i.addEventListener('input',()=>{state[i.dataset.key]=Number(i.value); if(out&&out.tagName==='OUTPUT') out.value=i.value; render();});}); const box=$('demoButtons'); if(box){const toggles=['engineOn','engineStarting','parkingBrake','tcsEnabled','tcsActive','absEnabled','absActive','escEnabled','escActive','launchEnabled','launchControl','rollWarning','burnout','motorcycle','electric']; toggles.forEach(k=>{const b=document.createElement('button'); b.textContent=k; b.classList.toggle('on',!!state[k]); b.onclick=()=>{state[k]=!state[k]; b.classList.toggle('on',!!state[k]); render();}; box.appendChild(b);});}
+ const presets={moto:{maximumSpeedKmH:299,redlineRPM:14500,maxGear:6,electric:false,motorcycle:true},superbike:{maximumSpeedKmH:340,redlineRPM:16200,maxGear:6,electric:false,motorcycle:true},touring:{maximumSpeedKmH:240,redlineRPM:10800,maxGear:6,electric:false,motorcycle:true},scooter:{maximumSpeedKmH:140,redlineRPM:9500,maxGear:1,electric:false,motorcycle:true,transmissionMode:1,automaticSelector:'D'},ev:{maximumSpeedKmH:220,redlineRPM:18000,maxGear:1,electric:true,motorcycle:true}};
+ document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>Dash.setVehicle(presets[b.dataset.preset]||{})); const ub=$('unitBtn'); if(ub) ub.onclick=()=>Dash.setUnit(unit==='kmh'?'mph':'kmh'); if(new URLSearchParams(location.search).has('game')) document.body.classList.add('game'); render();}
+
+function render(){
+  const speed=Math.round(speedValue()), rpmNorm=state.electric?clamp(state.normalizedRPM,0,1.15):clamp((state.physicalRPM||0)/(state.redlineRPM||1),0,1.15);
+  setText('speed', String(speed).padStart(3,'0')); setText('unit', unit==='mph'?'MPH':'KM/H'); setText('mode', modeLabel()); setText('odo', `${odoValue().toLocaleString(undefined,{maximumFractionDigits:1})} ${unit==='mph'?'mi':'km'}`); setText('gear', gearLabel()); setText('selector', state.automaticSelector || (state.electric?'E-DRIVE':state.launchControl?'LAUNCH':state.transmissionMode===1?'AUTO':'SPORT'));
+  setText('fuelNum', toPct(state.fuel)); setText('fuelPct', toPct(state.fuel)+'%'); setWidth('fuelBar', toPct(state.fuel));
+  const oilTemp=Math.round(state.oilTemperature||0); setText('oilTemp', oilTemp); setWidth('oilTempBar', clamp(oilTemp/150*100,0,100)); $('oilTempBar').style.background=oilTemp>125?'linear-gradient(90deg,#ff7e5b,var(--red))':oilTemp>110?'linear-gradient(90deg,#ff8f2c,var(--amber))':'linear-gradient(90deg,#15cfff,var(--cyan))';
+  const clutch=toPct(state.clutchHeat); setText('clutch', clutch); setText('clutchPct', clutch+'%'); setWidth('clutchBar', clutch); $('clutchBar').style.background=clutch>75?'linear-gradient(90deg,#ff7e5b,var(--red))':clutch>50?'linear-gradient(90deg,#ff8f2c,var(--amber))':'linear-gradient(90deg,#43d96f,var(--lime))';
+  const boost=Number(state.boost||0); setText('boost', boost.toFixed(1)); setText('boostState', boost.toFixed(1)+' BAR'); setWidth('boostBar', clamp((boost+1)/4*100,0,100)); $('boostBar').style.background='linear-gradient(90deg,#1ec9ff,var(--cyan))';
+  setText('engineHealth', toPct(state.engineHealth)); setText('gearboxHealth', toPct(state.gearboxHealth)); setText('maxSpeed', Math.round(state.maximumSpeedKmH*(unit==='mph'?K:1))); setText('vehicle', vehicleLabel());
+  const thr=toPct(state.throttle), brk=toPct(state.brake); setText('thrPct', thr+'%'); setWidth('thrBar',thr); $('thrBar').style.background='linear-gradient(90deg,#00b7ff,var(--cyan))'; setText('brkPct', brk+'%'); setWidth('brkBar',brk); $('brkBar').style.background='linear-gradient(90deg,#ff7e5b,var(--red))';
+  const deg=-130 + rpmNorm*260; setRotate('needle',deg); $('needle').style.boxShadow = rpmNorm>.92?'0 0 18px rgba(255,83,98,.8)':'0 0 12px rgba(121,184,255,.55)'; $('needle').style.background=rpmNorm>.92?'linear-gradient(180deg,#fff,var(--red))':'linear-gradient(180deg,var(--sky),#fff)';
+  lamp('lABS',state.absEnabled,state.absActive); lamp('lTCS',state.tcsEnabled,state.tcsActive); lamp('lESC',state.escEnabled,state.escActive); lamp('lPB',true,state.parkingBrake); lamp('lLC',state.launchEnabled,state.launchControl); lamp('lBurn',true,state.burnout); lamp('lRoll',true,state.rollWarning);
+  const ov=$('overlay'),txt=$('overlayText'); ov.classList.toggle('on',!state.engineOn||state.engineStarting); txt.textContent=state.engineStarting?'ENGINE STARTING':'ENGINE OFF'; txt.classList.toggle('starting',state.engineStarting);
+}
+initDemo();
+})();
+</script></body></html>

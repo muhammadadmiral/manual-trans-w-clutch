@@ -3,5 +3,5 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="melar-transmission.vcxproj" />
+  <Project Path="melar-transmission.vcxproj" Id="9f2c5c29-c5c5-1d9a-4345-9af8ec5aca35" />
 </Solution>

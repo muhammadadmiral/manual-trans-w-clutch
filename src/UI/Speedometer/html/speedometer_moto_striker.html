@@ -1,0 +1,94 @@
+
+<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MT HUD — Moto Striker</title>
+<style>
+:root{--scale:1;--fg:#eff8ff;--muted:#7b97a5;--cyan:#39ebff;--mag:#d26cff;--amber:#ffbd45;--red:#ff556a;--green:#89ff99;}
+*{box-sizing:border-box} html,body{margin:0;width:100%;height:100%;background:transparent;overflow:hidden;font-family:Inter,Segoe UI,Arial,sans-serif;color:var(--fg)} body{display:grid;place-items:end center;padding-bottom:20px} #hud{position:relative;width:980px;height:255px;transform:scale(var(--scale));transform-origin:bottom center;transition:.18s;filter:drop-shadow(0 10px 30px rgba(0,0,0,.38))} #hud.hidden{opacity:0;transform:translateY(18px) scale(.96)}
+.pill{border:1px solid rgba(255,255,255,.1);background:linear-gradient(180deg,rgba(12,18,24,.75),rgba(4,8,11,.55));backdrop-filter:blur(10px);box-shadow:inset 0 1px rgba(255,255,255,.06)}
+.topbar{position:absolute;left:0;right:0;top:0;height:26px;display:grid;grid-template-columns:repeat(36,1fr);gap:4px} .seg{border-radius:99px;background:rgba(255,255,255,.07);transition:.08s} .seg.on{background:linear-gradient(180deg,#88f6ff,var(--cyan));box-shadow:0 0 10px rgba(57,235,255,.34)} .seg.warn.on{background:linear-gradient(180deg,#ffd77b,var(--amber));box-shadow:0 0 10px rgba(255,189,69,.34)} .seg.red.on{background:linear-gradient(180deg,#ff9ca7,var(--red));box-shadow:0 0 12px rgba(255,85,106,.4)}
+.left-main{position:absolute;left:0;top:42px;width:470px;height:175px;display:grid;grid-template-columns:170px 1fr;gap:14px}
+.speed{border-radius:26px;padding:20px 18px;display:flex;flex-direction:column;justify-content:center;align-items:center} .speed .num{font:900 98px/.85 "Arial Narrow",Inter,sans-serif;letter-spacing:1px} .speed .unit{font-size:13px;letter-spacing:4px;color:var(--muted);font-weight:800} .speed .odo{margin-top:10px;font:700 12px/1 "Roboto Mono",Consolas,monospace;color:#cadae2}
+.meta{display:grid;grid-template-rows:repeat(3,1fr);gap:12px} .mode-card,.boost-card,.pedal-card{border-radius:22px;padding:14px 16px} .label{font-size:10px;letter-spacing:2px;color:var(--muted);font-weight:800} .big{margin-top:7px;font:800 28px/1 "Roboto Mono",Consolas,monospace} .sub{margin-top:6px;font-size:11px;color:#c5d4da} .tr{height:8px;border-radius:10px;background:rgba(255,255,255,.07);margin-top:8px;overflow:hidden} .tr i{display:block;height:100%;width:0;border-radius:inherit}
+.right-main{position:absolute;right:0;top:36px;width:480px;height:186px}
+.arc{position:absolute;right:18px;top:0;width:250px;height:186px} .arc svg{width:100%;height:100%;overflow:visible} .ringbg{stroke:rgba(255,255,255,.08);stroke-width:14;fill:none;stroke-linecap:round} .ringfg{stroke:url(#gradArc);stroke-width:14;fill:none;stroke-linecap:round;filter:drop-shadow(0 0 10px rgba(57,235,255,.28))} .arc-center{position:absolute;right:64px;top:58px;width:160px;text-align:center} .arc-center .rpm{font:900 44px/.95 "Arial Narrow",Inter,sans-serif} .arc-center .gear{margin-top:8px;font:900 56px/.9 "Arial Narrow",Inter,sans-serif;color:var(--cyan)} .arc-center .tag{font-size:10px;letter-spacing:2px;color:var(--muted);font-weight:800}
+.data-grid{position:absolute;left:0;top:8px;width:210px;display:grid;gap:11px} .row2{display:grid;grid-template-columns:1fr 1fr;gap:11px} .info{border-radius:18px;padding:12px 14px;min-height:78px} .info .v{margin-top:8px;font:800 20px/1 "Roboto Mono",Consolas,monospace}
+.bottom{position:absolute;left:0;right:0;bottom:0;height:28px;display:flex;justify-content:center;gap:8px} .lamp{min-width:60px;padding:7px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:rgba(8,13,16,.55);backdrop-filter:blur(8px);font-size:10px;letter-spacing:1px;color:#5c7079;font-weight:900;text-align:center} .lamp.enabled{color:#91a4ad} .lamp.active{color:#031116;background:rgba(57,235,255,.94);border-color:transparent;box-shadow:0 0 14px rgba(57,235,255,.36)} .lamp.warn.active{background:rgba(255,189,69,.95)} .lamp.danger.active{background:rgba(255,85,106,.95);color:white}
+.overlay{position:absolute;inset:0;display:grid;place-items:center;border-radius:30px;opacity:0;pointer-events:none;backdrop-filter:blur(6px);background:rgba(0,0,0,.46)} .overlay.on{opacity:1} .overlay b{font-size:16px;letter-spacing:5px} .overlay b.starting{color:var(--amber);animation:pulse .7s infinite alternate} @keyframes pulse{to{opacity:.35}}
+.demo-panel{position:fixed;top:10px;right:10px;width:275px;max-height:calc(100vh - 20px);overflow:auto;padding:10px;border-radius:12px;background:rgba(5,8,10,.94);color:#d7e7ee;border:1px solid #2a4048;font:11px Consolas,monospace;z-index:10} .demo-panel h4{margin:8px 0 4px;color:var(--cyan);font-size:11px} .demo-panel label{display:grid;grid-template-columns:86px 1fr 42px;gap:6px;align-items:center;margin:4px 0} .demo-panel button{margin:2px;border:1px solid #34505b;background:#0d161b;color:#99b8c4;border-radius:6px;padding:4px 6px;font:10px Consolas;cursor:pointer} .demo-panel button.on{background:var(--cyan);color:#051015;border-color:transparent} body.game .demo-panel{display:none}
+@media (max-width:1040px){:root{--scale:.84}} @media (max-width:860px){:root{--scale:.7}}
+</style></head><body>
+<div id="hud">
+  <div class="topbar" id="rpmStrip"></div>
+  <div class="left-main">
+    <div class="pill speed"><div class="num" id="speed">118</div><div class="unit" id="unit">KM/H</div><div class="odo" id="odo">18,426.3 km</div></div>
+    <div class="meta">
+      <div class="pill mode-card"><div class="label">MODE / VEHICLE</div><div class="big" id="mode">MANUAL</div><div class="sub" id="vehicle">MOTO</div></div>
+      <div class="pill boost-card"><div class="label">BOOST</div><div class="big"><span id="boost">0.6</span> <small>bar</small></div><div class="tr"><i id="boostBar"></i></div></div>
+      <div class="pill pedal-card"><div class="label">THROTTLE / BRAKE</div><div class="sub"><span id="thrPct">52%</span> THR · <span id="brkPct">4%</span> BRK</div><div class="tr"><i id="thrBar"></i></div><div class="tr"><i id="brkBar"></i></div></div>
+    </div>
+  </div>
+  <div class="right-main">
+    <div class="data-grid">
+      <div class="row2"><div class="pill info"><div class="label">FUEL</div><div class="v"><span id="fuel">61</span>%</div><div class="tr"><i id="fuelBar"></i></div></div><div class="pill info"><div class="label">OIL TEMP</div><div class="v"><span id="oilTemp">95</span>°</div><div class="tr"><i id="oilTempBar"></i></div></div></div>
+      <div class="row2"><div class="pill info"><div class="label">ENGINE</div><div class="v"><span id="engineHealth">91</span>%</div></div><div class="pill info"><div class="label">GEARBOX</div><div class="v"><span id="gearboxHealth">88</span>%</div></div></div>
+      <div class="row2"><div class="pill info"><div class="label">CLUTCH</div><div class="v"><span id="clutch">34</span>%</div><div class="tr"><i id="clutchBar"></i></div></div><div class="pill info"><div class="label">MAX</div><div class="v"><span id="maxSpeed">299</span></div><div class="sub" id="maxUnit">KM/H</div></div></div>
+    </div>
+    <div class="arc"><svg viewBox="0 0 250 186"><defs><linearGradient id="gradArc" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#39ebff"/><stop offset=".62" stop-color="#89ff99"/><stop offset=".85" stop-color="#ffbd45"/><stop offset="1" stop-color="#ff556a"/></linearGradient></defs><path class="ringbg" d="M25,154 A105,105 0 0 1 225,154"/><path class="ringfg" id="ringfg" d="M25,154 A105,105 0 0 1 225,154" pathLength="100" stroke-dasharray="0 100"/></svg><div class="arc-center"><div class="tag" id="rpmLabel">ENGINE RPM</div><div class="rpm" id="rpm">7420</div><div class="gear" id="gear">3</div><div class="tag" id="selector">SPORT</div></div></div>
+  </div>
+  <div class="bottom"><div class="lamp" id="lABS">ABS</div><div class="lamp" id="lTCS">TCS</div><div class="lamp" id="lESC">ESC</div><div class="lamp warn" id="lPB">PARK</div><div class="lamp" id="lLC">LC</div><div class="lamp danger" id="lBurn">BURN</div><div class="lamp danger" id="lRoll">ROLL</div></div>
+  <div class="overlay" id="overlay"><b id="overlayText">ENGINE OFF</b></div>
+</div>
+<div class="demo-panel"><h4>DEMO</h4>
+<label>Speed <input data-key="speedKmH" type="range" min="0" max="360" value="118"><output>118</output></label>
+<label>RPM <input data-key="physicalRPM" type="range" min="0" max="18000" value="7420"><output>7420</output></label>
+<label>Norm RPM <input data-key="normalizedRPM" type="range" min="0" max="1.2" step="0.01" value="0.58"><output>0.58</output></label>
+<label>Gear <input data-key="gear" type="range" min="-1" max="8" value="3"><output>3</output></label>
+<label>Fuel <input data-key="fuel" type="range" min="0" max="100" value="61"><output>61</output></label>
+<label>Oil Temp <input data-key="oilTemperature" type="range" min="0" max="160" value="95"><output>95</output></label>
+<label>Oil Life <input data-key="oilLife" type="range" min="0" max="100" value="82"><output>82</output></label>
+<label>Clutch <input data-key="clutchHeat" type="range" min="0" max="100" value="34"><output>34</output></label>
+<label>Boost <input data-key="boost" type="range" min="-1" max="3" step="0.1" value="0.6"><output>0.6</output></label>
+<label>Throttle <input data-key="throttle" type="range" min="0" max="1" step="0.01" value="0.52"><output>0.52</output></label>
+<label>Brake <input data-key="brake" type="range" min="0" max="1" step="0.01" value="0.04"><output>0.04</output></label>
+<label>Eng Health <input data-key="engineHealth" type="range" min="0" max="100" value="91"><output>91</output></label>
+<label>GB Health <input data-key="gearboxHealth" type="range" min="0" max="100" value="88"><output>88</output></label>
+<h4>TOGGLES</h4><div id="demoButtons"></div>
+<h4>PRESET</h4><button data-preset="moto">MOTO</button><button data-preset="superbike">SUPERBIKE</button><button data-preset="touring">TOURING</button><button data-preset="scooter">SCOOTER</button><button data-preset="ev">E-MOTO</button><button id="unitBtn">KM/H ↔ MPH</button></div>
+<script>
+(()=>{'use strict';
+
+const K=.621371,$=id=>document.getElementById(id),clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,Number(v)||0)),toPct=v=>Math.round(v<=1?clamp(v)*100:clamp(v,0,100));
+const state={speedKmH:118,normalizedRPM:.58,physicalRPM:7420,redlineRPM:14000,fuel:61,oilTemperature:95,oilLife:82,engineHealth:91,gearboxHealth:88,clutchHeat:34,boost:.6,odometerKm:18426.3,throttle:.52,brake:.04,maximumSpeedKmH:299,gear:3,maxGear:6,transmissionMode:0,automaticSelector:null,motorcycle:true,electric:false,engineOn:true,engineStarting:false,parkingBrake:false,tcsEnabled:true,tcsActive:false,absEnabled:true,absActive:false,escEnabled:true,escActive:false,launchEnabled:true,rollWarning:false,launchControl:false,burnout:false,vehicleClass:8,modelHash:0x6F5B6A5C};
+let unit='kmh';
+function gearLabel(){if(state.transmissionMode===1&&state.automaticSelector)return String(state.automaticSelector);return state.gear<0?'R':state.gear===0?'N':String(state.gear)}
+function speedValue(){return state.speedKmH*(unit==='mph'?K:1)}
+function odoValue(){return state.odometerKm*(unit==='mph'?K:1)}
+function modeLabel(){return ['MANUAL','AUTO','SEQ'][state.transmissionMode]||`MODE ${state.transmissionMode}`}
+function vehicleLabel(){if(state.electric) return state.motorcycle?'E-MOTO':'EV'; return state.motorcycle?'MOTO':'CAR';}
+function rangePct(v,max){return clamp((Number(v)||0)/(Number(max)||1),0,1)}
+function lamp(id,en,on){const e=$(id); if(!e) return; e.classList.toggle('enabled',!!en); e.classList.toggle('active',!!on)}
+function setText(id,val){const e=$(id); if(e) e.textContent=val}
+function setWidth(id,p){const e=$(id); if(e) e.style.width=clamp(p,0,100)+'%'}
+function setHeight(id,p){const e=$(id); if(e) e.style.height=clamp(p,0,100)+'%'}
+function setRotate(id,deg){const e=$(id); if(e) e.style.transform=`rotate(${deg}deg)`}
+function setVar(name,val){document.documentElement.style.setProperty(name,val)}
+const Dash={update(p={}){Object.assign(state,p);render()},setVehicle(p={}){Object.assign(state,p);render()},setUnit(u){unit=String(u).toLowerCase()==='mph'?'mph':'kmh';render()},setVisible(v){$('hud').classList.toggle('hidden',!v)},getState(){return{...state,unit}}};
+window.Dash=Dash; window.addEventListener('message',e=>{const m=e.data||{}; if(m.type==='updateHud') Dash.update(m.data||{}); else if(m.type==='setVehicle') Dash.setVehicle(m.data||{}); else if(m.type==='setUnit') Dash.setUnit(m.data?.unit); else if(m.type==='setVisible') Dash.setVisible(m.visible ?? m.data?.visible);});
+function initDemo(){document.querySelectorAll('[data-key]').forEach(i=>{const out=i.nextElementSibling; if(out&&out.tagName==='OUTPUT') out.value=i.value; i.addEventListener('input',()=>{state[i.dataset.key]=Number(i.value); if(out&&out.tagName==='OUTPUT') out.value=i.value; render();});}); const box=$('demoButtons'); if(box){const toggles=['engineOn','engineStarting','parkingBrake','tcsEnabled','tcsActive','absEnabled','absActive','escEnabled','escActive','launchEnabled','launchControl','rollWarning','burnout','motorcycle','electric']; toggles.forEach(k=>{const b=document.createElement('button'); b.textContent=k; b.classList.toggle('on',!!state[k]); b.onclick=()=>{state[k]=!state[k]; b.classList.toggle('on',!!state[k]); render();}; box.appendChild(b);});}
+ const presets={moto:{maximumSpeedKmH:299,redlineRPM:14500,maxGear:6,electric:false,motorcycle:true},superbike:{maximumSpeedKmH:340,redlineRPM:16200,maxGear:6,electric:false,motorcycle:true},touring:{maximumSpeedKmH:240,redlineRPM:10800,maxGear:6,electric:false,motorcycle:true},scooter:{maximumSpeedKmH:140,redlineRPM:9500,maxGear:1,electric:false,motorcycle:true,transmissionMode:1,automaticSelector:'D'},ev:{maximumSpeedKmH:220,redlineRPM:18000,maxGear:1,electric:true,motorcycle:true}};
+ document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>Dash.setVehicle(presets[b.dataset.preset]||{})); const ub=$('unitBtn'); if(ub) ub.onclick=()=>Dash.setUnit(unit==='kmh'?'mph':'kmh'); if(new URLSearchParams(location.search).has('game')) document.body.classList.add('game'); render();}
+
+for(let i=0;i<36;i++){const s=document.createElement('i');s.className='seg';$('rpmStrip').appendChild(s)}
+function render(){
+  const rpmNorm=state.electric?clamp(state.normalizedRPM,0,1.15):clamp((state.physicalRPM||0)/(state.redlineRPM||1),0,1.15); const active=Math.round(clamp(rpmNorm,0,1)*36); document.querySelectorAll('.seg').forEach((s,i)=>{s.className='seg'; if(i<active) s.classList.add('on'); if(i>=28) s.classList.add('warn'); if(i>=33) s.classList.add('red');});
+  setText('speed', String(Math.round(speedValue())).padStart(3,'0')); setText('unit', unit==='mph'?'MPH':'KM/H'); setText('odo', `${odoValue().toLocaleString(undefined,{maximumFractionDigits:1})} ${unit==='mph'?'mi':'km'}`); setText('mode', modeLabel()); setText('vehicle', vehicleLabel());
+  const boost=Number(state.boost||0); setText('boost', boost.toFixed(1)); setWidth('boostBar', clamp((boost+1)/4*100,0,100)); $('boostBar').style.background='linear-gradient(90deg,#54c7ff,var(--cyan))';
+  const thr=toPct(state.throttle), brk=toPct(state.brake); setText('thrPct',thr+'%'); setText('brkPct',brk+'%'); setWidth('thrBar',thr); $('thrBar').style.background='linear-gradient(90deg,#54c7ff,var(--cyan))'; setWidth('brkBar',brk); $('brkBar').style.background='linear-gradient(90deg,#ff8a64,var(--red))';
+  setText('fuel',toPct(state.fuel)); setWidth('fuelBar',toPct(state.fuel)); $('fuelBar').style.background='linear-gradient(90deg,#54c7ff,var(--cyan))'; const temp=Math.round(state.oilTemperature||0); setText('oilTemp',temp); setWidth('oilTempBar', clamp(temp/150*100,0,100)); $('oilTempBar').style.background=temp>125?'linear-gradient(90deg,#ff8a64,var(--red))':temp>110?'linear-gradient(90deg,#ffd36f,var(--amber))':'linear-gradient(90deg,#54c7ff,var(--cyan))';
+  setText('engineHealth', toPct(state.engineHealth)); setText('gearboxHealth', toPct(state.gearboxHealth)); const clutch=toPct(state.clutchHeat); setText('clutch', clutch); setWidth('clutchBar', clutch); $('clutchBar').style.background=clutch>75?'linear-gradient(90deg,#ff8a64,var(--red))':clutch>50?'linear-gradient(90deg,#ffd36f,var(--amber))':'linear-gradient(90deg,#75ff8c,var(--green))';
+  setText('maxSpeed', Math.round(state.maximumSpeedKmH*(unit==='mph'?K:1))); setText('maxUnit', unit==='mph'?'MPH':'KM/H'); setText('rpm', state.electric?Math.round(clamp(state.normalizedRPM,0,1)*100)+'%':Math.round(state.physicalRPM||0)); setText('rpmLabel', state.electric?'POWER OUT':'ENGINE RPM'); setText('gear', gearLabel()); setText('selector', state.automaticSelector || (state.launchControl?'LAUNCH':state.transmissionMode===1?'AUTO':'TRACK')); $('ringfg').style.strokeDasharray=`${clamp(rpmNorm,0,1)*100} 100`;
+  lamp('lABS',state.absEnabled,state.absActive); lamp('lTCS',state.tcsEnabled,state.tcsActive); lamp('lESC',state.escEnabled,state.escActive); lamp('lPB',true,state.parkingBrake); lamp('lLC',state.launchEnabled,state.launchControl); lamp('lBurn',true,state.burnout); lamp('lRoll',true,state.rollWarning);
+  const ov=$('overlay'),txt=$('overlayText'); ov.classList.toggle('on',!state.engineOn||state.engineStarting); txt.textContent=state.engineStarting?'ENGINE STARTING':'ENGINE OFF'; txt.classList.toggle('starting',state.engineStarting);
+}
+initDemo();
+})();
+</script></body></html>

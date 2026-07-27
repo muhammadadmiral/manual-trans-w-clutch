@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MT HUD — Analog Enhanced</title>
+<style>
+  :root{
+    --hud-scale:1;
+    --ink:#f5f7f8;
+    --muted:#7f8a91;
+    --panel:#0b0f12;
+    --panel2:#11181d;
+    --line:#26333a;
+    --cyan:#46e7ff;
+    --cyan2:#14a9c3;
+    --amber:#ffb53e;
+    --red:#ff4a4a;
+    --green:#66ef9c;
+    --blue:#67a9ff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;font-family:Inter,"Segoe UI",Arial,sans-serif;color:var(--ink)}
+  body{display:grid;place-items:end center;padding:0 0 22px}
+  #hud{
+    position:relative;width:1180px;height:450px;transform:scale(var(--hud-scale));transform-origin:bottom center;
+    filter:drop-shadow(0 18px 28px rgba(0,0,0,.55));transition:opacity .18s,transform .18s;
+  }
+  #hud.hidden{opacity:0;pointer-events:none;transform:scale(calc(var(--hud-scale) * .96)) translateY(20px)}
+  .cluster{
+    position:absolute;inset:0;border:1px solid rgba(112,231,255,.12);border-radius:34px;
+    background:linear-gradient(180deg,rgba(12,18,22,.95),rgba(6,9,11,.92));
+    box-shadow:inset 0 1px rgba(255,255,255,.06),inset 0 -30px 70px rgba(0,0,0,.35);
+    clip-path:polygon(2.5% 10%,8% 2%,92% 2%,97.5% 10%,100% 86%,95% 98%,5% 98%,0 86%);
+  }
+  .accent-line{position:absolute;left:86px;right:86px;top:16px;height:2px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);opacity:.55}
+  .dial{position:absolute;top:38px;width:366px;height:366px;border-radius:50%;background:
+    radial-gradient(circle at 50% 47%,#151d22 0 51%,#0a0e11 52% 61%,#222e34 62% 63%,#080b0d 64% 69%,#39484f 70% 71%,#0a0e10 72%);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.05),0 0 0 1px rgba(0,0,0,.8),0 0 25px rgba(0,0,0,.5)
+  }
+  .dial.left{left:46px}.dial.right{right:46px}
+  .dial svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+  .dial-title{position:absolute;left:0;right:0;top:232px;text-align:center;font-size:12px;letter-spacing:4px;color:var(--muted);font-weight:800}
+  .dial-sub{position:absolute;left:0;right:0;top:252px;text-align:center;font-size:11px;letter-spacing:1.7px;color:#506069}
+  .dial-value{position:absolute;left:0;right:0;top:280px;text-align:center;font:700 27px/1 "Roboto Mono",Consolas,monospace;color:#dfecef}
+  .dial-value small{font:700 10px/1 Inter,sans-serif;color:var(--muted);letter-spacing:1px}
+  .tick-major{stroke:#d9e2e5;stroke-width:2.6;stroke-linecap:round}.tick-minor{stroke:#55656d;stroke-width:1.1;stroke-linecap:round}
+  .tick-red{stroke:var(--red)}.tick-label{fill:#cad5d9;font-size:15px;font-weight:800;text-anchor:middle;dominant-baseline:middle}.tick-label.red{fill:var(--red)}
+  .needle{fill:var(--cyan);filter:drop-shadow(0 0 5px rgba(70,231,255,.75))}.needle.speed{fill:#f2f5f6;filter:drop-shadow(0 0 5px rgba(255,255,255,.4))}
+  .needle-hub{fill:#10171b;stroke:#73838b;stroke-width:2}.needle-dot{fill:var(--cyan)}
+  .redline-arc{fill:none;stroke:var(--red);stroke-width:5;stroke-linecap:round;opacity:.95}
+  .center{position:absolute;left:430px;top:42px;width:320px;height:350px}
+  .brand{text-align:center;color:#6b7a82;font-size:10px;font-weight:900;letter-spacing:5px;margin:2px 0 10px}.brand b{color:var(--cyan)}
+  .screen{height:245px;border-radius:18px;border:1px solid #28373e;background:
+    linear-gradient(180deg,rgba(21,31,36,.96),rgba(8,13,16,.98));box-shadow:inset 0 0 34px rgba(0,0,0,.55),0 0 18px rgba(0,0,0,.35);position:relative;overflow:hidden}
+  .screen:before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,.018),rgba(255,255,255,.018) 1px,transparent 1px,transparent 4px);pointer-events:none}
+  .toprow{height:38px;display:flex;align-items:center;justify-content:space-between;padding:0 15px;border-bottom:1px solid #1f2b31;font-size:10px;font-weight:800;letter-spacing:1.4px;color:var(--muted)}
+  .mode{color:var(--cyan)}.vehicle-tags{display:flex;gap:5px}.tag{padding:3px 6px;border:1px solid #2a3b43;border-radius:4px;color:#6e7d84}.tag.on{border-color:rgba(70,231,255,.55);color:var(--cyan);background:rgba(70,231,255,.08)}
+  .gear-zone{display:grid;grid-template-columns:1fr 126px 1fr;align-items:center;height:112px;padding:0 12px}
+  .mini{text-align:center}.mini .label{font-size:9px;color:var(--muted);letter-spacing:1.3px;font-weight:800}.mini .value{margin-top:7px;font:700 18px/1 "Roboto Mono",Consolas,monospace;color:#dce7ea}.mini .value small{font-size:9px;color:var(--muted)}
+  #gear{font:900 82px/.9 "Arial Narrow",Inter,sans-serif;text-align:center;color:#f4f7f8;text-shadow:0 0 18px rgba(70,231,255,.25)}
+  #selector{font:800 10px/1 Inter,sans-serif;color:var(--amber);letter-spacing:2px;text-align:center;margin-top:5px;min-height:10px}
+  .pedals{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 14px}.pedal-label{display:flex;justify-content:space-between;font-size:9px;letter-spacing:1px;color:var(--muted);font-weight:800}.track{height:8px;margin-top:5px;border-radius:9px;background:#1a252a;overflow:hidden}.fill{height:100%;width:0;border-radius:inherit;transition:width .05s linear}.fill.throttle{background:linear-gradient(90deg,var(--cyan2),var(--cyan));box-shadow:0 0 8px rgba(70,231,255,.35)}.fill.brake{background:linear-gradient(90deg,#ad3535,var(--red));box-shadow:0 0 8px rgba(255,74,74,.35)}
+  .telemetry{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin:13px 0 0;background:#1d292f;border:1px solid #24343b;border-radius:11px;overflow:hidden}
+  .tele{height:67px;background:linear-gradient(180deg,#11191d,#0b1114);padding:9px 10px}.tele .head{display:flex;justify-content:space-between;font-size:9px;color:var(--muted);font-weight:900;letter-spacing:1px}.tele .num{margin-top:7px;font:700 15px/1 "Roboto Mono",Consolas,monospace}.tele .bar{height:4px;background:#202d33;margin-top:8px;border-radius:4px;overflow:hidden}.tele .bar i{display:block;height:100%;width:0;background:var(--green);transition:width .12s,background .12s}
+  .status-strip{position:absolute;left:90px;right:90px;bottom:20px;height:33px;display:flex;justify-content:center;align-items:center;gap:9px}
+  .lamp{min-width:54px;height:25px;padding:0 9px;border-radius:7px;border:1px solid #25343b;background:#0b1114;color:#46545b;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;letter-spacing:.8px;transition:.12s}.lamp.enabled{color:#85949a}.lamp.active{color:#061114;border-color:transparent;background:var(--cyan);box-shadow:0 0 13px rgba(70,231,255,.42)}.lamp.warn.active{background:var(--amber);box-shadow:0 0 13px rgba(255,181,62,.42)}.lamp.danger.active{background:var(--red);color:white;box-shadow:0 0 13px rgba(255,74,74,.46)}
+  .side-meter{position:absolute;top:117px;width:18px;height:190px;border-radius:10px;background:#10171b;border:1px solid #2b3a41;overflow:hidden}.side-meter.left{left:25px}.side-meter.right{right:25px}.side-meter i{position:absolute;left:2px;right:2px;bottom:2px;height:0;border-radius:8px;background:linear-gradient(0deg,var(--cyan),#7ef2ff);box-shadow:0 0 9px rgba(70,231,255,.35);transition:height .09s}.side-meter.right i{background:linear-gradient(0deg,var(--red),#ff936c);box-shadow:0 0 9px rgba(255,74,74,.32)}.side-caption{position:absolute;top:317px;width:44px;text-align:center;font-size:8px;color:#65757c;font-weight:900;letter-spacing:1px}.side-caption.left{left:12px}.side-caption.right{right:12px}
+  .engine-overlay{position:absolute;inset:0;border-radius:34px;background:rgba(0,0,0,.74);display:grid;place-items:center;opacity:0;pointer-events:none;transition:.25s}.engine-overlay.on{opacity:1}.engine-message{font-size:13px;letter-spacing:5px;color:#718087;font-weight:900}.engine-message.starting{color:var(--amber);animation:pulse .65s infinite alternate}@keyframes pulse{to{opacity:.35}}
+  .flash-red{animation:redflash .35s infinite alternate}@keyframes redflash{to{filter:drop-shadow(0 0 18px rgba(255,40,40,.85))}}
+  .demo-panel{position:fixed;top:10px;right:10px;width:270px;max-height:calc(100vh - 20px);overflow:auto;padding:10px 12px;border-radius:12px;border:1px solid #314149;background:rgba(8,12,15,.94);color:#dce5e8;font:11px/1.35 Consolas,monospace;z-index:5;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+  .demo-panel h4{margin:8px 0 4px;color:var(--cyan);font-size:11px;letter-spacing:1px}.demo-panel label{display:grid;grid-template-columns:92px 1fr 40px;gap:6px;align-items:center;margin:4px 0}.demo-panel input[type=range]{width:100%}.demo-panel button{border:1px solid #34464e;background:#10181c;color:#9aacb3;border-radius:5px;padding:4px 7px;margin:2px;cursor:pointer;font:10px Consolas}.demo-panel button.on{background:var(--cyan);color:#071014;border-color:var(--cyan)}body.game .demo-panel{display:none}
+  @media(max-width:1250px){:root{--hud-scale:.82}}@media(max-width:980px){:root{--hud-scale:.65}}
+</style>
+</head>
+<body>
+<div id="hud">
+  <div class="cluster"></div><div class="accent-line"></div>
+  <div class="side-meter left"><i id="throttleSide"></i></div><div class="side-caption left">THR</div>
+  <div class="side-meter right"><i id="brakeSide"></i></div><div class="side-caption right">BRK</div>
+
+  <section class="dial left" id="rpmDial">
+    <svg viewBox="0 0 366 366" aria-label="tachometer">
+      <g transform="translate(183,183)"><path id="rpmRedArc" class="redline-arc"/><g id="rpmTicks"></g><g id="rpmNeedle"><path class="needle" d="M-4 18 L0 -138 L4 18 Z"/><circle class="needle-hub" r="17"/><circle class="needle-dot" r="5"/></g></g>
+    </svg>
+    <div class="dial-title" id="rpmTitle">RPM × 1000</div><div class="dial-sub" id="rpmSub">REDLINE 7000</div><div class="dial-value"><span id="rpmValue">0</span> <small>RPM</small></div>
+  </section>
+
+  <section class="center">
+    <div class="brand">MANUAL <b>TRANSMISSION</b></div>
+    <div class="screen">
+      <div class="toprow"><span class="mode" id="mode">MANUAL</span><div class="vehicle-tags"><span class="tag" id="tagMoto">MOTO</span><span class="tag" id="tagEV">EV</span></div><span id="hash">00000000</span></div>
+      <div class="gear-zone">
+        <div class="mini"><div class="label">BOOST</div><div class="value"><span id="boost">0.0</span> <small>bar</small></div></div>
+        <div><div id="gear">N</div><div id="selector"></div></div>
+        <div class="mini"><div class="label">MAX GEAR</div><div class="value"><span id="maxGear">6</span></div></div>
+      </div>
+      <div class="pedals"><div><div class="pedal-label"><span>THROTTLE</span><b id="throttlePct">0%</b></div><div class="track"><div class="fill throttle" id="throttleFill"></div></div></div><div><div class="pedal-label"><span>BRAKE</span><b id="brakePct">0%</b></div><div class="track"><div class="fill brake" id="brakeFill"></div></div></div></div>
+    </div>
+    <div class="telemetry">
+      <div class="tele"><div class="head"><span>FUEL</span><span id="fuelNum">0%</span></div><div class="num" id="rangeHint">—</div><div class="bar"><i id="fuelBar"></i></div></div>
+      <div class="tele"><div class="head"><span>OIL</span><span id="oilLifeNum">0%</span></div><div class="num"><span id="oilTemp">0</span>°C</div><div class="bar"><i id="oilBar"></i></div></div>
+      <div class="tele"><div class="head"><span>CLUTCH</span><span id="clutchNum">0%</span></div><div class="num" id="clutchState">COOL</div><div class="bar"><i id="clutchBar"></i></div></div>
+    </div>
+  </section>
+
+  <section class="dial right">
+    <svg viewBox="0 0 366 366" aria-label="speedometer"><g transform="translate(183,183)"><g id="speedTicks"></g><g id="speedNeedle"><path class="needle speed" d="M-4 18 L0 -138 L4 18 Z"/><circle class="needle-hub" r="17"/><circle fill="#eef5f7" r="5"/></g></g></svg>
+    <div class="dial-title" id="speedUnit">KM/H</div><div class="dial-sub">MAX <span id="maxSpeed">320</span></div><div class="dial-value"><span id="speedValue">0</span> <small id="speedUnitSmall">KM/H</small></div>
+  </section>
+
+  <div class="status-strip">
+    <div class="lamp" id="lABS">ABS</div><div class="lamp" id="lTCS">TCS</div><div class="lamp" id="lESC">ESC</div><div class="lamp warn" id="lPB">PARK</div><div class="lamp" id="lLaunch">LAUNCH</div><div class="lamp danger" id="lBurnout">BURNOUT</div><div class="lamp danger" id="lRoll">ROLL</div><div class="lamp warn" id="lEngine">ENGINE</div>
+  </div>
+  <div class="engine-overlay" id="engineOverlay"><div class="engine-message" id="engineMessage">ENGINE OFF</div></div>
+</div>
+
+<div class="demo-panel" id="demoPanel">
+  <h4>ANALOG ENHANCED — DEMO</h4>
+  <label>Speed <input data-key="speedKmH" type="range" min="0" max="420" value="96"><output>96</output></label>
+  <label>RPM <input data-key="physicalRPM" type="range" min="0" max="16000" value="4200"><output>4200</output></label>
+  <label>Gear <input data-key="gear" type="range" min="-1" max="8" value="4"><output>4</output></label>
+  <label>Fuel <input data-key="fuel" type="range" min="0" max="100" value="68"><output>68</output></label>
+  <label>Oil temp <input data-key="oilTemperature" type="range" min="0" max="160" value="96"><output>96</output></label>
+  <label>Oil life <input data-key="oilLife" type="range" min="0" max="100" value="82"><output>82</output></label>
+  <label>Clutch <input data-key="clutchHeat" type="range" min="0" max="100" value="32"><output>32</output></label>
+  <label>Boost <input data-key="boost" step="0.1" type="range" min="-1" max="3" value="0.8"><output>0.8</output></label>
+  <label>Throttle <input data-key="throttle" step="0.01" type="range" min="0" max="1" value="0.46"><output>0.46</output></label>
+  <label>Brake <input data-key="brake" step="0.01" type="range" min="0" max="1" value="0"><output>0</output></label>
+  <label>Eng health <input data-key="engineHealth" type="range" min="0" max="100" value="93"><output>93</output></label>
+  <label>Gear health <input data-key="gearboxHealth" type="range" min="0" max="100" value="89"><output>89</output></label>
+  <h4>STATE</h4><div id="demoButtons"></div>
+  <h4>PRESET</h4><button data-preset="city">CITY</button><button data-preset="sport">SPORT</button><button data-preset="truck">TRUCK</button><button data-preset="moto">MOTO</button><button data-preset="ev">EV</button><button id="unitBtn">KM/H ↔ MPH</button>
+</div>
+
+<script>
+(()=>{
+  'use strict';
+  const KMH_TO_MPH=0.621371, START=-132, END=132;
+  const defaults={
+    speedKmH:96,normalizedRPM:.6,physicalRPM:4200,redlineRPM:7000,fuel:68,oilTemperature:96,oilLife:82,
+    engineHealth:93,gearboxHealth:89,clutchHeat:32,boost:.8,odometerKm:12843.7,throttle:.46,brake:0,
+    maximumSpeedKmH:320,gear:4,maxGear:6,transmissionMode:0,automaticSelector:null,motorcycle:false,electric:false,
+    engineOn:true,engineStarting:false,parkingBrake:false,tcsEnabled:true,tcsActive:false,absEnabled:true,absActive:false,
+    escEnabled:true,escActive:false,launchEnabled:true,rollWarning:false,launchControl:false,burnout:false,vehicleClass:0,modelHash:0x1234ABCD
+  };
+  const state={...defaults}; let unit='kmh';
+  const $=id=>document.getElementById(id), clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,Number(v)||0));
+  const pct=v=>Math.round(clamp(v,0,1)*100); const valPct=v=>v<=1?pct(v):Math.round(clamp(v,0,100));
+  const polar=(r,a)=>{const q=(a-90)*Math.PI/180;return{x:r*Math.cos(q),y:r*Math.sin(q)}};
+  const arc=(r,a0,a1)=>{const p0=polar(r,a0),p1=polar(r,a1),large=Math.abs(a1-a0)>180?1:0;return`M${p0.x} ${p0.y} A${r} ${r} 0 ${large} 1 ${p1.x} ${p1.y}`};
+  function niceStep(max,target=8){const rough=max/target,mag=10**Math.floor(Math.log10(rough||1)),n=rough/mag;return(n<1.5?1:n<3?2:n<7?5:10)*mag}
+  function buildDial(el,max,labeler,redFrom=null){
+    const step=niceStep(max),top=Math.ceil(max/step)*step,minor=5; let html='';
+    for(let v=0;v<=top+.001;v+=step/minor){const major=Math.abs((v/step)-Math.round(v/step))<.001,a=START+(v/top)*(END-START);const p1=polar(major?137:147,a),p2=polar(158,a);const red=redFrom!==null&&v>=redFrom;
+      html+=`<line class="${major?'tick-major':'tick-minor'}${red?' tick-red':''}" x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}"/>`;
+      if(major){const p=polar(115,a);html+=`<text class="tick-label${red?' red':''}" x="${p.x}" y="${p.y}">${labeler(v)}</text>`}
+    } el.innerHTML=html; return top;
+  }
+  let rpmTop=8000,speedTop=320;
+  function rebuild(){
+    const rpmMax=state.electric?100:Math.max(6000,Math.ceil((state.redlineRPM*1.16)/1000)*1000);
+    rpmTop=buildDial($('rpmTicks'),state.electric?100:rpmMax,state.electric?v=>Math.round(v):v=>Math.round(v/1000),state.electric?85:state.redlineRPM);
+    $('rpmRedArc').setAttribute('d',arc(165,START+(clamp(state.electric?85:state.redlineRPM,0,rpmTop)/rpmTop)*(END-START),END));
+    $('rpmTitle').textContent=state.electric?'POWER %':'RPM × 1000'; $('rpmSub').textContent=state.electric?'ELECTRIC DRIVE':`REDLINE ${Math.round(state.redlineRPM)}`;
+    const displayMax=state.maximumSpeedKmH*(unit==='mph'?KMH_TO_MPH:1); speedTop=buildDial($('speedTicks'),displayMax,v=>Math.round(v));
+    $('maxSpeed').textContent=Math.round(displayMax); $('speedUnit').textContent=unit==='mph'?'MPH':'KM/H'; $('speedUnitSmall').textContent=unit==='mph'?'MPH':'KM/H';
+  }
+  function gearLabel(){if(state.transmissionMode===1&&state.automaticSelector)return String(state.automaticSelector);return state.gear<0?'R':state.gear===0?'N':String(state.gear)}
+  function lamp(id,enabled,active){const el=$(id);el.classList.toggle('enabled',!!enabled);el.classList.toggle('active',!!active)}
+  function healthColor(v){return v<30?'var(--red)':v<60?'var(--amber)':'var(--green)'}
+  function render(){
+    const rpmSource=state.electric?clamp(state.normalizedRPM,0,1)*100:(state.physicalRPM||clamp(state.normalizedRPM,0,1)*state.redlineRPM);
+    $('rpmNeedle').setAttribute('transform',`rotate(${START+clamp(rpmSource,0,rpmTop)/rpmTop*(END-START)})`);
+    const speed=state.speedKmH*(unit==='mph'?KMH_TO_MPH:1); $('speedNeedle').setAttribute('transform',`rotate(${START+clamp(speed,0,speedTop)/speedTop*(END-START)})`);
+    $('rpmValue').textContent=state.electric?Math.round(rpmSource):Math.round(state.physicalRPM||0).toLocaleString(); $('speedValue').textContent=Math.round(speed);
+    $('gear').textContent=gearLabel(); $('maxGear').textContent=state.maxGear||'—'; $('mode').textContent=['MANUAL','AUTOMATIC','SEQUENTIAL'][state.transmissionMode]||`MODE ${state.transmissionMode}`; $('selector').textContent=state.automaticSelector||'';
+    $('boost').textContent=Number(state.boost||0).toFixed(1); $('hash').textContent=(Number(state.modelHash)>>>0).toString(16).padStart(8,'0').toUpperCase();
+    $('tagMoto').classList.toggle('on',!!state.motorcycle); $('tagEV').classList.toggle('on',!!state.electric);
+    const th=valPct(state.throttle),br=valPct(state.brake); $('throttlePct').textContent=th+'%';$('brakePct').textContent=br+'%';$('throttleFill').style.width=th+'%';$('brakeFill').style.width=br+'%';$('throttleSide').style.height=`calc(${th}% - 4px)`;$('brakeSide').style.height=`calc(${br}% - 4px)`;
+    const fuel=valPct(state.fuel),oilLife=valPct(state.oilLife),clutch=valPct(state.clutchHeat); $('fuelNum').textContent=fuel+'%';$('oilLifeNum').textContent=oilLife+'%';$('clutchNum').textContent=clutch+'%';$('oilTemp').textContent=Math.round(state.oilTemperature||0);$('rangeHint').textContent=`ODO ${(state.odometerKm*(unit==='mph'?KMH_TO_MPH:1)).toLocaleString(undefined,{maximumFractionDigits:1})} ${unit==='mph'?'mi':'km'}`;
+    for(const [id,v] of [['fuelBar',fuel],['oilBar',oilLife],['clutchBar',clutch]])$(id).style.width=v+'%'; $('fuelBar').style.background=healthColor(fuel);$('oilBar').style.background=healthColor(oilLife);$('clutchBar').style.background=clutch>75?'var(--red)':clutch>50?'var(--amber)':'var(--green)';$('clutchState').textContent=clutch>85?'CRITICAL':clutch>65?'HOT':clutch>40?'WARM':'COOL';
+    lamp('lABS',state.absEnabled,state.absActive);lamp('lTCS',state.tcsEnabled,state.tcsActive);lamp('lESC',state.escEnabled,state.escActive);lamp('lPB',true,state.parkingBrake);lamp('lLaunch',state.launchEnabled,state.launchControl);lamp('lBurnout',true,state.burnout);lamp('lRoll',true,state.rollWarning);lamp('lEngine',true,(state.engineHealth||100)<35);
+    $('rpmDial').classList.toggle('flash-red',rpmSource>(state.electric?95:state.redlineRPM));
+    const overlay=$('engineOverlay'),msg=$('engineMessage');overlay.classList.toggle('on',!state.engineOn||state.engineStarting);msg.classList.toggle('starting',!!state.engineStarting);msg.textContent=state.engineStarting?'ENGINE STARTING':'ENGINE OFF';
+  }
+  const Dash={
+    update(partial={}){const rebuildNeeded=['redlineRPM','maximumSpeedKmH','electric'].some(k=>k in partial);Object.assign(state,partial);if(rebuildNeeded)rebuild();render()},
+    setVehicle(data={}){Object.assign(state,data);rebuild();render()},
+    setUnit(next){unit=String(next).toLowerCase()==='mph'?'mph':'kmh';rebuild();render()},
+    setVisible(visible){$('hud').classList.toggle('hidden',!visible)},
+    getState(){return{...state,unit}}
+  }; window.Dash=Dash;
+  window.addEventListener('message',e=>{const m=e.data||{};if(m.type==='updateHud')Dash.update(m.data);else if(m.type==='setVehicle')Dash.setVehicle(m.data);else if(m.type==='setUnit')Dash.setUnit(m.data?.unit);else if(m.type==='setVisible')Dash.setVisible(m.visible??m.data?.visible)});
+  const toggles=['engineOn','engineStarting','parkingBrake','tcsEnabled','tcsActive','absEnabled','absActive','escEnabled','escActive','launchEnabled','launchControl','rollWarning','burnout','motorcycle','electric'];
+  const box=$('demoButtons'); toggles.forEach(k=>{const b=document.createElement('button');b.textContent=k;b.onclick=()=>{state[k]=!state[k];b.classList.toggle('on',state[k]);if(k==='electric')rebuild();render()};b.classList.toggle('on',state[k]);box.appendChild(b)});
+  document.querySelectorAll('[data-key]').forEach(i=>i.addEventListener('input',()=>{const k=i.dataset.key;state[k]=Number(i.value);i.nextElementSibling.value=i.value;render()}));
+  const presets={city:{maximumSpeedKmH:180,redlineRPM:6500,maxGear:5,electric:false,motorcycle:false},sport:{maximumSpeedKmH:340,redlineRPM:8500,maxGear:7,electric:false,motorcycle:false},truck:{maximumSpeedKmH:150,redlineRPM:4500,maxGear:12,electric:false,motorcycle:false},moto:{maximumSpeedKmH:299,redlineRPM:14500,maxGear:6,electric:false,motorcycle:true},ev:{maximumSpeedKmH:260,redlineRPM:18000,maxGear:1,electric:true,motorcycle:false}};
+  document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>Dash.setVehicle(presets[b.dataset.preset])); $('unitBtn').onclick=()=>Dash.setUnit(unit==='kmh'?'mph':'kmh');
+  if(new URLSearchParams(location.search).has('game'))document.body.classList.add('game'); rebuild();render();
+})();
+</script>
+</body>
+</html>
