@@ -427,52 +427,21 @@ static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
       engagement * (launchDemand + lugDemand + externalLoad);
   s_state.torqueReserve = availableTorque - torqueDemand;
 
+  // v1.1: Stall disederhanakan. Jika RPM fisik mesin jatuh di bawah
+  // batas idle bawaan kendaraan (650-900 RPM tergantung mobil), mesin
+  // langsung mati. Automatic mode tidak stall (torque converter).
   const float stallClutch =
       std::clamp(Config::StallClutchThreshold, 0.30f, 0.95f);
-  const float stallCutoffRPM =
-      std::clamp(Config::StallCutoffRPM,
-                 rpmRange.idle * 0.60f,
-                 rpmRange.redline * 0.24f);
-  const float netReserve = s_state.torqueReserve - uphillLoad * 0.20f;
-  const float decelerationRisk =
-      Clamp01((-s_state.longitudinalAcceleration - 0.15f) / 2.50f);
-  const bool unresolvedLug =
-      netReserve < 0.0f ||
-      (s_state.lugSeverity > 0.20f && decelerationRisk > 0.05f);
-  const bool powerBrakeWindow =
-      !automaticMode && gear == 1 && usefulSpeed < 3.0f &&
-      throttle > 0.35f && brake > 0.18f;
-  const bool bogging = !automaticMode && Config::StallEnabled &&
-                       engagement > stallClutch &&
-                       s_state.estimatedEngineRPM < stallCutoffRPM &&
-                       unresolvedLug && !powerBrakeWindow &&
-                       !s_state.burnoutActive;
-  if (bogging) {
-    const float clutchLoad =
-        Clamp01((engagement - stallClutch) / (1.0f - stallClutch));
-    const float torqueDeficit = Clamp01(-netReserve / 0.65f);
-    const float brakeLoad = 1.0f + Clamp01(brake) * 1.25f;
-    const float highGearLoad =
-        1.0f + gearWeight * 0.65f;
-    const float unresolvedLoad =
-        Clamp01(torqueDeficit + decelerationRisk * 0.55f);
-    const float stallDelay =
-        std::clamp(Config::LugStallDelay, 0.40f, 8.0f) *
-        VehicleUpgrades::GetState().stallResistance *
-        (0.55f + s_state.engineCondition * 0.45f);
-    s_state.stallProgress +=
-        clutchLoad * s_state.lugSeverity *
-        (0.30f + unresolvedLoad * 1.70f) * brakeLoad * highGearLoad *
-        dt * std::max(0.10f, Config::StallRate) / stallDelay;
+  if (!automaticMode && Config::StallEnabled &&
+      engagement > stallClutch &&
+      s_state.estimatedEngineRPM < rpmRange.idle &&
+      !s_state.burnoutActive) {
+    s_state.stallProgress = 0.0f;
+    return true;
   } else {
     s_state.stallProgress =
         std::max(0.0f, s_state.stallProgress -
                            dt * (engagement < stallClutch ? 3.5f : 1.25f));
-  }
-
-  if (s_state.stallProgress >= 1.0f) {
-    s_state.stallProgress = 0.0f;
-    return true;
   }
 
   const bool hardBraking =
@@ -481,7 +450,7 @@ static bool UpdateLoadAndStall(Vehicle vehicle, VehicleData &data, int gear,
       throttle < 0.12f && !s_state.burnoutActive &&
       s_state.longitudinalAcceleration < -4.5f &&
       (std::fabs(speedMps) < 3.5f ||
-       s_state.estimatedEngineRPM < stallCutoffRPM);
+       s_state.estimatedEngineRPM < rpmRange.idle);
   if (hardBraking) {
     s_state.hardBrakeStallProgress += dt / 0.22f;
   } else {
@@ -700,6 +669,14 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
       s_state.controlledRPM =
           std::clamp(std::max(rpm, s_state.idleRPM), s_state.idleRPM, 1.0f);
       s_state.rpmOwned = true;
+    }
+
+    // v1.1: Sinkronisasi dengan RPM yang sudah diset oleh AutomaticGearbox.
+    // Jika RPM aktual di memori berbeda jauh dari controlledRPM (karena
+    // AutomaticGearbox::ApplyToMemory memaksa nilai saat shifting), snap
+    // controlledRPM ke nilai tersebut agar tidak terjadi "fighting".
+    if (automaticMode && std::fabs(rpm - s_state.controlledRPM) > 0.05f) {
+      s_state.controlledRPM = rpm;
     }
 
     const float pedal = Clamp01(throttle);

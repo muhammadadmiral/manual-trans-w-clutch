@@ -184,9 +184,9 @@ Calibration Resolve(Vehicle vehicle, VehicleData &data, int gear, int maxGear) {
         AdaptiveLimit(vehicle, gear, maxGear, result.estimatedTopSpeedMps);
     if (result.ratioSetValid && result.rawRatio > 0.03f) {
         const float ratioLimit = result.flatVelocity / result.rawRatio;
-        const float relative = ratioLimit / adaptive;
-        if (std::isfinite(ratioLimit) && ratioLimit > 2.0f &&
-            relative >= 0.62f && relative <= 1.55f) {
+        if (std::isfinite(ratioLimit) && ratioLimit > 2.0f) {
+            // v1.1: Selalu gunakan rasio native GTA jika valid.
+            // Adaptive curve (overhaul v1.0) hanya sebagai fallback.
             result.gearLimitSpeedMps = ratioLimit;
         } else {
             result.gearLimitSpeedMps = adaptive;

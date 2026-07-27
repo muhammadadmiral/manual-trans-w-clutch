@@ -315,10 +315,11 @@ void TransmissionController::Update(
         ClutchSystem::ApplyToVehicle(data, m_manualGear, forwardSpeed);
     }
 
-    // ── Engine model ──────────────────────────────────────────────────────
+    // v1.1: Gunakan controlThrottle (sudah termasuk idle creep) agar
+    // EngineModel melihat tenaga creep dan menjaga RPM di atas idle.
     const bool engineStall = EngineModel::Update(
         veh, data, m_manualGear, maxGear, m_simulatedClutch,
-        clutchEngagement, m_driveThrottle, m_absBrake, forwardSpeed, isEngineOn,
+        clutchEngagement, controlThrottle, m_absBrake, forwardSpeed, isEngineOn,
         automaticMode);
     if (traceFrame)
         LOG_INFO(Script,
