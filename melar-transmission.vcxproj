@@ -63,6 +63,8 @@
     <ClCompile Include="src\Vehicle\Maintenance\RefuelInteraction.cpp" />
     <ClCompile Include="src\Vehicle\Maintenance\ServiceInteraction.cpp" />
     <ClCompile Include="src\Vehicle\Maintenance\WorkshopIntegration.cpp" />
+    <ClCompile Include="src\Vehicle\Maintenance\WorkshopTuning.cpp" />
+    <ClCompile Include="src\Vehicle\Physics\VehicleDynamics.cpp" />
     <ClCompile Include="src\Vehicle\TelemetryLogger.cpp" />
     <ClCompile Include="src\Vehicle\VehicleData.cpp" />
     <ClCompile Include="src\Vehicle\VehicleProfile.cpp" />
@@ -113,6 +115,8 @@
     <ClInclude Include="src\Vehicle\Maintenance\RefuelInteraction.h" />
     <ClInclude Include="src\Vehicle\Maintenance\ServiceInteraction.h" />
     <ClInclude Include="src\Vehicle\Maintenance\WorkshopIntegration.h" />
+    <ClInclude Include="src\Vehicle\Maintenance\WorkshopTuning.h" />
+    <ClInclude Include="src\Vehicle\Physics\VehicleDynamics.h" />
     <ClInclude Include="src\Vehicle\TelemetryLogger.h" />
     <ClInclude Include="src\Vehicle\VehicleData.h" />
     <ClInclude Include="src\Vehicle\VehicleProfile.h" />

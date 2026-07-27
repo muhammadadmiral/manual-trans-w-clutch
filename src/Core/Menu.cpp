@@ -66,7 +66,6 @@ void Menu::Initialize() {
   Submenu main;
   main.title = "MELAR TRANSMISSION";
   main.items.push_back(MenuItem("Main Settings", MenuItem::Submenu, 1));
-  main.items.push_back(MenuItem("Pedal / Keyboard", MenuItem::Submenu, 2));
   main.items.push_back(MenuItem("Controls / Keybinds", MenuItem::Submenu, 4));
   main.items.push_back(MenuItem("HUD Settings", MenuItem::Submenu, 3));
   main.items.push_back(MenuItem("Engine / Stall", MenuItem::Submenu, 5));
@@ -97,12 +96,7 @@ void Menu::Initialize() {
 
   // 2: Analog Tuning
   Submenu analog;
-  analog.title = "PEDAL / KEYBOARD";
-  analog.items.push_back(MenuItem(
-      "Pedal Preset", MenuItem::IntChoice, &Config::PedalPreset,
-      0, 4, {"DEFAULT", "RESPONSIVE", "SMOOTH", "SIM RACING", "CUSTOM"}));
-  analog.items.push_back(
-      MenuItem("Reset Pedals to Default", MenuItem::Action, 1));
+  analog.title = "PEDAL CALIBRATION (LSC)";
   analog.items.push_back(MenuItem("Throttle Attack", MenuItem::Float,
                                   &Config::ThrottleAttack,
                                   0.01f, 0.01f, 1.50f));
@@ -455,6 +449,19 @@ void Menu::Initialize() {
       0.02f, 0.25f, 0.95f));
   audio.items.push_back(MenuItem(
       "Native GTA Layers", MenuItem::Bool, &Config::AudioNativeLayers));
+  audio.items.push_back(MenuItem(
+      "Turbo / Blow-off", MenuItem::Bool, &Config::AudioTurboSounds));
+  audio.items.push_back(MenuItem(
+      "Clutch Slip", MenuItem::Bool, &Config::AudioClutchSounds));
+  audio.items.push_back(MenuItem(
+      "Gearbox / Clunk", MenuItem::Bool,
+      &Config::AudioTransmissionSounds));
+  audio.items.push_back(MenuItem(
+      "Engine Load / Lug", MenuItem::Bool,
+      &Config::AudioEngineLoadSounds));
+  audio.items.push_back(MenuItem(
+      "TCS / ABS / Launch", MenuItem::Bool,
+      &Config::AudioAssistSounds));
   menus.push_back(audio);
 
   Submenu maintenance;
@@ -488,12 +495,16 @@ void Menu::Initialize() {
                &Config::SpeedometerEnabled));
   speedometer.items.push_back(MenuItem(
       "Car Layout", MenuItem::IntChoice, &Config::SpeedometerCarStyle,
-      0, 5, {"FULL DIGITAL", "TWIN ANALOG", "SPORT HYBRID",
-             "RETRO HYBRID", "MINIMAL DIGITAL", "AUTO DYNAMIC"}));
+      0, 9, {"GT DIGITAL", "TWIN ANALOG", "SPORT HYBRID",
+             "RETRO TOURING", "MINIMAL DIGITAL", "ARC DIGITAL",
+             "RALLY STACK", "LUXURY CLUSTER", "TRACK BAR",
+             "AUTO DYNAMIC"}));
   speedometer.items.push_back(MenuItem(
       "Bike Layout", MenuItem::IntChoice, &Config::SpeedometerBikeStyle,
-      0, 5, {"FULL DIGITAL", "ROUND ANALOG", "SPORT HYBRID",
-             "RETRO HYBRID", "MINIMAL DIGITAL", "AUTO DYNAMIC"}));
+      0, 9, {"ROAD TFT", "ROUND CLASSIC", "SUPERSPORT TFT",
+             "CAFE RACER", "MINIMAL ENDURO", "ARC TFT",
+             "MOTOCROSS STACK", "CRUISER TWIN", "TRACK BAR",
+             "AUTO DYNAMIC"}));
   speedometer.items.push_back(MenuItem(
       "Units", MenuItem::IntChoice, &Config::SpeedometerUnits,
       0, 1, {"KM/H", "MPH"}));

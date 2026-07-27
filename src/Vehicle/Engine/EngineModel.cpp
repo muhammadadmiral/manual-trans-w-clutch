@@ -2,8 +2,10 @@
 #include "../DrivetrainKinematics.h"
 #include "../VehicleData.h"
 #include "../VehicleUpgrades.h"
+#include "../Maintenance/WorkshopTuning.h"
 #include "../../Core/Config.h"
 #include "../../Memory/GearboxPatches.h"
+#include "../../Script/DrivingEventBus.h"
 #include "../../../sdk/inc/natives.h"
 #include <algorithm>
 #include <cmath>
@@ -11,6 +13,7 @@
 namespace EngineModel {
 
 static State s_state;
+static bool s_lugEventLatched = false;
 
 static float Clamp01(float value) {
   return std::clamp(value, 0.0f, 1.0f);
@@ -127,6 +130,7 @@ static float ResolveWheelRPM(Vehicle vehicle, VehicleData &data, int gear,
 
 void Reset() {
   s_state = State{};
+  s_lugEventLatched = false;
 }
 
 float PrepareIdleDrive(Vehicle vehicle, VehicleData &data, int gear,
@@ -154,8 +158,12 @@ float PrepareIdleDrive(Vehicle vehicle, VehicleData &data, int gear,
   // benar-benar merayap maju saat brake dilepas di D.
   const float idleRoadSpeed =
       drivetrainEstimateValid
-          ? std::clamp(s_state.idleRPM * gearLimitSpeed, 1.5f, 5.5f)
-          : (automaticMode ? 3.2f : 2.0f);
+          ? std::clamp(
+                s_state.idleRPM * gearLimitSpeed *
+                    WorkshopTuning::GetCreepSpeedMultiplier(),
+                0.0f, 5.5f)
+          : (automaticMode ? 3.2f : 2.0f) *
+                WorkshopTuning::GetCreepSpeedMultiplier();
   const float directionalSpeed = gear < 0 ? -speedMps : speedMps;
   const float speedGap =
       idleRoadSpeed > 0.01f
@@ -175,7 +183,9 @@ float PrepareIdleDrive(Vehicle vehicle, VehicleData &data, int gear,
   if (s_state.hillRollback)
     return 0.0f;
 
-  const float base = Clamp01(Config::IdleCreepThrottle);
+  const float base =
+      Clamp01(Config::IdleCreepThrottle) *
+      WorkshopTuning::GetCreepTorqueMultiplier();
   if (automaticMode) {
     // v1.0: Creep diperkuat. Brake release curve lebih agresif (0.18 bukan 0.25)
     // sehingga mobil mulai merayap lebih cepat saat brake diangkat.
@@ -572,12 +582,14 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
   s_state.handlingBacked =
       std::isfinite(inertia) && inertia >= 0.05f && inertia <= 10.0f;
   if (s_state.handlingBacked) {
-    s_state.inertia = inertia;
+    s_state.inertia =
+        inertia * WorkshopTuning::GetFlywheelInertiaMultiplier();
   } else {
     const float nativeAcceleration =
         std::max(0.01f, VEHICLE::GET_VEHICLE_ACCELERATION(vehicle));
     s_state.inertia =
-        std::clamp(0.72f + nativeAcceleration * 1.10f, 0.65f, 1.60f);
+        std::clamp(0.72f + nativeAcceleration * 1.10f, 0.65f, 1.60f) *
+        WorkshopTuning::GetFlywheelInertiaMultiplier();
   }
 
   // ScriptMain hanya memanggil model ini saat mode drivetrain aktif. Ownership
@@ -738,7 +750,8 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
         Clamp01(std::fabs(speedMps) / nativeTop);
     const float target =
         Clamp01(rpmOverrun * (0.45f + ratioLoad * 0.55f) +
-                roadLoad * ratioLoad * 0.35f);
+                roadLoad * ratioLoad * 0.35f) *
+        WorkshopTuning::GetEngineBrakeMultiplier();
     s_state.engineBrake +=
         (target - s_state.engineBrake) * Clamp01(dt * 8.0f);
   } else {
@@ -749,6 +762,18 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
   const bool stalled = UpdateLoadAndStall(
       vehicle, data, gear, maxGear, clutchEngagement, throttle, brake,
       speedMps, engineOn, dt, automaticMode);
+  if (engineOn && gear != 0 && s_state.lugSeverity > 0.58f &&
+      s_state.load > 0.28f && !s_lugEventLatched) {
+    DrivingEventBus::EventData event{};
+    event.vehicle = vehicle;
+    event.severity = s_state.lugSeverity;
+    event.value = s_state.estimatedEngineRPM;
+    DrivingEventBus::Publish(
+        DrivingEventBus::Event::EngineLug, event);
+    s_lugEventLatched = true;
+  } else if (s_state.lugSeverity < 0.32f || !engineOn) {
+    s_lugEventLatched = false;
+  }
   UpdateDriveTorque(gear, maxGear, clutchEngagement, throttle, brake,
                     engineOn, automaticMode, dt);
   return stalled || environmentStall;

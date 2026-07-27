@@ -47,6 +47,7 @@ void DriveAssistController::Reset() {
     m_absWasActive = false;
     m_escWasActive = false;
     m_lcWasArmed = false;
+    m_lcWasLimiting = false;
     m_rollWasActive = false;
     TractionControl::Reset();
     BrakeSystem::Reset();
@@ -211,12 +212,15 @@ void DriveAssistController::Update(
     m_state.tcsActive = TractionControl::IsTCSActive();
     m_state.absActive = BrakeSystem::IsABSActive();
     m_state.lcArmed = LaunchControl::GetState().armed;
+    m_state.launchCut = LaunchControl::GetState().cutLevel;
     m_state.hillHoldActive = ParkingBrake::IsHillHoldActive();
     m_state.tcsThrottle = throttle;
     m_state.absBrake = brake;
     m_state.torqueIntervention =
-        std::max(TractionControl::GetState().cutLevel,
-                 m_state.escThrottleCut);
+        std::max(
+            std::max(TractionControl::GetState().cutLevel,
+                     m_state.escThrottleCut),
+            m_state.launchCut);
     m_state.lateralVelocity = lateralVelocity;
     m_state.lateralAcceleration = m_filteredLateralAcceleration;
     m_state.slipAngleDeg = m_filteredSlipAngle;
@@ -226,12 +230,20 @@ void DriveAssistController::Update(
 
     DrivingEventBus::EventData eventData{};
     eventData.vehicle = veh;
-    if (m_state.tcsActive && !m_tcsWasActive)
+    if (m_state.tcsActive && !m_tcsWasActive) {
+        eventData.severity = TractionControl::GetState().cutLevel;
         DrivingEventBus::Publish(
             DrivingEventBus::Event::TCSActivated, eventData);
-    if (m_state.absActive && !m_absWasActive)
+        DrivingEventBus::Publish(
+            DrivingEventBus::Event::TCSCut, eventData);
+    }
+    if (m_state.absActive && !m_absWasActive) {
+        eventData.severity = BrakeSystem::GetState().absLevel;
         DrivingEventBus::Publish(
             DrivingEventBus::Event::ABSActivated, eventData);
+        DrivingEventBus::Publish(
+            DrivingEventBus::Event::ABSPulse, eventData);
+    }
     if (m_state.escActive && !m_escWasActive) {
         eventData.severity = m_state.stabilityError;
         DrivingEventBus::Publish(
@@ -240,6 +252,12 @@ void DriveAssistController::Update(
     if (m_state.lcArmed && !m_lcWasArmed)
         DrivingEventBus::Publish(
             DrivingEventBus::Event::LaunchControlArmed, eventData);
+    const bool launchLimiting = LaunchControl::GetState().limiting;
+    if (launchLimiting && !m_lcWasLimiting) {
+        eventData.severity = LaunchControl::GetState().cutLevel;
+        DrivingEventBus::Publish(
+            DrivingEventBus::Event::LaunchControlCut, eventData);
+    }
     if (m_state.rollWarning && !m_rollWasActive) {
         eventData.severity =
             Clamp01((rollAngle - rollThreshold) /
@@ -254,5 +272,6 @@ void DriveAssistController::Update(
     m_absWasActive = m_state.absActive;
     m_escWasActive = m_state.escActive;
     m_lcWasArmed = m_state.lcArmed;
+    m_lcWasLimiting = launchLimiting;
     m_rollWasActive = m_state.rollWarning;
 }

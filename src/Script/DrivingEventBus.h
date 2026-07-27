@@ -30,17 +30,25 @@ enum class Event {
 
     // Clutch events
     ClutchDump,
+    ClutchSlip,
     ClutchOverheat,
 
     // Drivetrain events
     MoneyShift,
     TurboBlowoff,
+    TurboFlutter,
+    TransmissionClunk,
+    EngineLug,
+    DrivetrainFlex,
 
     // Assist events
     ABSActivated,
+    ABSPulse,
     TCSActivated,
+    TCSCut,
     ESCActivated,
     LaunchControlArmed,
+    LaunchControlCut,
     RolloverWarning,
     ParkingBrakeEngaged,
     ParkingBrakeReleased,

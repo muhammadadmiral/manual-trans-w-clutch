@@ -63,7 +63,10 @@ void Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
       clutchDisengagement < 0.20f && throttle > 0.95f && rpm > 0.985f) {
     s_state.overRev += dt;
     if (s_state.overRev > 1.5f) {
-      s_state.health = std::max(0.0f, s_state.health - 0.001f);
+      s_state.health = std::max(
+          0.0f, s_state.health -
+                    0.001f *
+                        VehicleUpgrades::GetState().durabilityMultiplier);
       s_state.overRev = 0.0f;
     }
   } else {
@@ -110,7 +113,11 @@ void Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
 
 void NotifyGrind() {
   s_state.health =
-      std::max(0.0f, s_state.health - std::max(0.0f, Config::GearGrindDamage));
+      std::max(
+          0.0f,
+          s_state.health -
+              std::max(0.0f, Config::GearGrindDamage) *
+                  VehicleUpgrades::GetState().durabilityMultiplier);
 }
 
 void NotifyShift(Vehicle vehicle, VehicleData &data, int fromGear, int toGear,
@@ -182,7 +189,9 @@ void NotifyShift(Vehicle vehicle, VehicleData &data, int fromGear, int toGear,
       s_state.syncError < 0.10f;
   s_state.penaltyMultiplier =
       s_state.quickShift || s_state.powerShift
-          ? 0.05f
+          ? (upgrades.raceTransmission
+                 ? upgrades.shiftPenaltyMultiplier
+                 : 0.05f)
           : (s_state.synchroShift
                  ? 0.18f
                  : upgrades.shiftPenaltyMultiplier);

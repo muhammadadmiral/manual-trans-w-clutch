@@ -10,11 +10,13 @@ struct State {
   bool active = false;
   bool limiting = false;
   float targetRPM = 0.72f;
+  float cutLevel = 0.0f;
+  float outputThrottle = 0.0f;
 };
 
 void Reset();
 void Update(VehicleData &data, int gear, float clutchDisengagement,
-            float throttle, float brake, float speedMps, bool engineOn,
+            float &throttle, float brake, float speedMps, bool engineOn,
             bool automaticMode = false);
 bool IsActive();
 const State &GetState();

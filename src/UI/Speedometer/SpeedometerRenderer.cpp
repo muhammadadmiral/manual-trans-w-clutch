@@ -33,12 +33,18 @@ SafeRect GetSafeRect() {
 }
 
 int ResolveStyle(const Data &data, int configuredStyle) {
-  if (configuredStyle != 5)
-    return std::clamp(configuredStyle, 0, 4);
+  if (configuredStyle != 9)
+    return std::clamp(configuredStyle, 0, 8);
+  if (data.motorcycle) {
+    if (data.electric)
+      return 5;
+    if (data.vehicleClass == 9)
+      return 6;
+    return static_cast<int>(
+        (data.modelHash + static_cast<unsigned>(data.maxGear)) % 9u);
+  }
   if (data.electric)
     return 0;
-  if (data.motorcycle)
-    return data.maxGear >= 6 ? 2 : 1;
   switch (data.vehicleClass) {
   case 4:
   case 5:
@@ -51,7 +57,7 @@ int ResolveStyle(const Data &data, int configuredStyle) {
   case 12:
     return 3;
   default:
-    return static_cast<int>(data.modelHash % 5u);
+    return static_cast<int>(data.modelHash % 9u);
   }
 }
 
@@ -193,19 +199,42 @@ void Draw(const Data &data) {
                       : Config::SpeedometerCarStyle;
   const int style = ResolveStyle(data, configuredStyle);
 
-  float baseWidth =
-      style == 1 ? 0.330f
-                 : (style == 2 ? 0.320f
-                               : (style == 3 ? 0.310f
-                                             : (style == 4 ? 0.250f
-                                                           : 0.300f)));
+  float baseWidth = 0.300f;
+  float mainHeight = 0.145f;
+  switch (style) {
+  case 1:
+    baseWidth = 0.330f;
+    mainHeight = 0.175f;
+    break;
+  case 2:
+    baseWidth = 0.320f;
+    mainHeight = 0.160f;
+    break;
+  case 3:
+    baseWidth = 0.310f;
+    mainHeight = 0.160f;
+    break;
+  case 4:
+    baseWidth = 0.250f;
+    mainHeight = 0.110f;
+    break;
+  case 6:
+    baseWidth = 0.285f;
+    mainHeight = 0.175f;
+    break;
+  case 7:
+    baseWidth = 0.350f;
+    mainHeight = 0.180f;
+    break;
+  case 8:
+    baseWidth = 0.330f;
+    mainHeight = 0.135f;
+    break;
+  default:
+    break;
+  }
   if (data.motorcycle)
     baseWidth -= 0.018f;
-  const float mainHeight =
-      style == 1 ? 0.175f
-                 : ((style == 2 || style == 3) ? 0.160f
-                                               : (style == 4 ? 0.110f
-                                                             : 0.145f));
   const float telemetryHeight =
       Config::SpeedometerDetailed ? 0.089f : 0.030f;
   const float width = baseWidth * scale;
@@ -254,7 +283,7 @@ void Draw(const Data &data) {
                           : std::max(0.0f, data.physicalRPM) / 1000.0f);
   const std::string gearText = FormatGear(data);
 
-  if (style == 0 || style == 4) {
+  if (style == 0 || style == 4 || style == 8) {
     DrawTachBar(left + 0.013f * scale, top + 0.017f * scale,
                 width - 0.026f * scale, rpm,
                 data.motorcycle ? 18 : 16, accent, opacity, scale);
@@ -262,7 +291,7 @@ void Draw(const Data &data) {
 
   if (style == 0) {
     Renderer::DrawTextOverlay(
-        data.motorcycle ? "RACE DIGITAL" : "GT DIGITAL",
+        data.motorcycle ? "ROAD TFT" : "GT DIGITAL",
         left + 0.013f * scale, top + 0.027f * scale, 0.25f * scale,
         130, 145, 160, opacity, 0, false, false);
     Renderer::DrawTextOverlay(speedText, left + 0.012f * scale,
@@ -280,6 +309,22 @@ void Draw(const Data &data) {
                               top + 0.045f * scale, 0.80f * scale,
                               accent.r, accent.g, accent.b, opacity,
                               2, true, true);
+  } else if (style == 1 && data.motorcycle) {
+    const float radiusY = 0.064f * scale;
+    DrawDial(x, top + 0.079f * scale, radiusY / safe.aspect,
+             radiusY, std::clamp(rpm, 0.0f, 1.0f),
+             data.electric ? "POWER" : "RPM x1000",
+             data.electric ? "100" : maximumRpmText,
+             accent, opacity, scale);
+    Renderer::DrawTextOverlay(
+        speedText, x, top + 0.054f * scale, 0.58f * scale,
+        245, 248, 252, opacity, 2, true, true);
+    Renderer::DrawTextOverlay(
+        unit, x, top + 0.100f * scale, 0.20f * scale,
+        155, 170, 185, opacity, 0, false, true);
+    Renderer::DrawTextOverlay(
+        gearText.c_str(), x, top + 0.128f * scale, 0.40f * scale,
+        accent.r, accent.g, accent.b, opacity, 2, true, true);
   } else if (style == 1) {
     const float dialY = top + 0.079f * scale;
     const float radiusY = 0.052f * scale;
@@ -322,7 +367,9 @@ void Draw(const Data &data) {
              data.electric ? "100" : maximumRpmText,
              accent, opacity, scale);
   } else if (style == 3) {
-    Renderer::DrawTextOverlay("RETRO TOURING", x,
+    Renderer::DrawTextOverlay(
+                              data.motorcycle ? "CAFE RACER"
+                                              : "RETRO TOURING", x,
                               top + 0.017f * scale, 0.23f * scale,
                               184, 164, 128, opacity, 0, false, true);
     const float radiusY = 0.050f * scale;
@@ -339,7 +386,7 @@ void Draw(const Data &data) {
     Renderer::DrawTextOverlay(rpmText, left + width * 0.73f,
                               top + 0.098f * scale, 0.22f * scale,
                               190, 174, 145, opacity, 0, false, true);
-  } else {
+  } else if (style == 4) {
     Renderer::DrawTextOverlay(speedText, left + 0.012f * scale,
                               top + 0.038f * scale, 0.70f * scale,
                               245, 248, 252, opacity, 2, true, false);
@@ -355,6 +402,86 @@ void Draw(const Data &data) {
                               left + width - 0.076f * scale,
                               top + 0.078f * scale, 0.21f * scale,
                               165, 180, 195, opacity, 0, false, true);
+  } else if (style == 5) {
+    Renderer::DrawTextOverlay(
+        data.motorcycle ? "ARC TFT" : "ARC DIGITAL",
+        x, top + 0.015f * scale, 0.23f * scale,
+        accent.r, accent.g, accent.b, opacity, 0, false, true);
+    const float radiusY = 0.058f * scale;
+    DrawArc(x, top + 0.078f * scale, radiusY / safe.aspect,
+            radiusY, std::clamp(rpm, 0.0f, 1.0f),
+            accent, opacity, scale);
+    Renderer::DrawTextOverlay(
+        speedText, x, top + 0.050f * scale, 0.66f * scale,
+        245, 248, 252, opacity, 2, true, true);
+    Renderer::DrawTextOverlay(
+        unit, x, top + 0.096f * scale, 0.20f * scale,
+        145, 160, 175, opacity, 0, false, true);
+    Renderer::DrawTextOverlay(
+        gearText.c_str(), left + width - 0.040f * scale,
+        top + 0.054f * scale, 0.60f * scale,
+        accent.r, accent.g, accent.b, opacity, 2, true, true);
+  } else if (style == 6) {
+    Renderer::DrawTextOverlay(
+        data.motorcycle ? "MOTOCROSS STACK" : "RALLY STACK",
+        left + 0.014f * scale, top + 0.015f * scale,
+        0.23f * scale, accent.r, accent.g, accent.b,
+        opacity, 0, false, false);
+    Renderer::DrawTextOverlay(
+        gearText.c_str(), left + width * 0.25f,
+        top + 0.047f * scale, 0.92f * scale,
+        accent.r, accent.g, accent.b, opacity, 2, true, true);
+    Renderer::DrawTextOverlay(
+        speedText, left + width * 0.64f,
+        top + 0.052f * scale, 0.72f * scale,
+        245, 248, 252, opacity, 2, true, true);
+    Renderer::DrawTextOverlay(
+        unit, left + width * 0.64f,
+        top + 0.098f * scale, 0.21f * scale,
+        145, 160, 175, opacity, 0, false, true);
+    DrawTachBar(left + 0.014f * scale, top + 0.135f * scale,
+                width - 0.028f * scale, rpm, 20,
+                accent, opacity, scale);
+  } else if (style == 7) {
+    const float radiusY = 0.047f * scale;
+    DrawDial(left + width * 0.24f, top + 0.082f * scale,
+             radiusY / safe.aspect, radiusY, speedFraction,
+             unit, maximumSpeedText, accent, opacity, scale);
+    DrawDial(left + width * 0.76f, top + 0.082f * scale,
+             radiusY / safe.aspect, radiusY,
+             std::clamp(rpm, 0.0f, 1.0f),
+             data.electric ? "POWER" : "RPM",
+             data.electric ? "100" : maximumRpmText,
+             accent, opacity, scale);
+    GRAPHICS::DRAW_RECT(x, top + 0.083f * scale,
+                        0.078f * scale, 0.064f * scale,
+                        15, 18, 21, opacity, 0);
+    Renderer::DrawTextOverlay(
+        gearText.c_str(), x, top + 0.052f * scale,
+        0.58f * scale, accent.r, accent.g, accent.b,
+        opacity, 2, true, true);
+    Renderer::DrawTextOverlay(
+        data.motorcycle ? "CRUISER" : "TOURING",
+        x, top + 0.107f * scale, 0.19f * scale,
+        175, 185, 194, opacity, 0, false, true);
+  } else {
+    Renderer::DrawTextOverlay(
+        data.motorcycle ? "BIKE TRACK" : "TRACK BAR",
+        left + 0.014f * scale, top + 0.023f * scale,
+        0.22f * scale, accent.r, accent.g, accent.b,
+        opacity, 0, false, false);
+    Renderer::DrawTextOverlay(
+        gearText.c_str(), x, top + 0.036f * scale,
+        0.94f * scale, accent.r, accent.g, accent.b,
+        opacity, 2, true, true);
+    Renderer::DrawTextOverlay(
+        speedText, left + width - 0.060f * scale,
+        top + 0.052f * scale, 0.58f * scale,
+        245, 248, 252, opacity, 2, true, true);
+    Renderer::DrawTextOverlay(
+        unit, left + width - 0.060f * scale,
+        top + 0.089f * scale, 0.19f * scale,
+        145, 160, 175, opacity, 0, false, true);
   }
 
   const float iconY = top + (mainHeight + 0.015f) * scale;

@@ -1,7 +1,7 @@
-# Melar Transmission — Overhaul & Modularisasi v1.0
+# Melar Transmission — Overhaul & Modularisasi v1.1
 
 **Dari:** `r25` (test build, 1 file, 1078 baris)  
-**Ke:** `v1.0` (production release, arsitektur modular, ~15 file baru, ~2500+ baris tambahan)
+**Ke:** `v1.1` (production release, arsitektur modular dan dynamic drivetrain)
 
 ---
 
@@ -15,7 +15,7 @@
 
 ---
 
-## Gambaran Arsitektur v1.0
+## Gambaran Arsitektur v1.1
 
 ```
 src/Script/
@@ -315,7 +315,7 @@ float wearRate  = 0.0f;       // ← logging
 ```
 
 ### 2.3 `GearboxSystem` — Synchro Wear Persistence
-**File:** `src/Vehicle/Gears/GearboxSystem.h/.cpp`
+**File:** `src/Vehicle/Gearbox/Core/GearboxSystem.h/.cpp`
 
 Mirip dengan clutch wear, `synchroWear[]` saat ini di-reset tiap ganti mobil. Padahal harusnya nyimpen kondisi per-kendaraan.
 
@@ -346,7 +346,7 @@ Ganti semua string "r25" yang hardcoded di `MainScript.cpp` dengan satu sumber k
 
 ```cpp
 namespace VersionInfo {
-    constexpr const char* kVersion     = "1.0.0";
+    constexpr const char* kVersion     = "1.1.0";
     constexpr const char* kBuildLabel  = "Melar Transmission";
     constexpr const char* kReleaseDate = "2026";
     constexpr bool        kReleaseBuild = true;
@@ -403,10 +403,10 @@ extern VehicleBlackboard g_frame; // diisi di awal loop, dibaca oleh semua contr
 
 ---
 
-## Rencana Versi String: r25 → v1.0
+## Rencana Versi String: r25 → v1.1
 
 Ganti semua kemunculan `"r25"` dan `"r18"` (ada di trace logs) ke:
-- Notifikasi startup: `"Melar Transmission v1.0"`
+- Notifikasi startup: `"Melar Transmission v1.1"`
 - Trace log: `"TRACE v1 stage=..."`
 
 ---
@@ -444,21 +444,51 @@ Upgrade di Los Santos Customs nggak cuma nambah top speed, tapi ngerubah behavio
 | **2** | `VehicleSessionController` + `EngineController` + `SignalController` | ✅ Selesai |
 | **3** | `CalibrationController` + `HUDController` | ✅ Selesai |
 | **4** | `TransmissionController` (core physics) + Creep Fix | ✅ Selesai |
-| **5** | Refactor `MainScript.cpp` jadi Orchestrator murni | 🔄 Berjalan |
-| **6** | `DiagnosticsController` + `DrivingEventBus` | ⏳ Pending |
-| **7** | Implementasi `DriveAssistController` (ESC/Rollover) | ⏳ Pending |
-| **8** | Super Dynamic Gearbox Overhaul (Tabel 4.1 - 4.3) | ⏳ Pending |
-| **9** | Enhancement & Persistence (Wear, Audio) | ⏳ Pending |
+| **5** | Refactor `MainScript.cpp` jadi Orchestrator murni | ✅ Selesai |
+| **6** | `DriveAssistController`: TCS/ABS/LC + ESC/Rollover | ✅ Selesai |
+| **7** | `DiagnosticsController` + payload `DrivingEventBus` + audio wiring | ✅ Selesai |
+| **8** | Native-handling dynamic gearbox + profile/ratio architecture | ✅ Selesai |
+| **9** | LSC tuning, dynamic cluster, audio, weight/flex physics | ✅ Selesai |
+| **10** | Persistensi plate/synchro wear lintas sesi | 🧭 Follow-up |
+
+## Update v1.1 — Implementasi Aktual
+
+- `src/Vehicle/Gearbox/` sudah dipisah menjadi `Automatic/`, `Manual/`, dan
+  `Core/`. Profil membaca `fInitialDriveForce`,
+  `fInitialDriveMaxFlatVel`, serta clutch change rate native. Ratio custom
+  hanya ditulis jika layout inline per-kendaraan tervalidasi.
+- Upgrade transmission LSC dan paket Melar per model digabungkan. Paket Race
+  membuka quickshifter dan powershifter pada mobil maupun motor dengan
+  multiplier wear/health `0.0000001`, tanpa mengubah redline atau napas rasio
+  native.
+- Workshop LSC memiliki enam pedal map, empat clutch, empat flywheel, empat
+  transmission calibration, creep, cruise, drivetrain mounts, serta kalibrasi
+  TCS/ABS/launch. Semua pilihan disimpan berdasarkan model hash.
+- `DriveAssistController` menjadi satu-satunya owner update TCS, ABS, launch,
+  ESC, dan rollover. TCS/ABS memakai telemetry roda tervalidasi dan selalu
+  fail-open bila layout tidak tersedia.
+- `VehicleDynamics` mengestimasi massa berdasarkan kelas/dimensi, memodelkan
+  compliance mount/driveline, torque wind-up, dan load-transfer pitch dengan
+  force entity konservatif.
+- Speedometer assetless berada di `src/UI/Speedometer/`, dengan sembilan
+  layout aktual plus Auto Dynamic untuk mobil dan motor secara terpisah.
+- Audio memakai event bus dan bank opsional untuk blow-off/flutter, clutch
+  slip, transmission clunk, engine lug, ABS, TCS, launch, serta drivetrain
+  flex. Jika WAV tidak tersedia, layer native yang aman dipakai bila aktif.
 
 ---
 
 ## Verification Plan
 
 ### Automated
-- Compile di Visual Studio tanpa warning/error.
+
+- Audit delimiter source, whitespace diff, dan XML MSBuild.
+- Cocokkan seluruh `.cpp/.h` di `src/` dengan `.vcxproj` dan `.filters`.
+- Build `Release | x64` dilakukan di Visual Studio Windows setelah
+  push/pull; audit macOS ini sengaja tidak menghasilkan binary.
 
 ### Manual (In-Game)
-1. Mod startup → notifikasi `"Melar Transmission v1.0"` muncul.
+1. Mod startup → notifikasi `"Melar Transmission v1.1"` muncul.
 2. Cold start — starter fatigue masih jalan (mesin makin susah dinyalain kalau sering gagal).
 3. Lampu sein (kiri/kanan/hazard) + auto-cancel saat belok.
 4. Mode switch Manual → Automatic → Off, notifikasi muncul tiap switch.

@@ -38,6 +38,7 @@ float Update(Vehicle vehicle, VehicleData &data, float rpm, float throttle, bool
     s_state.nativeBoostActive = false;
     s_state.spool = 0.0f;
     s_state.boostPressure = 0.0f;
+    s_state.previousThrottle = 0.0f;
     return 1.0f; // 1.0x power multiplier (no effect)
   }
 
@@ -50,24 +51,38 @@ float Update(Vehicle vehicle, VehicleData &data, float rpm, float throttle, bool
     s_state.spool += dt * (0.55f + rpm * 0.85f);
     if (s_state.spool > targetSpool) s_state.spool = targetSpool;
     s_state.blowOffLatched = false;
+    s_state.flutterLatched = false;
   } else {
     float diff = s_state.spool - targetSpool;
     if (diff > 0.3f && throttle < 0.1f && !s_state.blowOffLatched) {
-      if (Config::AudioNativeLayers)
-      AUDIO::PLAY_SOUND_FROM_ENTITY(-1, "TURBO_BLOW_OFF", vehicle, "0", 0, 0);
       DrivingEventBus::EventData event{};
       event.vehicle = vehicle;
       event.severity = std::clamp(diff, 0.0f, 1.0f);
       DrivingEventBus::Publish(
           DrivingEventBus::Event::TurboBlowoff, event);
       s_state.blowOffLatched = true;
+    } else if (s_state.spool > 0.42f &&
+               s_state.previousThrottle - throttle > 0.24f &&
+               throttle >= 0.08f && throttle < 0.58f &&
+               !s_state.flutterLatched) {
+      DrivingEventBus::EventData event{};
+      event.vehicle = vehicle;
+      event.severity =
+          std::clamp(s_state.spool *
+                         (s_state.previousThrottle - throttle),
+                     0.0f, 1.0f);
+      DrivingEventBus::Publish(
+          DrivingEventBus::Event::TurboFlutter, event);
+      s_state.flutterLatched = true;
     }
     s_state.spool -= dt * (throttle < 0.1f ? 2.8f : 1.2f);
     if (s_state.spool < targetSpool) s_state.spool = targetSpool;
   }
   
   s_state.boostPressure = s_state.spool;
+  s_state.previousThrottle = throttle;
   const bool nativeBoost =
+      Config::AudioEnabled && Config::AudioTurboSounds &&
       Config::AudioNativeLayers && throttle > 0.16f &&
       s_state.boostPressure > 0.18f;
   if (nativeBoost != s_state.nativeBoostActive) {

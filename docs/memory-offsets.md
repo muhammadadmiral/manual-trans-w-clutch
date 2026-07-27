@@ -13,8 +13,11 @@ bukan alamat absolut.
 | Gear ratios | `CVehicle` | inline `NextGear + 0xC`, atau pointer build lama | read |
 | Handling pointer | `CVehicle` | pola handling | read |
 | Drive inertia | `CHandlingData` | `0x54` | read |
+| Clutch change rate upshift | `CHandlingData` | `0x58` | read |
+| Clutch change rate downshift | `CHandlingData` | `0x5C` | read |
 | Initial drive force | `CHandlingData` | `0x60` | read |
-| Initial drive max velocity | `CHandlingData` | `0x64` | fallback read |
+| Drive max flat velocity | `CHandlingData` | `0x64` | fallback read |
+| Initial drive max flat velocity | `CHandlingData` | `0x68` | fallback read |
 | Runtime drive force | `CTransmission` dalam `CVehicle` | `NextGear - 0x68` | read |
 | Runtime drive max flat velocity | `CTransmission` dalam `CVehicle` | `NextGear - 0x60` | read |
 | Wheel array / count | `CVehicle` | pola wheel count | read |

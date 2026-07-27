@@ -29,6 +29,7 @@ public:
         float absBrake = 0.0f;
         float escBrake = 0.0f;
         float escThrottleCut = 0.0f;
+        float launchCut = 0.0f;
         float torqueIntervention = 0.0f;
         float lateralVelocity = 0.0f;
         float lateralAcceleration = 0.0f;
@@ -62,5 +63,6 @@ private:
     bool m_absWasActive = false;
     bool m_escWasActive = false;
     bool m_lcWasArmed = false;
+    bool m_lcWasLimiting = false;
     bool m_rollWasActive = false;
 };

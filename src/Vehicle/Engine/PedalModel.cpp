@@ -1,5 +1,6 @@
 #include "PedalModel.h"
 #include "../../Core/Config.h"
+#include "../Maintenance/WorkshopTuning.h"
 #include "../../../sdk/inc/natives.h"
 #include <algorithm>
 #include <cmath>
@@ -32,7 +33,9 @@ void Update(float rawThrottle, float rawBrake, float clutchDisengagement,
             int gear, float signedSpeedMps, bool automaticMode,
             bool engineOn) {
   const float dt = std::clamp(MISC::GET_FRAME_TIME(), 0.001f, 0.05f);
-  const float throttleTarget = engineOn ? Clamp01(rawThrottle) : 0.0f;
+  float throttleTarget = engineOn ? Clamp01(rawThrottle) : 0.0f;
+  if (std::fabs(signedSpeedMps) > 8.0f && throttleTarget < 0.48f)
+    throttleTarget *= WorkshopTuning::GetCruisePedalMultiplier();
   const float brakeTarget = Clamp01(rawBrake);
   s_state.automaticActuator = automaticMode;
   if (automaticMode) {

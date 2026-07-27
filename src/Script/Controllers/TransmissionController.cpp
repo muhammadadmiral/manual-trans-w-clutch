@@ -1,8 +1,8 @@
 // =============================================================================
 // TransmissionController.cpp — Core per-frame physics loop.
 // Extracted from MainScript.cpp baris 579–873. This is the largest controller:
-// mode switching, clutch/gear calc, pedal model, TCS, ABS, turbo, fuel,
-// memory writes, and stall detection.
+// mode switching, clutch/gear calc, pedal model, turbo/fuel, assist
+// delegation, memory writes, and stall detection.
 // =============================================================================
 #include "TransmissionController.h"
 #include "DriveAssistController.h"
@@ -24,6 +24,7 @@
 #include "../../Vehicle/Gearbox/Manual/ManualGearbox.h"
 #include "../../Vehicle/LightsLogic.h"
 #include "../../Vehicle/Maintenance/MaintenanceSystem.h"
+#include "../../Vehicle/Physics/VehicleDynamics.h"
 #include "../../Vehicle/VehicleUpgrades.h"
 #include "../../../sdk/inc/natives.h"
 
@@ -94,6 +95,8 @@ void TransmissionController::Update(
         GearboxSystem::Reset();
         ClutchSystem::Reset();
         EngineModel::Reset();
+        VehicleDynamics::Reset();
+        VehicleDynamics::SelectVehicle(veh);
         PedalModel::Reset();
         assist.Reset();
         m_manualGear = 0;
@@ -263,7 +266,8 @@ void TransmissionController::Update(
                     assist.GetState().desiredYawRate);
 
     const float turboMul =
-        TurboSystem::Update(veh, data, rpm, throttle, isEngineOn);
+        TurboSystem::Update(
+            veh, data, rpm, assistedThrottle, isEngineOn);
     if (turboMul > 1.05f) {
         LOG_DEBUG_T(Turbo, 1000,
                     "Boost telemetry: native power, mul=%.3f press=%.3f",
@@ -280,6 +284,9 @@ void TransmissionController::Update(
     const float clutchEngagement =
         automaticMode ? AutomaticGearbox::GetCoupling()
                       : ClutchSystem::GetEngagement();
+    VehicleDynamics::Update(
+        veh, data, m_manualGear, m_driveThrottle, m_absBrake,
+        clutchEngagement, forwardSpeed);
     const bool gentleClutchRelease =
         automaticMode || !ClutchSystem::IsDumpActive();
     const float idleDrive =
@@ -327,7 +334,8 @@ void TransmissionController::Update(
         rpm, throttle, speedKmH, FuelSystem::GetOilTemperature(), isEngineOn);
     m_powerMultiplier =
         std::clamp(EngineModel::GetDriveTorqueFactor() * sportTorque *
-                       MaintenanceSystem::GetPowerFactor(),
+                       MaintenanceSystem::GetPowerFactor() *
+                       VehicleDynamics::GetTorqueTransfer(),
                    0.0f, 4.50f);
     VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(veh, m_powerMultiplier);
 

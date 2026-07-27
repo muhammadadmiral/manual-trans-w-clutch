@@ -20,10 +20,15 @@ CVT gas-rem.
 
 ## Pedal / Keyboard
 
-- `Pedal Preset`: `DEFAULT`, `RESPONSIVE`, `SMOOTH`, atau `SIM RACING`.
-  Mengubah satu parameter pedal secara manual menandai map sebagai `CUSTOM`.
-- `Reset Pedals to Default`: mengembalikan seluruh attack/release/curve
-  throttle, brake, dan clutch sekaligus.
+Preset pedal dipilih per model kendaraan hanya dari panel Melar di Los Santos
+Customs: `FACTORY`, `SPORT`, `COMFORT`, `SIM RACE`, `CRAWL / VALET`, dan
+`ECO TOURING`. Pilihan itu disimpan pada section
+`[WorkshopTuning.<MODEL_HASH>]`.
+
+- `SPORT` dan `SIM RACE` mempercepat tip-in/release tanpa menambah peak power.
+- `CRAWL / VALET` memberi travel progresif untuk parkir dan gerak sangat
+  pelan.
+- `ECO TOURING` melembutkan tip-in serta memperpanjang coast untuk cruising.
 - `Throttle Attack/Release` membentuk waktu naik dan turun pedal virtual W.
 - `Brake Attack/Release` membentuk pressure virtual tombol S.
 - `Throttle/Brake Curve` mencampur respons linear dan cubic.
@@ -186,6 +191,11 @@ MasterVolume=0.72
 PitchRandomness=0.045
 LimiterCeiling=0.72
 NativeLayers=1
+TurboSounds=1
+ClutchSounds=1
+TransmissionSounds=1
+EngineLoadSounds=1
+AssistSounds=1
 
 [Maintenance]
 FuelEnabled=1
@@ -221,8 +231,9 @@ Radius=14.0
 ```
 
 `LimiterCeiling` diterapkan saat WAV dimuat, jadi perubahan nilai ini perlu
-restart game. Volume master dan random pitch dibaca saat runtime. Audio native
-GTA untuk mesin, ban, road/wind noise tetap menjadi layer utama.
+restart game. Lima toggle kategori dapat dimatikan terpisah. `Enabled=0`
+mematikan WAV dan fallback sound native milik mod; audio kendaraan GTA yang
+tidak dimiliki mod tetap berjalan.
 
 `Refuel` dan `OilService` berada di bagian `[Controls]` dan dapat diubah dari
 menu. Nilai default masing-masing adalah virtual-key `69` (E) dan `79` (O).
@@ -237,8 +248,12 @@ membutuhkan DLL UI, SVG, texture dictionary, atau file aset tambahan. Data
 speed memakai `GET_ENTITY_SPEED`, sedangkan RPM/gear berasal dari state yang
 sama dengan drivetrain frame aktif.
 
-- Mobil: `GT DIGITAL`, `CLASSIC`, `TRACK`.
-- Motor/quad: `RACE DASH`, `NAKED`, `TOURING`.
+- Mobil: `GT DIGITAL`, `TWIN ANALOG`, `SPORT HYBRID`, `RETRO TOURING`,
+  `MINIMAL DIGITAL`, `ARC DIGITAL`, `RALLY STACK`, `LUXURY CLUSTER`,
+  `TRACK BAR`, dan `AUTO DYNAMIC`.
+- Motor/quad: `ROAD TFT`, `ROUND CLASSIC`, `SUPERSPORT TFT`, `CAFE RACER`,
+  `MINIMAL ENDURO`, `ARC TFT`, `MOTOCROSS STACK`, `CRUISER TWIN`,
+  `TRACK BAR`, dan `AUTO DYNAMIC`.
 - `Units`: km/h atau mph.
 - `Accent`, `Position`, `Scale`, dan `Opacity`: customization live.
 - `Detailed Telemetry`: fuel, temperatur/life oli, engine/gearbox health,
@@ -250,5 +265,30 @@ sama dengan drivetrain frame aktif.
 `LS Customs Service Bays` menambahkan menu Melar ketika kendaraan berhenti di
 dekat Los Santos Customs Burton/La Mesa/LSIA/Harmony, Beeker's Garage, atau
 Benny's. Tekan key `Workshop` (default E). Service mekanikal mewajibkan mesin
-mati; drivetrain mode, pedal map, TCS, dan ABS dapat dituning dari panel yang
-sama. `Workshop Radius` dapat diperbesar untuk map overhaul.
+mati; tuning boleh dilakukan saat mesin hidup.
+
+Panel menyediakan pedal, clutch package, flywheel, transmission, creep,
+cruise/coast, drivetrain mounts, TCS, ABS, launch, dan empat tindakan servis.
+Paket transmisi `RACE Q/P-SHIFT` membuka quick/powershift untuk mobil dan
+motor dengan wear nyaris nol. Street/Sport tetap meningkatkan shift stage
+tanpa mengganti max RPM, final ratio, atau top-speed handling native.
+`Workshop Radius` dapat diperbesar untuk map overhaul.
+
+Contoh section yang dibuat otomatis:
+
+```ini
+[WorkshopTuning.1A2B3C4D]
+PedalMap=4
+ClutchPackage=1
+Flywheel=2
+Transmission=3
+CreepCalibration=3
+CruiseCalibration=2
+DrivetrainMounts=1
+TCSCalibration=2
+ABSCalibration=0
+LaunchCalibration=2
+```
+
+Nilai disimpan sebagai index sesuai urutan label pada panel; gunakan panel
+untuk mengubahnya agar range selalu tervalidasi.

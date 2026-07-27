@@ -11,8 +11,12 @@ GTA controls
     ├── AutomaticGearbox> selector P-R-N-D-S-L2-L1 dan shift map
     ├── ClutchSystem ───> engagement / slip / heat / signed actuator
     ├── EngineModel ────> RPM open-driveline, load, creep, stall
-    ├── TractionControl > throttle cut bila CWheel valid
-    └── BrakeSystem ────> brake modulation bila CWheel valid
+    ├── DriveAssistController
+    │   ├── TractionControl > predictive torque cut bila CWheel valid
+    │   ├── BrakeSystem ────> load-aware ABS pulse bila CWheel valid
+    │   ├── LaunchControl ──> progressive soft-cut
+    │   └── ESC/Rollover ───> yaw/slip intervention konservatif
+    └── VehicleDynamics ────> mass estimate, mount flex, suspension pitch
 ```
 
 ## Urutan frame
@@ -23,13 +27,16 @@ GTA controls
    EV/scooter dikunci ke automatic; mode Off tidak menulis gear.
    `VehicleUpgrades` membaca engine, transmission, dan turbo mod native.
 3. Bentuk travel clutch manual atau coupling torque-converter automatic.
-4. Proses selector/shift, pedal overlap, TCS, dan ABS.
+4. Proses selector/shift, pedal overlap, lalu TCS/ABS/ESC/launch melalui satu
+   `DriveAssistController`.
 5. Tulis gear dan signed clutch actuator. Pedal clutch mentok memakai gear 1
    sebagai carrier, tetapi logical gear tidak berubah.
 6. Jalankan free-rev hanya bila driveline terbuka, lalu load/stall, launch
    soft-cut, turbo telemetry, dan shift shock.
-7. Ulangi write drivetrain sebagai write terakhir, lalu update lampu, HUD, log,
-   dan telemetry.
+7. Terapkan driveline wind-up dan load-transfer pitch tanpa mengubah redline
+   atau ratio native.
+8. Ulangi write drivetrain sebagai write terakhir, lalu update lampu, HUD, log,
+   event bus, audio, dan telemetry.
 
 `VehicleData` menjadi facade tunggal ke memory. Modul domain tidak menghitung
 alamat pointer sendiri.

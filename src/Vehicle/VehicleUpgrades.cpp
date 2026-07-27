@@ -1,4 +1,5 @@
 #include "VehicleUpgrades.h"
+#include "Maintenance/WorkshopTuning.h"
 #include "../../sdk/inc/natives.h"
 #include <algorithm>
 #include <Windows.h>
@@ -39,26 +40,36 @@ void Initialize(Vehicle vehicle) {
   s_state.transmissionStage =
       ResolveStage(vehicle, 13, s_state.transmissionLevel,
                    s_state.transmissionMaxLevel);
+  s_state.transmissionStage =
+      std::max(s_state.transmissionStage,
+               WorkshopTuning::GetTransmissionStage());
   s_state.turbo = VEHICLE::IS_TOGGLE_MOD_ON(vehicle, 18) != FALSE;
-  s_state.raceTransmission =
+  const bool nativeRaceTransmission =
       s_state.transmissionMaxLevel > 0 &&
       s_state.transmissionLevel >= s_state.transmissionMaxLevel;
+  s_state.raceTransmission =
+      nativeRaceTransmission || WorkshopTuning::IsRaceTransmission();
 
   s_state.stallResistance =
       1.0f + s_state.engineStage * 0.45f +
       s_state.transmissionStage * 0.10f;
   s_state.durabilityMultiplier =
-      1.0f / (1.0f + s_state.engineStage * 0.40f +
-              s_state.transmissionStage * 0.30f);
+      s_state.raceTransmission
+          ? 0.0000001f
+          : 1.0f / (1.0f + s_state.engineStage * 0.40f +
+                    s_state.transmissionStage * 0.30f);
   s_state.shiftPenaltyMultiplier =
       s_state.raceTransmission
-          ? 0.08f
+          ? 0.0000001f
           : 1.0f - s_state.transmissionStage * 0.62f;
 
+  // Racing transmission unlocks both strategies for both platforms. The
+  // active shift path still decides which one is mechanically appropriate:
+  // clutch-open no-lift uses powershift, clutchless upshift uses quickshift.
   s_state.quickshifter =
-      s_state.motorcycle && s_state.transmissionStage >= 0.34f;
-  s_state.powershifter =
-      !s_state.motorcycle && s_state.raceTransmission;
+      s_state.raceTransmission ||
+      (s_state.motorcycle && s_state.transmissionStage >= 0.34f);
+  s_state.powershifter = s_state.raceTransmission;
   s_vehicle = vehicle;
   s_lastRefresh = GetTickCount64();
 }

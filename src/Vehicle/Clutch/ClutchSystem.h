@@ -21,6 +21,7 @@ struct State {
   float overloadSlip = 0.0f;
   float torqueDemand = 0.0f;
   float torqueCapacity = 1.0f;
+  float packageCapacityMultiplier = 1.0f;
   float judder = 0.0f;
   float judderPhase = 0.0f;
   bool slipping = false;

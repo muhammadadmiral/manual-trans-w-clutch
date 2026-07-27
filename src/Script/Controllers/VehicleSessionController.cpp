@@ -24,6 +24,8 @@
 #include "../../Vehicle/Maintenance/RefuelInteraction.h"
 #include "../../Vehicle/Maintenance/ServiceInteraction.h"
 #include "../../Vehicle/Maintenance/WorkshopIntegration.h"
+#include "../../Vehicle/Maintenance/WorkshopTuning.h"
+#include "../../Vehicle/Physics/VehicleDynamics.h"
 #include "../../Vehicle/TelemetryLogger.h"
 #include "../../Vehicle/VehicleUpgrades.h"
 #include "../../../sdk/inc/natives.h"
@@ -38,6 +40,8 @@ void VehicleSessionController::Reset() {
         VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(m_activeVehicle, 1.0f);
     }
     GearboxProfile::Reset();
+    WorkshopTuning::Reset();
+    VehicleDynamics::Reset();
     m_activeVehicle = 0;
     m_enterTick     = 0;
     m_justChanged   = false;
@@ -59,6 +63,8 @@ bool VehicleSessionController::CheckAndUpdate(Vehicle current, int maxGear) {
         VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(m_activeVehicle, 1.0f);
     }
     GearboxProfile::Reset();
+    WorkshopTuning::Reset();
+    VehicleDynamics::Reset();
 
     LOG_INFO(Script, "Entered vehicle handle=%d maxGear=%d", current, maxGear);
     m_activeVehicle = current;
@@ -86,6 +92,8 @@ void VehicleSessionController::ResetSubsystems(Vehicle veh) {
     GearboxSystem::Reset();
     ClutchSystem::Reset();
     EngineModel::Reset();
+    WorkshopTuning::SelectVehicle(veh);
+    VehicleDynamics::SelectVehicle(veh);
     VehicleUpgrades::Reset();
     VehicleUpgrades::Initialize(veh);
     LaunchControl::Reset();

@@ -1,9 +1,11 @@
 #include "WorkshopIntegration.h"
 
 #include "MaintenanceSystem.h"
+#include "WorkshopTuning.h"
 #include "../Clutch/ClutchSystem.h"
 #include "../Gearbox/Automatic/AutomaticGearbox.h"
 #include "../Gearbox/Core/GearboxSystem.h"
+#include "../VehicleUpgrades.h"
 #include "../../Core/Config.h"
 #include "../../Core/Menu.h"
 #include "../../Core/Renderer.h"
@@ -14,8 +16,6 @@
 #include <array>
 #include <cstdio>
 #include <string>
-
-extern HMODULE g_pluginModule;
 
 namespace WorkshopIntegration {
 namespace {
@@ -45,7 +45,7 @@ int s_selected = 0;
 Vehicle s_vehicle = 0;
 const ServiceBay *s_activeBay = nullptr;
 
-constexpr int kItemCount = 9;
+constexpr int kItemCount = 16;
 
 void Notify(const char *message) {
   Renderer::ShowNotification(message);
@@ -81,9 +81,9 @@ const ServiceBay *FindNearest(Vehicle vehicle) {
 void DrawPanel(bool engineOn) {
   const float x = 0.50f;
   const float y = 0.48f;
-  const float width = 0.36f;
+  const float width = 0.54f;
   const float rowHeight = 0.038f;
-  const float height = 0.105f + rowHeight * kItemCount;
+  const float height = 0.132f + rowHeight * kItemCount;
   const float top = y - height * 0.5f;
   const float left = x - width * 0.5f;
   GRAPHICS::DRAW_RECT(x + 0.004f, y + 0.005f, width + 0.008f,
@@ -100,15 +100,40 @@ void DrawPanel(bool engineOn) {
       x, top + 0.050f, 0.27f, 190, 205, 220, 255, 0, false, true);
 
   const char *names[kItemCount] = {
-      "Engine Oil Service",
-      "Gearbox Rebuild",
-      "Clutch / Flywheel Service",
-      "ATF / Transmission Service",
-      "Drivetrain Setup",
-      "Pedal Map",
-      "Traction Control",
+      "Pedal / Throttle Map",
+      "Clutch Package",
+      "Flywheel Package",
+      "Transmission Calibration",
+      "Low-Speed Creep",
+      "Cruise / Coast Map",
+      "Drivetrain Mounts",
+      "TCS Calibration",
       "ABS Calibration",
+      "Launch Calibration",
+      "Engine Oil + Filter",
+      "Gearbox / Synchro Rebuild",
+      "Clutch Surface Service",
+      "ATF + Adaptation Reset",
+      "Complete Driveline Inspection",
       "Close Service Bay",
+  };
+  const char *details[kItemCount] = {
+      "Enam response map per model: factory sampai crawl dan eco.",
+      "Kapasitas torsi, bite, heat soak, dan cooling clutch.",
+      "Inersia mesin saat naik/turun RPM tanpa mengubah redline.",
+      "Street/Sport/Race mengikuti rasio handling native kendaraan.",
+      "Kalibrasi gerak pelan untuk macet, parkir, dan crawling.",
+      "Karakter pedal ringan dan engine-braking saat cruising.",
+      "Compliance drivetrain, clunk, dan suspension load transfer.",
+      "Slip target dan kekuatan torque intervention TCS.",
+      "Wheel-slip target, release pressure, dan pulse ABS.",
+      "Target RPM serta agresivitas soft-cut launch control.",
+      "Pulihkan umur oli dan kualitas pelumasan mesin.",
+      "Pulihkan health gearbox dan synchronizer.",
+      "Hilangkan heat, slip, dan judder permukaan clutch.",
+      "Pulihkan temperatur ATF dan adaptation automatic gearbox.",
+      "Servis oli, gearbox, clutch, ATF, dan adaptation sekaligus.",
+      "Tutup panel modifikasi Melar x Los Santos Customs.",
   };
 
   for (int i = 0; i < kItemCount; ++i) {
@@ -116,7 +141,9 @@ void DrawPanel(bool engineOn) {
     const bool selected = i == s_selected;
     GRAPHICS::DRAW_RECT(
         x, rowY + rowHeight * 0.5f, width - 0.014f, rowHeight - 0.002f,
-        selected ? 22 : 12, selected ? 70 : 18, selected ? 94 : 25,
+        selected ? 22 : (i < 10 ? 12 : 18),
+        selected ? 70 : (i < 10 ? 24 : 20),
+        selected ? 94 : (i < 10 ? 32 : 25),
         selected ? 245 : 220, 0);
     if (selected) {
       GRAPHICS::DRAW_RECT(left + 0.010f, rowY + rowHeight * 0.5f,
@@ -124,111 +151,148 @@ void DrawPanel(bool engineOn) {
                           55, 205, 255, 255, 0);
     }
     Renderer::DrawTextOverlay(
-        names[i], left + 0.018f, rowY + 0.006f, 0.31f,
+        names[i], left + 0.018f, rowY + 0.006f, 0.285f,
         selected ? 255 : 210, selected ? 255 : 222,
         selected ? 255 : 232, 255, 0, false, false);
 
     char value[64]{};
     switch (i) {
     case 0:
-      sprintf_s(value, "%d%%",
-                static_cast<int>(MaintenanceSystem::GetState().oilLife *
-                                 100.0f));
+      sprintf_s(value, "< %s >",
+                WorkshopTuning::GetLabel(
+                    WorkshopTuning::Option::PedalMap));
       break;
     case 1:
+      sprintf_s(value, "< %s >",
+                WorkshopTuning::GetLabel(
+                    WorkshopTuning::Option::ClutchPackage));
+      break;
+    case 2:
+      sprintf_s(value, "< %s >",
+                WorkshopTuning::GetLabel(
+                    WorkshopTuning::Option::Flywheel));
+      break;
+    case 3:
+      sprintf_s(value, "< %s >",
+                WorkshopTuning::GetLabel(
+                    WorkshopTuning::Option::Transmission));
+      break;
+    case 4:
+      sprintf_s(value, "< %s >",
+                WorkshopTuning::GetLabel(
+                    WorkshopTuning::Option::CreepCalibration));
+      break;
+    case 5:
+      sprintf_s(value, "< %s >",
+                WorkshopTuning::GetLabel(
+                    WorkshopTuning::Option::CruiseCalibration));
+      break;
+    case 6:
+      sprintf_s(value, "< %s >",
+                WorkshopTuning::GetLabel(
+                    WorkshopTuning::Option::DrivetrainMounts));
+      break;
+    case 7:
+      sprintf_s(value, "< %s >",
+                WorkshopTuning::GetLabel(
+                    WorkshopTuning::Option::TcsCalibration));
+      break;
+    case 8:
+      sprintf_s(value, "< %s >",
+                WorkshopTuning::GetLabel(
+                    WorkshopTuning::Option::AbsCalibration));
+      break;
+    case 9:
+      sprintf_s(value, "< %s >",
+                WorkshopTuning::GetLabel(
+                    WorkshopTuning::Option::LaunchCalibration));
+      break;
+    case 10:
+      sprintf_s(value, "%d%%",
+                static_cast<int>(
+                    MaintenanceSystem::GetState().oilLife * 100.0f));
+      break;
+    case 11:
       sprintf_s(value, "%d%%",
                 static_cast<int>(GearboxSystem::GetHealth() * 100.0f));
       break;
-    case 2:
+    case 12:
       sprintf_s(value, "HEAT %d%%",
                 static_cast<int>(ClutchSystem::GetHeat() * 100.0f));
       break;
-    case 3:
+    case 13:
       sprintf_s(value, "%s",
-                AutomaticGearbox::GetState().limpMode ? "LIMP" : "CHECK");
+                AutomaticGearbox::GetState().limpMode ? "LIMP" : "READY");
       break;
-    case 4: {
-      const char *modes[] = {"OFF", "AUTOMATIC", "MANUAL"};
-      sprintf_s(value, "< %s >",
-                modes[std::clamp(Config::TransmissionMode, 0, 2)]);
-      break;
-    }
-    case 5: {
-      const char *presets[] =
-          {"DEFAULT", "RESPONSIVE", "SMOOTH", "SIM RACING", "CUSTOM"};
-      sprintf_s(value, "< %s >",
-                presets[std::clamp(Config::PedalPreset, 0, 4)]);
-      break;
-    }
-    case 6:
-      sprintf_s(value, "%s", Config::TcsEnabled ? "ON" : "OFF");
-      break;
-    case 7:
-      sprintf_s(value, "%s", Config::AbsEnabled ? "ON" : "OFF");
+    case 14:
+      sprintf_s(value, "SERVICE ALL");
       break;
     default:
       break;
     }
     if (value[0]) {
       Renderer::DrawTextOverlay(
-          value, left + width - 0.078f, rowY + 0.006f, 0.29f,
+          value, left + width - 0.105f, rowY + 0.006f, 0.275f,
           selected ? 115 : 145, selected ? 225 : 165,
           selected ? 255 : 180, 255, 0, false, true);
     }
   }
 
   Renderer::DrawTextOverlay(
-      "UP/DOWN navigate   LEFT/RIGHT tune   ENTER service   BACK exit",
-      x, top + 0.088f + rowHeight * kItemCount, 0.255f,
+      details[s_selected], x,
+      top + 0.086f + rowHeight * kItemCount, 0.245f,
+      195, 210, 225, 245, 0, false, true);
+  Renderer::DrawTextOverlay(
+      "UP/DOWN NAVIGATE   LEFT/RIGHT TUNE   ENTER APPLY   BACK EXIT",
+      x, top + 0.110f + rowHeight * kItemCount, 0.235f,
       145, 160, 175, 235, 0, false, true);
 }
 
 // Mengubah nilai konfigurasi/opsi menu ke kiri (-1) atau kanan (+1)
 void AdjustSelected(int direction) {
-  if (s_selected == 4) {
-    Config::TransmissionMode =
-        std::clamp(Config::TransmissionMode + direction, 0, 2);
-    Config::SaveConfig(g_pluginModule);
-  } else if (s_selected == 5) {
-    const int next =
-        std::clamp(Config::PedalPreset + direction, 0, 3);
-    Config::ApplyPedalPreset(next);
-    Config::SaveConfig(g_pluginModule);
-  }
+  if (s_selected < 0 || s_selected > 9)
+    return;
+  WorkshopTuning::Adjust(
+      static_cast<WorkshopTuning::Option>(s_selected), direction);
+  VehicleUpgrades::Initialize(s_vehicle);
 }
 
 // Mengeksekusi servis mekanikal atau mengubah pengaturan saat tombol ENTER/SELECT ditekan
 void ActivateSelected(bool engineOn) {
-  if (s_selected <= 3 && engineOn) {
+  if (s_selected >= 10 && s_selected <= 14 && engineOn) {
     Notify("~r~Service locked:~w~ matikan mesin terlebih dahulu");
     return;
   }
   switch (s_selected) {
-  case 0:
+  case 0: case 1: case 2: case 3: case 4:
+  case 5: case 6: case 7: case 8: case 9:
+    AdjustSelected(1);
+    Notify("~b~LSC tune applied:~w~ profile disimpan per model kendaraan");
+    break;
+  case 10:
     MaintenanceSystem::ServiceOil();
     Notify("~g~LSC:~w~ oli dan filter sudah diganti");
     break;
-  case 1:
+  case 11:
     GearboxSystem::ServiceGearbox();
     Notify("~g~LSC:~w~ gearbox dan synchronizer direbuild");
     break;
-  case 2:
+  case 12:
     ClutchSystem::ServiceClutch();
     Notify("~g~LSC:~w~ clutch/flywheel selesai diservis");
     break;
-  case 3:
+  case 13:
     AutomaticGearbox::ServiceTransmission();
     Notify("~g~LSC:~w~ ATF dan transmission adaptation direset");
     break;
-  case 6:
-    Config::TcsEnabled = !Config::TcsEnabled;
-    Config::SaveConfig(g_pluginModule);
+  case 14:
+    MaintenanceSystem::ServiceOil();
+    GearboxSystem::ServiceGearbox();
+    ClutchSystem::ServiceClutch();
+    AutomaticGearbox::ServiceTransmission();
+    Notify("~g~LSC:~w~ complete driveline inspection selesai");
     break;
-  case 7:
-    Config::AbsEnabled = !Config::AbsEnabled;
-    Config::SaveConfig(g_pluginModule);
-    break;
-  case 8:
+  case 15:
     s_open = false;
     break;
   default:
@@ -249,12 +313,12 @@ void Reset() {
 
 // Fungsi utama yang dipanggil setiap frame untuk menangani deteksi jarak bengkel,
 // input pemain (buka menu, navigasi), dan mengunci pergerakan kendaraan.
-void Update(Ped playerPed, Vehicle vehicle, bool engineOn) {
+bool Update(Ped playerPed, Vehicle vehicle, bool engineOn) {
   if (!Config::WorkshopEnabled || !vehicle ||
       !ENTITY::DOES_ENTITY_EXIST(vehicle) ||
       VEHICLE::GET_PED_IN_VEHICLE_SEAT(vehicle, -1, 0) != playerPed) {
     Reset();
-    return;
+    return false;
   }
 
   s_activeBay = FindNearest(vehicle);
@@ -277,12 +341,12 @@ void Update(Ped playerPed, Vehicle vehicle, bool engineOn) {
         s_selected = 0;
       }
     }
-    return;
+    return false;
   }
 
   if (vehicle != s_vehicle || !s_near || Menu::IsOpen()) {
     s_open = false;
-    return;
+    return false;
   }
 
   // Nonaktifkan kontrol kendaraan dan menu navigasi standar GTA
@@ -309,6 +373,7 @@ void Update(Ped playerPed, Vehicle vehicle, bool engineOn) {
     s_open = false;
 
   DrawPanel(engineOn);
+  return s_open;
 }
 
 bool IsOpen() { return s_open; }

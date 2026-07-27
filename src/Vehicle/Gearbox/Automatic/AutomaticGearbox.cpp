@@ -299,28 +299,36 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
     const DWORD disengageMs = s_state.disengageDurationMs;
     const DWORD synchronizeMs = s_state.synchronizeDurationMs;
     const DWORD engageMs = s_state.engageDurationMs;
+    const bool uninterruptedShift = GearboxProfile::IsDualClutch();
+    const float couplingFloor = uninterruptedShift ? 0.78f : 0.0f;
 
     if (s_state.shiftPhase == ShiftPhase::Disengaging) {
       const float progress =
           static_cast<float>(phaseElapsed) /
           static_cast<float>((std::max<DWORD>)(1, disengageMs));
-      s_state.coupling = converterCoupling * (1.0f - SmoothStep(progress));
+      s_state.coupling =
+          couplingFloor +
+          (converterCoupling - couplingFloor) *
+              (1.0f - SmoothStep(progress));
       s_state.hydraulicCoupling = s_state.coupling;
       s_state.coupling =
-          nativeCoupling * (1.0f - SmoothStep(progress));
+          couplingFloor +
+          (nativeCoupling - couplingFloor) *
+              (1.0f - SmoothStep(progress));
       if (s_state.pendingGear > s_state.shiftFromGear &&
-          s_state.decisionRPM > 0.72f && phaseElapsed < 100)
+          (uninterruptedShift || s_state.decisionRPM > 0.72f) &&
+          phaseElapsed < 100)
         s_state.ignitionCut = true;
       if (phaseElapsed >= disengageMs) {
         s_state.currentGear = s_state.pendingGear;
         s_state.shiftPhase = ShiftPhase::Synchronizing;
         s_state.phaseStartedAt = now;
-        s_state.coupling = 0.0f;
-        s_state.hydraulicCoupling = 0.0f;
+        s_state.coupling = couplingFloor;
+        s_state.hydraulicCoupling = couplingFloor;
       }
     } else if (s_state.shiftPhase == ShiftPhase::Synchronizing) {
-      s_state.coupling = 0.0f;
-      s_state.hydraulicCoupling = 0.0f;
+      s_state.coupling = couplingFloor;
+      s_state.hydraulicCoupling = couplingFloor;
       s_state.shiftTargetRPM =
           std::clamp(RoadRPM(vehicle, data, vehicleMaxGear,
                              s_state.currentGear, signedSpeedMps),
@@ -340,9 +348,13 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
       const float progress =
           static_cast<float>(phaseElapsed) /
           static_cast<float>((std::max<DWORD>)(1, engageMs));
-      s_state.coupling = converterCoupling * SmoothStep(progress);
+      s_state.coupling =
+          couplingFloor +
+          (converterCoupling - couplingFloor) * SmoothStep(progress);
       s_state.hydraulicCoupling = s_state.coupling;
-      s_state.coupling = nativeCoupling * SmoothStep(progress);
+      s_state.coupling =
+          couplingFloor +
+          (nativeCoupling - couplingFloor) * SmoothStep(progress);
       s_state.shiftTargetRPM =
           std::clamp(RoadRPM(vehicle, data, vehicleMaxGear,
                              s_state.currentGear, signedSpeedMps),
@@ -517,6 +529,8 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
     shiftEvent.fromGear = previous;
     shiftEvent.toGear = targetGear;
     shiftEvent.severity = harsh ? 0.90f : (slow ? 0.15f : 0.45f);
+    shiftEvent.quickShift =
+        GearboxProfile::IsDualClutch() && targetGear > previous;
     DrivingEventBus::Publish(
         targetGear > previous
             ? DrivingEventBus::Event::GearShiftUp

@@ -6,7 +6,7 @@ using Vehicle = int;
 namespace WorkshopIntegration {
 
 void Reset();
-void Update(Ped playerPed, Vehicle vehicle, bool engineOn);
+bool Update(Ped playerPed, Vehicle vehicle, bool engineOn);
 bool IsOpen();
 bool IsNearServiceBay();
 

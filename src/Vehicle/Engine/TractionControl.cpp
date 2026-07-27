@@ -1,5 +1,6 @@
 #include "TractionControl.h"
 #include "../VehicleData.h"
+#include "../Maintenance/WorkshopTuning.h"
 #include "../../Core/Config.h"
 #include "../../../sdk/inc/natives.h"
 #include <algorithm>
@@ -25,6 +26,7 @@ void Update(Vehicle vehicle, VehicleData &data, float speedMps,
   const float dt = std::clamp(MISC::GET_FRAME_TIME(), 0.001f, 0.05f);
   const uint8_t count = data.GetWheelCount();
   float fastestDrivenOmega = 0.0f;
+  float drivenOmegaSum = 0.0f;
   float allOmega = 0.0f;
   int valid = 0;
   int driven = 0;
@@ -41,6 +43,7 @@ void Update(Vehicle vehicle, VehicleData &data, float speedMps,
     const float powerWeight = std::fabs(wheel.power);
     if (powerWeight > 0.001f) {
       fastestDrivenOmega = std::max(fastestDrivenOmega, omega);
+      drivenOmegaSum += omega;
       ++driven;
     }
   }
@@ -58,7 +61,9 @@ void Update(Vehicle vehicle, VehicleData &data, float speedMps,
   }
 
   const float omega =
-      driven > 0 ? fastestDrivenOmega
+      driven > 0
+          ? (drivenOmegaSum / static_cast<float>(driven)) * 0.72f +
+                fastestDrivenOmega * 0.28f
                  : allOmega / static_cast<float>(valid);
   const float roadSpeed = std::fabs(speedMps);
   if (throttle < 0.05f && roadSpeed > 3.0f && omega > 1.0f) {
@@ -74,23 +79,42 @@ void Update(Vehicle vehicle, VehicleData &data, float speedMps,
   const float slipAlpha = 1.0f - std::exp(-14.0f * dt);
   s_state.slipRatio +=
       (s_state.rawSlipRatio - s_state.slipRatio) * slipAlpha;
+  s_state.slipRate =
+      (s_state.slipRatio - s_state.previousSlipRatio) / dt;
+  s_state.previousSlipRatio = s_state.slipRatio;
 
-  const float target = std::clamp(Config::TcsSlipTarget, 0.02f, 0.60f);
+  const float lowSpeedAllowance =
+      roadSpeed < 5.0f ? (5.0f - roadSpeed) * 0.012f : 0.0f;
+  const float target = std::clamp(
+      Config::TcsSlipTarget *
+              WorkshopTuning::GetTcsSlipMultiplier() +
+          lowSpeedAllowance,
+      0.02f, 0.95f);
   const bool interventionAllowed =
       s_state.enabled && gear > 0 && clutchDisengagement < 0.40f &&
-      throttle > 0.10f && roadSpeed > 1.0f;
-  const float requestedCut =
+      throttle > 0.10f && roadSpeed > 1.0f &&
+      WorkshopTuning::GetTcsCutMultiplier() > 0.01f;
+  const float proportionalCut =
       interventionAllowed && s_state.slipRatio > target
           ? Clamp01((s_state.slipRatio - target) /
                     std::max(0.10f, 0.50f - target))
           : 0.0f;
+  const float predictiveCut =
+      interventionAllowed && s_state.slipRate > 0.35f
+          ? Clamp01((s_state.slipRate - 0.35f) / 2.5f) * 0.30f
+          : 0.0f;
+  const float requestedCut =
+      std::max(proportionalCut, predictiveCut);
+  s_state.requestedCut = Clamp01(requestedCut);
   const float cutRate = requestedCut > s_state.cutLevel ? 12.0f : 5.0f;
   s_state.cutLevel +=
-      (requestedCut - s_state.cutLevel) * Clamp01(dt * cutRate);
+      (s_state.requestedCut - s_state.cutLevel) * Clamp01(dt * cutRate);
   s_state.active = interventionAllowed && s_state.cutLevel > 0.01f;
   if (s_state.active) {
     throttle *=
-        1.0f - Clamp01(Config::TcsMaxCut) * s_state.cutLevel;
+        1.0f - Clamp01(Config::TcsMaxCut) *
+                   WorkshopTuning::GetTcsCutMultiplier() *
+                   s_state.cutLevel;
     PAD::DISABLE_CONTROL_ACTION(0, 71, true);
     PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, 71, throttle);
   } else {

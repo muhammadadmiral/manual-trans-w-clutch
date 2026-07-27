@@ -126,6 +126,11 @@ float AudioMasterVolume = 0.72f;
 float AudioPitchRandomness = 0.045f;
 float AudioLimiterCeiling = 0.72f;
 bool AudioNativeLayers = true;
+bool AudioTurboSounds = true;
+bool AudioClutchSounds = true;
+bool AudioTransmissionSounds = true;
+bool AudioEngineLoadSounds = true;
+bool AudioAssistSounds = true;
 
 bool FuelEnabled = true;
 bool FuelBlipsEnabled = true;
@@ -188,7 +193,7 @@ bool  WorkshopEnabled  = true;
 float WorkshopRadius   = 14.0f;
 
 void ApplyPedalPreset(int preset) {
-    PedalPreset = std::clamp(preset, 0, 4);
+    PedalPreset = std::clamp(preset, 0, 5);
     switch (PedalPreset) {
     case 0:
         ThrottleAttack = 0.08f;
@@ -233,6 +238,32 @@ void ApplyPedalPreset(int preset) {
         ThrottleExpo = 0.50f;
         BrakeExpo = 0.42f;
         ClutchExpo = 0.30f;
+        break;
+    case 4:
+        // Crawl/valet: long, progressive throttle travel and a soft clutch
+        // pickup for parking, trailers and technical low-speed driving.
+        ThrottleAttack = 0.24f;
+        ThrottleRelease = 0.38f;
+        BrakeAttack = 0.11f;
+        BrakeRelease = 0.24f;
+        ClutchAttack = 0.075f;
+        ClutchRelease = 0.13f;
+        ThrottleExpo = 0.68f;
+        BrakeExpo = 0.30f;
+        ClutchExpo = 0.42f;
+        break;
+    case 5:
+        // Eco touring: relaxed tip-in and long release for steady cruising
+        // while retaining full pedal output at the end of travel.
+        ThrottleAttack = 0.18f;
+        ThrottleRelease = 0.46f;
+        BrakeAttack = 0.10f;
+        BrakeRelease = 0.30f;
+        ClutchAttack = 0.065f;
+        ClutchRelease = 0.11f;
+        ThrottleExpo = 0.52f;
+        BrakeExpo = 0.32f;
+        ClutchExpo = 0.24f;
         break;
     default:
         break;
@@ -448,6 +479,16 @@ void ReadConfig(HMODULE module) {
                    0.25f, 0.95f);
     AudioNativeLayers =
         GetPrivateProfileIntA("Audio", "NativeLayers", 1, ini) != 0;
+    AudioTurboSounds =
+        GetPrivateProfileIntA("Audio", "TurboSounds", 1, ini) != 0;
+    AudioClutchSounds =
+        GetPrivateProfileIntA("Audio", "ClutchSounds", 1, ini) != 0;
+    AudioTransmissionSounds =
+        GetPrivateProfileIntA("Audio", "TransmissionSounds", 1, ini) != 0;
+    AudioEngineLoadSounds =
+        GetPrivateProfileIntA("Audio", "EngineLoadSounds", 1, ini) != 0;
+    AudioAssistSounds =
+        GetPrivateProfileIntA("Audio", "AssistSounds", 1, ini) != 0;
 
     FuelEnabled =
         GetPrivateProfileIntA("Maintenance", "FuelEnabled", 1, ini) != 0;
@@ -529,7 +570,7 @@ void ReadConfig(HMODULE module) {
     ClutchExpo       = ReadFloat("Analog", "ClutchExpo",       0.10f,  ini);
     PedalPreset = std::clamp(
         static_cast<int>(GetPrivateProfileIntA("Analog", "Preset", 0, ini)),
-        0, 4);
+        0, 5);
 
     // Steering
     SteerAttack      = ReadFloat("Steering", "Attack",      0.055f, ini);
@@ -550,11 +591,11 @@ void ReadConfig(HMODULE module) {
     SpeedometerCarStyle = std::clamp(
         static_cast<int>(
             GetPrivateProfileIntA("Speedometer", "CarStyle", 0, ini)),
-        0, 5);
+        0, 9);
     SpeedometerBikeStyle = std::clamp(
         static_cast<int>(
             GetPrivateProfileIntA("Speedometer", "BikeStyle", 0, ini)),
-        0, 5);
+        0, 9);
     SpeedometerUnits = std::clamp(
         static_cast<int>(
             GetPrivateProfileIntA("Speedometer", "Units", 0, ini)),
@@ -712,6 +753,13 @@ void SaveConfig(HMODULE module) {
     WriteFloat("Audio", "PitchRandomness", AudioPitchRandomness, ini);
     WriteFloat("Audio", "LimiterCeiling", AudioLimiterCeiling, ini);
     WriteInt("Audio", "NativeLayers", AudioNativeLayers ? 1 : 0, ini);
+    WriteInt("Audio", "TurboSounds", AudioTurboSounds ? 1 : 0, ini);
+    WriteInt("Audio", "ClutchSounds", AudioClutchSounds ? 1 : 0, ini);
+    WriteInt("Audio", "TransmissionSounds",
+             AudioTransmissionSounds ? 1 : 0, ini);
+    WriteInt("Audio", "EngineLoadSounds",
+             AudioEngineLoadSounds ? 1 : 0, ini);
+    WriteInt("Audio", "AssistSounds", AudioAssistSounds ? 1 : 0, ini);
 
     WriteInt("Maintenance", "FuelEnabled", FuelEnabled ? 1 : 0, ini);
     WriteInt("Maintenance", "FuelBlips",

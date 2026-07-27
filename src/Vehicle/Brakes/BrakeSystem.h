@@ -12,6 +12,10 @@ struct State {
   float rollingRadius = 0.34f;
   float wheelSlip = 0.0f;
   float rawWheelSlip = 0.0f;
+  float slipRate = 0.0f;
+  float previousWheelSlip = 0.0f;
+  float outputPressure = 0.0f;
+  float pulsePhase = 0.0f;
   float temperature = 0.0f;
   float fadeLevel = 0.0f;
   bool wheelDataValid = false;

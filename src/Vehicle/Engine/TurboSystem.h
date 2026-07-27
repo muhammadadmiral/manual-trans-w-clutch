@@ -14,10 +14,12 @@ namespace TurboSystem {
 struct TurboState {
   bool hasTurbo = false;
   bool blowOffLatched = false;
+  bool flutterLatched = false;
   bool nativeBoostActive = false;
   Vehicle vehicle = 0;
   float spool = 0.0f;
   float boostPressure = 0.0f;
+  float previousThrottle = 0.0f;
 };
 
 void Reset();

@@ -55,6 +55,15 @@ Bank s_bikeError;
 Bank s_parkApply;
 Bank s_parkRelease;
 Bank s_autoSelector;
+Bank s_turboBlowoff;
+Bank s_turboFlutter;
+Bank s_clutchSlip;
+Bank s_transmissionClunk;
+Bank s_engineLug;
+Bank s_absPulse;
+Bank s_tcsCut;
+Bank s_launchCut;
+Bank s_drivetrainFlex;
 Vehicle s_nativePopVehicle = 0;
 ULONGLONG s_nativePopUntil = 0;
 
@@ -203,6 +212,19 @@ bool Play(Bank &bank, float gain = 1.0f, ULONGLONG cooldownMs = 90,
   return SUCCEEDED(voice->Start());
 }
 
+void EnableNativePopWindow(Vehicle vehicle, ULONGLONG durationMs) {
+  if (!Config::AudioEnabled || !Config::AudioNativeLayers || !vehicle ||
+      !ENTITY::DOES_ENTITY_EXIST(vehicle))
+    return;
+  if (s_nativePopVehicle && s_nativePopVehicle != vehicle &&
+      ENTITY::DOES_ENTITY_EXIST(s_nativePopVehicle))
+    AUDIO::ENABLE_VEHICLE_EXHAUST_POPS(s_nativePopVehicle, FALSE);
+  AUDIO::ENABLE_VEHICLE_EXHAUST_POPS(vehicle, TRUE);
+  s_nativePopVehicle = vehicle;
+  s_nativePopUntil =
+      std::max(s_nativePopUntil, GetTickCount64() + durationMs);
+}
+
 std::filesystem::path ModuleDirectory(HMODULE module) {
   wchar_t path[MAX_PATH]{};
   const DWORD size = GetModuleFileNameW(module, path, MAX_PATH);
@@ -286,12 +308,39 @@ bool Initialize(HMODULE module) {
            {L"automatic_selector_01.wav", L"automatic_selector_02.wav",
             L"automatic_selector_03.wav", L"automatic_selector_04.wav",
             L"automatic_park_01.wav"});
+  LoadBank(root, s_turboBlowoff,
+           {L"turbo_blowoff_01.wav", L"turbo_blowoff_02.wav",
+            L"turbo_blowoff_03.wav"});
+  LoadBank(root, s_turboFlutter,
+           {L"turbo_flutter_01.wav", L"turbo_flutter_02.wav",
+            L"turbo_flutter_03.wav"});
+  LoadBank(root, s_clutchSlip,
+           {L"clutch_slip_01.wav", L"clutch_slip_02.wav",
+            L"clutch_slip_03.wav"});
+  LoadBank(root, s_transmissionClunk,
+           {L"transmission_clunk_01.wav", L"transmission_clunk_02.wav",
+            L"transmission_clunk_03.wav"});
+  LoadBank(root, s_engineLug,
+           {L"engine_lug_01.wav", L"engine_lug_02.wav",
+            L"engine_lug_03.wav"});
+  LoadBank(root, s_absPulse,
+           {L"abs_pulse_01.wav", L"abs_pulse_02.wav"});
+  LoadBank(root, s_tcsCut,
+           {L"tcs_cut_01.wav", L"tcs_cut_02.wav"});
+  LoadBank(root, s_launchCut,
+           {L"launch_cut_01.wav", L"launch_cut_02.wav",
+            L"launch_cut_03.wav"});
+  LoadBank(root, s_drivetrainFlex,
+           {L"drivetrain_flex_01.wav", L"drivetrain_flex_02.wav"});
 
   s_ready = true;
   if (!s_eventHandlersRegistered) {
     using Event = DrivingEventBus::Event;
     using EventData = DrivingEventBus::EventData;
     auto shiftHandler = [](bool upshift, const EventData &event) {
+      if (!Config::AudioEnabled ||
+          !Config::AudioTransmissionSounds)
+        return;
       const ShiftCharacter character =
           event.severity >= 0.70f
               ? ShiftCharacter::Harsh
@@ -314,6 +363,9 @@ bool Initialize(HMODULE module) {
         });
     DrivingEventBus::Subscribe(Event::GearGrind,
         [](const EventData &event) {
+          if (!Config::AudioEnabled ||
+              !Config::AudioTransmissionSounds)
+            return;
           if (PlayGearGrind(event.vehicle))
             return;
           const Hash model = ENTITY::GET_ENTITY_MODEL(event.vehicle);
@@ -330,15 +382,151 @@ bool Initialize(HMODULE module) {
         });
     DrivingEventBus::Subscribe(Event::SelectorChanged,
         [](const EventData &event) {
+          if (!Config::AudioEnabled ||
+              !Config::AudioTransmissionSounds)
+            return;
           PlaySelector(event.vehicle);
         });
     DrivingEventBus::Subscribe(Event::ParkingBrakeEngaged,
         [](const EventData &) {
+          if (!Config::AudioEnabled ||
+              !Config::AudioTransmissionSounds)
+            return;
           PlayParkingBrake(true);
         });
     DrivingEventBus::Subscribe(Event::ParkingBrakeReleased,
         [](const EventData &) {
+          if (!Config::AudioEnabled ||
+              !Config::AudioTransmissionSounds)
+            return;
           PlayParkingBrake(false);
+        });
+    DrivingEventBus::Subscribe(Event::TurboBlowoff,
+        [](const EventData &event) {
+          if (!Config::AudioEnabled || !Config::AudioTurboSounds)
+            return;
+          if (!Play(s_turboBlowoff, 0.90f, 130,
+                    0.92f + event.severity * 0.14f) &&
+              Config::AudioNativeLayers) {
+            AUDIO::PLAY_SOUND_FROM_ENTITY(
+                -1, "TURBO_BLOW_OFF", event.vehicle, "0", FALSE, 0);
+          }
+        });
+    DrivingEventBus::Subscribe(Event::TurboFlutter,
+        [](const EventData &event) {
+          if (!Config::AudioEnabled || !Config::AudioTurboSounds)
+            return;
+          if (!Play(s_turboFlutter, 0.82f, 110,
+                    0.88f + event.severity * 0.18f))
+            EnableNativePopWindow(event.vehicle, 95);
+        });
+    DrivingEventBus::Subscribe(Event::ClutchSlip,
+        [](const EventData &event) {
+          if (!Config::AudioEnabled || !Config::AudioClutchSounds)
+            return;
+          if (!Play(s_clutchSlip, 0.68f, 420,
+                    0.82f + event.severity * 0.12f) &&
+              Config::AudioNativeLayers) {
+            AUDIO::PLAY_SOUND_FROM_ENTITY(
+                -1, "ENGINE_LUGGING", event.vehicle, "0", FALSE, 0);
+          }
+        });
+    DrivingEventBus::Subscribe(Event::ClutchDump,
+        [](const EventData &event) {
+          if (!Config::AudioEnabled || !Config::AudioClutchSounds)
+            return;
+          Play(s_transmissionClunk,
+               0.48f + event.severity * 0.28f, 180,
+               0.86f + event.severity * 0.10f);
+        });
+    DrivingEventBus::Subscribe(Event::ClutchOverheat,
+        [](const EventData &event) {
+          if (!Config::AudioEnabled || !Config::AudioClutchSounds)
+            return;
+          Play(s_clutchSlip, 0.58f + event.severity * 0.20f,
+               650, 0.78f);
+        });
+    DrivingEventBus::Subscribe(Event::TransmissionClunk,
+        [](const EventData &event) {
+          if (!Config::AudioEnabled ||
+              !Config::AudioTransmissionSounds)
+            return;
+          if (!Play(s_transmissionClunk,
+                    0.55f + event.severity * 0.35f, 150, 0.94f) &&
+              Config::AudioNativeLayers) {
+            AUDIO::PLAY_SOUND_FROM_ENTITY(
+                -1, "NAV_UP_DOWN", event.vehicle,
+                "HUD_FREEMODE_SOUNDSET", FALSE, 0);
+          }
+        });
+    DrivingEventBus::Subscribe(Event::EngineLug,
+        [](const EventData &event) {
+          if (!Config::AudioEnabled ||
+              !Config::AudioEngineLoadSounds)
+            return;
+          if (!Play(s_engineLug, 0.58f + event.severity * 0.28f,
+                    480, 0.78f + event.severity * 0.12f) &&
+              Config::AudioNativeLayers) {
+            AUDIO::PLAY_SOUND_FROM_ENTITY(
+                -1, "ENGINE_LUGGING", event.vehicle, "0", FALSE, 0);
+          }
+        });
+    DrivingEventBus::Subscribe(Event::EngineStall,
+        [](const EventData &event) {
+          if (!Config::AudioEnabled ||
+              !Config::AudioEngineLoadSounds)
+            return;
+          Play(s_engineLug, 0.62f, 900, 0.74f);
+          if (Config::AudioNativeLayers)
+            EnableNativePopWindow(event.vehicle, 80);
+        });
+    DrivingEventBus::Subscribe(Event::MoneyShift,
+        [](const EventData &event) {
+          if (!Config::AudioEnabled ||
+              !Config::AudioTransmissionSounds)
+            return;
+          Play(s_transmissionClunk,
+               0.72f + event.severity * 0.25f, 220, 0.78f);
+        });
+    DrivingEventBus::Subscribe(Event::ABSPulse,
+        [](const EventData &event) {
+          if (!Config::AudioEnabled || !Config::AudioAssistSounds)
+            return;
+          if (!Play(s_absPulse, 0.42f + event.severity * 0.22f, 170) &&
+              Config::AudioNativeLayers) {
+            AUDIO::PLAY_SOUND_FRONTEND(
+                -1, "NAV_LEFT_RIGHT",
+                "HUD_FRONTEND_DEFAULT_SOUNDSET", TRUE);
+          }
+        });
+    DrivingEventBus::Subscribe(Event::TCSCut,
+        [](const EventData &event) {
+          if (!Config::AudioEnabled || !Config::AudioAssistSounds)
+            return;
+          if (!Play(s_tcsCut, 0.48f + event.severity * 0.28f, 180))
+            EnableNativePopWindow(event.vehicle, 75);
+        });
+    DrivingEventBus::Subscribe(Event::ESCActivated,
+        [](const EventData &event) {
+          if (!Config::AudioEnabled || !Config::AudioAssistSounds)
+            return;
+          Play(s_tcsCut, 0.38f + event.severity * 0.20f, 280, 0.92f);
+        });
+    DrivingEventBus::Subscribe(Event::LaunchControlCut,
+        [](const EventData &event) {
+          if (!Config::AudioEnabled || !Config::AudioAssistSounds)
+            return;
+          if (!Play(s_launchCut, 0.65f + event.severity * 0.30f,
+                    115, 0.94f + event.severity * 0.10f))
+            EnableNativePopWindow(event.vehicle, 115);
+        });
+    DrivingEventBus::Subscribe(Event::DrivetrainFlex,
+        [](const EventData &event) {
+          if (!Config::AudioEnabled ||
+              !Config::AudioTransmissionSounds)
+            return;
+          Play(s_drivetrainFlex, 0.42f + event.severity * 0.22f,
+               260, 0.88f);
         });
     s_eventHandlersRegistered = true;
   }
@@ -388,6 +576,8 @@ bool IsReady() { return s_ready; }
 
 bool PlayShift(Vehicle vehicle, bool upshift, ShiftCharacter character,
                bool quickshifter) {
+  if (!Config::AudioEnabled || !Config::AudioTransmissionSounds)
+    return false;
   const Hash model = ENTITY::GET_ENTITY_MODEL(vehicle);
   const bool bike = VEHICLE::IS_THIS_MODEL_A_BIKE(model) ||
                     VEHICLE::IS_THIS_MODEL_A_QUADBIKE(model);
@@ -395,12 +585,7 @@ bool PlayShift(Vehicle vehicle, bool upshift, ShiftCharacter character,
   const bool slow = character == ShiftCharacter::Slow;
 
   if (harsh && Config::AudioNativeLayers) {
-    if (s_nativePopVehicle && s_nativePopVehicle != vehicle &&
-        ENTITY::DOES_ENTITY_EXIST(s_nativePopVehicle))
-      AUDIO::ENABLE_VEHICLE_EXHAUST_POPS(s_nativePopVehicle, FALSE);
-    AUDIO::ENABLE_VEHICLE_EXHAUST_POPS(vehicle, TRUE);
-    s_nativePopVehicle = vehicle;
-    s_nativePopUntil = GetTickCount64() + (quickshifter ? 90 : 140);
+    EnableNativePopWindow(vehicle, quickshifter ? 90 : 140);
   }
 
   if (bike) {
@@ -417,6 +602,8 @@ bool PlayShift(Vehicle vehicle, bool upshift, ShiftCharacter character,
 }
 
 bool PlayGearGrind(Vehicle vehicle) {
+  if (!Config::AudioEnabled || !Config::AudioTransmissionSounds)
+    return false;
   const Hash model = ENTITY::GET_ENTITY_MODEL(vehicle);
   if (VEHICLE::IS_THIS_MODEL_A_BIKE(model) ||
       VEHICLE::IS_THIS_MODEL_A_QUADBIKE(model))
@@ -425,10 +612,14 @@ bool PlayGearGrind(Vehicle vehicle) {
 }
 
 bool PlayParkingBrake(bool engaged) {
+  if (!Config::AudioEnabled || !Config::AudioTransmissionSounds)
+    return false;
   return Play(engaged ? s_parkApply : s_parkRelease, 0.86f, 180);
 }
 
 bool PlaySelector(Vehicle vehicle) {
+  if (!Config::AudioEnabled || !Config::AudioTransmissionSounds)
+    return false;
   (void)vehicle;
   return Play(s_autoSelector, 0.72f, 150);
 }

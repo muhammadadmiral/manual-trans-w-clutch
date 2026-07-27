@@ -16,6 +16,8 @@
 #include "../../Vehicle/Gearbox/Automatic/AutomaticGearbox.h"
 #include "../../Vehicle/Gearbox/Core/GearboxProfile.h"
 #include "../../Vehicle/Gearbox/Core/GearboxSystem.h"
+#include "../../Vehicle/Maintenance/WorkshopTuning.h"
+#include "../../Vehicle/Physics/VehicleDynamics.h"
 #include "../../Vehicle/Engine/FuelSystem.h"
 #include "../../Vehicle/Engine/TurboSystem.h"
 #include "../../Vehicle/TelemetryLogger.h"
@@ -243,8 +245,28 @@ void Update(Vehicle veh, VehicleData& data,
         profileState.ratiosApplied ? 1 : 0,
         profileState.learnedAggression, profileState.predictedGear,
         profileState.predictedShiftMatched ? 1 : 0);
-
-    // v1.0: Auto-record faults from system states
+    const auto& dynamicsState = VehicleDynamics::GetState();
+    LOG_INFO(
+        Physics,
+        "WORKSHOP_DYNAMICS: Pedal=%s Clutch=%s Flywheel=%s Trans=%s "
+        "Creep=%s Cruise=%s Mounts=%s Mass=%.0fkg Accel=%.2f "
+        "Twist=%.3f Pitch=%.4f Transfer=%.3f",
+        WorkshopTuning::GetLabel(WorkshopTuning::Option::PedalMap),
+        WorkshopTuning::GetLabel(WorkshopTuning::Option::ClutchPackage),
+        WorkshopTuning::GetLabel(WorkshopTuning::Option::Flywheel),
+        WorkshopTuning::GetLabel(WorkshopTuning::Option::Transmission),
+        WorkshopTuning::GetLabel(
+            WorkshopTuning::Option::CreepCalibration),
+        WorkshopTuning::GetLabel(
+            WorkshopTuning::Option::CruiseCalibration),
+        WorkshopTuning::GetLabel(
+            WorkshopTuning::Option::DrivetrainMounts),
+        dynamicsState.estimatedMassKg,
+        dynamicsState.longitudinalAcceleration,
+        dynamicsState.drivelineTwist,
+        dynamicsState.suspensionPitchMoment,
+        dynamicsState.torqueTransfer);
+    // Auto-record faults from system states.
     if (gearboxState.moneyShift)
         RecordFault("money_shift");
     if (clutchState.heat > 0.85f)

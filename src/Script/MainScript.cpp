@@ -1,5 +1,5 @@
 // =============================================================================
-// MainScript.cpp — Orkestrator per-frame (v1.0)
+// MainScript.cpp — Orkestrator per-frame (v1.1)
 // Rumus fisika dipindah ke Controllers, file ini murni sebagai wiring.
 // =============================================================================
 #define NOMINMAX
@@ -19,6 +19,7 @@
 #include "../Vehicle/Maintenance/RefuelInteraction.h"
 #include "../Vehicle/Maintenance/ServiceInteraction.h"
 #include "../Vehicle/Maintenance/WorkshopIntegration.h"
+#include "../Vehicle/Maintenance/WorkshopTuning.h"
 #include "../Vehicle/Gearbox/Core/GearboxProfile.h"
 #include "../Vehicle/VehicleData.h"
 #include "../Vehicle/VehicleProfile.h"
@@ -113,6 +114,7 @@ void ScriptMain() {
 
     Config::ReadConfig(g_pluginModule);
     GearboxProfile::Initialize(g_pluginModule);
+    WorkshopTuning::Initialize(g_pluginModule);
     DrivingEventBus::Reset();
     DiagnosticsController::Initialize();
     AudioEngine::Initialize(g_pluginModule);
@@ -236,7 +238,9 @@ void ScriptMain() {
                           transCtrl.GetManualGear());
         signalCtrl.Update(vehicle);
 
-        const bool workshopOpen = WorkshopIntegration::Update(vehicle);
+        const bool workshopOpen =
+            WorkshopIntegration::Update(
+                playerPed, vehicle, engineCtrl.IsOn());
 
         // 5. Run Drivetrain physics loop
         transCtrl.Update(vehicle, data, g_frame.profile, engineCtrl.IsOn(), workshopOpen,

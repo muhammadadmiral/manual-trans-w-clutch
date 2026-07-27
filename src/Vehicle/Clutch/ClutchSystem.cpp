@@ -1,6 +1,7 @@
 #include "ClutchSystem.h"
 #include "../VehicleData.h"
 #include "../VehicleUpgrades.h"
+#include "../Maintenance/WorkshopTuning.h"
 #include "../../Core/Config.h"
 #include "../../Script/DrivingEventBus.h"
 #include "../../../sdk/inc/natives.h"
@@ -11,6 +12,7 @@ namespace ClutchSystem {
 
 static State s_state;
 static bool s_overheatPublished = false;
+static bool s_slipPublished = false;
 
 static float Clamp01(float value) {
   return std::clamp(value, 0.0f, 1.0f);
@@ -24,6 +26,7 @@ static float SmoothStep(float value) {
 void Reset() {
   s_state = State{};
   s_overheatPublished = false;
+  s_slipPublished = false;
 }
 
 void ServiceClutch() {
@@ -34,6 +37,8 @@ void ServiceClutch() {
   s_state.judder = 0.0f;
   s_state.slipping = false;
   s_state.overloaded = false;
+  s_overheatPublished = false;
+  s_slipPublished = false;
 }
 
 float UpdatePedal(VehicleData &data, float rawPedal, float throttle,
@@ -58,7 +63,10 @@ float UpdatePedal(VehicleData &data, float rawPedal, float throttle,
   const float torqueFactor =
       std::sqrt(std::clamp(driveForce, 0.05f, 1.50f) / 0.30f);
   const float biteRate =
-      std::clamp(9.0f * rateFactor / torqueFactor, 3.0f, 28.0f);
+      std::clamp(
+          9.0f * rateFactor / torqueFactor *
+              WorkshopTuning::GetClutchBiteRateMultiplier(),
+          2.5f, 34.0f);
   const bool opening =
       targetDisengagement > s_state.actuatorDisengagement;
   const float responseRate = opening ? biteRate * 1.65f : biteRate;
@@ -90,6 +98,7 @@ float UpdatePedal(VehicleData &data, float rawPedal, float throttle,
     s_state.dumpRemaining = 0.16f;
     if (!wasDumpActive) {
       DrivingEventBus::EventData event{};
+      event.vehicle = WorkshopTuning::GetState().vehicle;
       event.severity = s_state.dumpSeverity;
       DrivingEventBus::Publish(
           DrivingEventBus::Event::ClutchDump, event);
@@ -132,7 +141,10 @@ float UpdatePedal(VehicleData &data, float rawPedal, float throttle,
                  Clamp01(Config::ClutchFadeStrength);
   s_state.torqueCapacity =
       std::max(0.05f, Config::MaxClutchTorque) *
+      WorkshopTuning::GetClutchCapacityMultiplier() *
       (0.08f + engagement * 0.92f) * heatFade;
+  s_state.packageCapacityMultiplier =
+      WorkshopTuning::GetClutchCapacityMultiplier();
   const float overloadTarget =
       engineOn && engagement > 0.08f &&
               s_state.torqueDemand > s_state.torqueCapacity
@@ -155,13 +167,30 @@ float UpdatePedal(VehicleData &data, float rawPedal, float throttle,
     const float slipEnergy =
         ((1.0f - engagement) + s_state.overloadSlip * 0.80f) *
         (0.25f + Clamp01(throttle) * 0.75f);
-    s_state.heat += slipEnergy * std::max(0.0f, Config::ClutchHeatRate) * dt;
+    s_state.heat +=
+        slipEnergy * std::max(0.0f, Config::ClutchHeatRate) *
+        WorkshopTuning::GetClutchHeatMultiplier() * dt;
   } else {
-    s_state.heat -= std::max(0.0f, Config::ClutchCoolRate) * dt;
+    s_state.heat -=
+        std::max(0.0f, Config::ClutchCoolRate) *
+        WorkshopTuning::GetClutchCoolingMultiplier() * dt;
   }
   s_state.heat = Clamp01(s_state.heat);
+  if (s_state.slipping && !s_slipPublished) {
+    DrivingEventBus::EventData event{};
+    event.vehicle = WorkshopTuning::GetState().vehicle;
+    event.severity =
+        Clamp01((1.0f - engagement) * 0.55f +
+                s_state.overloadSlip * 0.75f);
+    DrivingEventBus::Publish(
+        DrivingEventBus::Event::ClutchSlip, event);
+    s_slipPublished = true;
+  } else if (!s_state.slipping) {
+    s_slipPublished = false;
+  }
   if (s_state.heat > 0.85f && !s_overheatPublished) {
     DrivingEventBus::EventData event{};
+    event.vehicle = WorkshopTuning::GetState().vehicle;
     event.severity = s_state.heat;
     DrivingEventBus::Publish(
         DrivingEventBus::Event::ClutchOverheat, event);

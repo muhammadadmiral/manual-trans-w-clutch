@@ -49,6 +49,9 @@
     <Filter Include="Source Files\Vehicle\Maintenance">
       <UniqueIdentifier>{79A42323-F2CC-4E63-A9DD-61C1FC05F9D2}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Vehicle\Physics">
+      <UniqueIdentifier>{8C3C0A8A-FB9A-49D8-91F3-E70C1BC5A143}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Header Files\Script">
       <UniqueIdentifier>{A6F7B8C9-D0E1-2345-F012-345678901235}</UniqueIdentifier>
     </Filter>
@@ -81,6 +84,9 @@
     </Filter>
     <Filter Include="Header Files\Vehicle\Maintenance">
       <UniqueIdentifier>{D11D7776-F8BF-4706-BD57-B56FD81290EE}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Vehicle\Physics">
+      <UniqueIdentifier>{3EBEE507-6F2C-4E12-9531-6AA9D8A8D56C}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -156,10 +162,16 @@
     <ClCompile Include="src\Memory\OffsetResolver.cpp">
       <Filter>Source Files\Memory</Filter>
     </ClCompile>
+    <ClCompile Include="src\Memory\GearboxPatches.cpp">
+      <Filter>Source Files\Memory</Filter>
+    </ClCompile>
     <ClCompile Include="src\Vehicle\VehicleData.cpp">
       <Filter>Source Files\Vehicle</Filter>
     </ClCompile>
     <ClCompile Include="src\Vehicle\VehicleProfile.cpp">
+      <Filter>Source Files\Vehicle</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Vehicle\VehicleUpgrades.cpp">
       <Filter>Source Files\Vehicle</Filter>
     </ClCompile>
     <ClCompile Include="src\Vehicle\DrivetrainKinematics.cpp">
@@ -222,6 +234,12 @@
     <ClCompile Include="src\Vehicle\Maintenance\WorkshopIntegration.cpp">
       <Filter>Source Files\Vehicle\Maintenance</Filter>
     </ClCompile>
+    <ClCompile Include="src\Vehicle\Maintenance\WorkshopTuning.cpp">
+      <Filter>Source Files\Vehicle\Maintenance</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Vehicle\Physics\VehicleDynamics.cpp">
+      <Filter>Source Files\Vehicle\Physics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Audio\AudioEngine.h">
@@ -281,6 +299,9 @@
     <ClInclude Include="src\Core\Renderer.h">
       <Filter>Header Files\Core</Filter>
     </ClInclude>
+    <ClInclude Include="src\Core\VersionInfo.h">
+      <Filter>Header Files\Core</Filter>
+    </ClInclude>
     <ClInclude Include="src\Memory\AOBScanner.h">
       <Filter>Header Files\Memory</Filter>
     </ClInclude>
@@ -293,10 +314,16 @@
     <ClInclude Include="src\Memory\OffsetResolver.h">
       <Filter>Header Files\Memory</Filter>
     </ClInclude>
+    <ClInclude Include="src\Memory\GearboxPatches.h">
+      <Filter>Header Files\Memory</Filter>
+    </ClInclude>
     <ClInclude Include="src\Vehicle\VehicleData.h">
       <Filter>Header Files\Vehicle</Filter>
     </ClInclude>
     <ClInclude Include="src\Vehicle\VehicleProfile.h">
+      <Filter>Header Files\Vehicle</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vehicle\VehicleUpgrades.h">
       <Filter>Header Files\Vehicle</Filter>
     </ClInclude>
     <ClInclude Include="src\Vehicle\DrivetrainKinematics.h">
@@ -358,6 +385,12 @@
     </ClInclude>
     <ClInclude Include="src\Vehicle\Maintenance\WorkshopIntegration.h">
       <Filter>Header Files\Vehicle\Maintenance</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vehicle\Maintenance\WorkshopTuning.h">
+      <Filter>Header Files\Vehicle\Maintenance</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vehicle\Physics\VehicleDynamics.h">
+      <Filter>Header Files\Vehicle\Physics</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -22,6 +22,16 @@ bike_shift_error_01.wav .. bike_shift_error_04.wav
 
 parking_brake_apply_01.wav .. parking_brake_apply_05.wav
 parking_brake_release_01.wav .. parking_brake_release_04.wav
+
+turbo_blowoff_01.wav .. turbo_blowoff_03.wav
+turbo_flutter_01.wav .. turbo_flutter_03.wav
+clutch_slip_01.wav .. clutch_slip_03.wav
+transmission_clunk_01.wav .. transmission_clunk_03.wav
+engine_lug_01.wav .. engine_lug_03.wav
+abs_pulse_01.wav .. abs_pulse_02.wav
+tcs_cut_01.wav .. tcs_cut_02.wav
+launch_cut_01.wav .. launch_cut_03.wav
+drivetrain_flex_01.wav .. drivetrain_flex_02.wav
 ```
 
 `automatic_park_01.wav` masih dibaca sebagai nama legacy, tetapi nama baru
@@ -42,13 +52,13 @@ Varian sebaiknya benar-benar berbeda pada transient, bukan sekadar file yang
 sama dengan volume berbeda. Randomizer menghindari pengulangan varian terakhir
 dan memberi variasi pitch/level kecil.
 
-## Layer yang tidak perlu direkam
+## Layer native dan layer opsional
 
-Turbo spool/boost, blow-off, exhaust pop pada harsh shift, tyre slip, permukaan
-jalan, tunnel, dan angin memakai layer native GTA. Dengan begitu intensitas
-ban dan angin tetap mengikuti wheel slip, material permukaan, kecepatan,
-kamera, dan occlusion game. Menambahkan WAV loop untuk layer tersebut akan
-menyebabkan phasing dan suara ganda.
+Turbo spool/boost, exhaust pop, tyre slip, permukaan jalan, tunnel, dan angin
+tetap memakai layer native GTA. Blow-off/flutter dan transient mekanikal lain
+boleh memakai bank WAV di atas; bila bank tidak tersedia, event yang cocok
+jatuh ke sound/exhaust native. Hindari WAV loop panjang agar tidak terjadi
+phasing dengan audio kendaraan GTA.
 
 Aset buatan sendiri, rekaman sendiri, atau aset dengan lisensi redistribusi
 yang jelas paling aman untuk bundle open-source. Simpan catatan sumber dan

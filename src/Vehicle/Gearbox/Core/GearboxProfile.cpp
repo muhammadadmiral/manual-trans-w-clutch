@@ -3,6 +3,7 @@
 #include "../../VehicleData.h"
 #include "../../VehicleProfile.h"
 #include "../../VehicleUpgrades.h"
+#include "../../Maintenance/WorkshopTuning.h"
 #include "../../../Core/ModLogger.h"
 #include "../../../../sdk/inc/natives.h"
 
@@ -17,6 +18,14 @@ namespace {
 
 State s_state;
 char s_iniPath[MAX_PATH]{};
+
+Architecture EffectiveArchitecture() {
+  if (WorkshopTuning::IsRaceTransmission() &&
+      s_state.architecture != Architecture::CVT &&
+      s_state.architecture != Architecture::SingleSpeed)
+    return Architecture::DualClutch;
+  return s_state.architecture;
+}
 
 float ClampRatio(float value, float fallback, bool reverse) {
   if (!std::isfinite(value))
@@ -285,13 +294,18 @@ void UpdateDriverModel(float throttle, float brake, float normalizedRPM,
 void NotifyShiftTarget(int targetGear) {
   s_state.predictedShiftMatched =
       s_state.predictivePreselection &&
-      s_state.architecture == Architecture::DualClutch &&
+      EffectiveArchitecture() == Architecture::DualClutch &&
       targetGear == s_state.predictedGear;
 }
 
 float GetAutomaticShiftTimeMultiplier(bool upshift, bool sport) {
   float result = 1.0f / std::max(0.50f, s_state.shiftSpeedMultiplier);
-  switch (s_state.architecture) {
+  result *=
+      1.0f -
+      std::clamp(VehicleUpgrades::GetState().transmissionStage,
+                 0.0f, 1.0f) *
+          0.28f;
+  switch (EffectiveArchitecture()) {
   case Architecture::DualClutch:
     result *= s_state.predictedShiftMatched ? 0.58f : 0.82f;
     break;
@@ -320,30 +334,35 @@ float GetManualPenaltyMultiplier(int fromGear, int toGear,
   if (!clutchless)
     return 1.0f;
   const bool upshift = toGear > fromGear;
-  if (s_state.architecture == Architecture::DogBox)
+  const Architecture architecture = EffectiveArchitecture();
+  if (architecture == Architecture::DualClutch)
+    return upshift ? 0.02f : 0.20f;
+  if (architecture == Architecture::DogBox)
     return upshift ? 0.22f : 0.55f;
-  if (s_state.architecture == Architecture::Sequential)
+  if (architecture == Architecture::Sequential)
     return upshift ? 0.38f : 0.72f;
   return 1.0f;
 }
 
 bool AllowsSkipShift() {
+  const Architecture architecture = EffectiveArchitecture();
   return s_state.skipShift &&
-         s_state.architecture != Architecture::CVT &&
-         s_state.architecture != Architecture::SingleSpeed;
+         architecture != Architecture::CVT &&
+         architecture != Architecture::SingleSpeed;
 }
 
 bool UsesTorqueConverter() {
-  return s_state.architecture == Architecture::TorqueConverter ||
-         s_state.architecture == Architecture::HandlingNative;
+  const Architecture architecture = EffectiveArchitecture();
+  return architecture == Architecture::TorqueConverter ||
+         architecture == Architecture::HandlingNative;
 }
 
 bool IsDualClutch() {
-  return s_state.architecture == Architecture::DualClutch;
+  return EffectiveArchitecture() == Architecture::DualClutch;
 }
 
 bool IsDogBox() {
-  return s_state.architecture == Architecture::DogBox;
+  return EffectiveArchitecture() == Architecture::DogBox;
 }
 
 const State &GetState() {
@@ -351,7 +370,10 @@ const State &GetState() {
 }
 
 const char *GetArchitectureName() {
-  switch (s_state.architecture) {
+  if (WorkshopTuning::IsRaceTransmission() &&
+      EffectiveArchitecture() == Architecture::DualClutch)
+    return "race-quick/powershift";
+  switch (EffectiveArchitecture()) {
   case Architecture::SynchromeshManual: return "synchromesh";
   case Architecture::DogBox: return "dog-box";
   case Architecture::Sequential: return "sequential";

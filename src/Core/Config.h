@@ -1,5 +1,8 @@
 // Konfigurasi runtime. Detail tiap parameter ada di docs/configuration.md.
 #pragma once
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <string>
 #include <vector>
 #include <Windows.h>
@@ -124,6 +127,11 @@ extern float AudioMasterVolume;
 extern float AudioPitchRandomness;
 extern float AudioLimiterCeiling;
 extern bool AudioNativeLayers;
+extern bool AudioTurboSounds;
+extern bool AudioClutchSounds;
+extern bool AudioTransmissionSounds;
+extern bool AudioEngineLoadSounds;
+extern bool AudioAssistSounds;
 
 // Fuel dan maintenance.
 extern bool FuelEnabled;
@@ -158,7 +166,9 @@ extern float BrakeExpo;
 extern float ClutchExpo;
 extern int PedalPreset;
 
-// 0 default, 1 responsive, 2 smooth, 3 sim-racing, 4 custom.
+// 0 factory, 1 sport, 2 comfort, 3 sim-racing, 4 crawl/valet,
+// 5 eco-touring.
+// Preset selection is exposed through the per-vehicle LSC workshop.
 void ApplyPedalPreset(int preset);
 void ResetPedalsToDefault();
 

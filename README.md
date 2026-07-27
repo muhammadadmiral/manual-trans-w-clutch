@@ -1,196 +1,139 @@
-# Melar Transmission — GTA V
+<div align="center">
+  <h1>🏎️ Melar Transmission — GTA V</h1>
+  <p><strong>The Ultimate Vehicle Physics & Transmission Mod for Grand Theft Auto V</strong></p>
 
-Plugin ScriptHookV open-source untuk mengganti perilaku transmisi GTA V dengan
-mode Off, automatic P-R-N-D-S-L2-L1, atau manual sequential. Simulasi mencakup clutch,
-free-rev netral, creep, stall berbasis beban drivetrain, pedal interlock, dan
-assist yang hanya aktif kalau telemetry memory-nya tervalidasi.
+  [![Build Status](https://img.shields.io/badge/Build-v1.1-brightgreen.svg)]()
+  [![Platform](https://img.shields.io/badge/Platform-GTA_V_Enhanced-blue.svg)]()
+  [![ScriptHookV](https://img.shields.io/badge/Required-ScriptHookV-orange.svg)]()
+</div>
 
-## Status
+---
 
-Sprint drivetrain aktif. Fokus saat ini:
+## 🌟 Overview
+**Melar Transmission** adalah plugin *ScriptHookV open-source* yang merevolusi cara lu mengendarai kendaraan di GTA V. Ucapkan selamat tinggal pada transmisi arcade bawaan game! Mod ini mengubah total fisika kendaraan dengan simulasi *drivetrain* serealistis mungkin: mulai dari *clutch bite point*, *engine stall*, sistem *wear and tear*, hingga dukungan audio mekanis XAudio2.
 
-- netral dan clutch memutus drivetrain tanpa mematikan throttle mesin;
-- gearbox native Enhanced yang memaksa shift/clutch/throttle diambil alih lewat
-  lima signature tervalidasi; pemasangan atomik dan selalu punya rollback;
-- RPM netral/clutch-open memakai free-rev inertia, sedangkan RPM tersambung
-  mengikuti kecepatan jalan dan rasio gear aktif tanpa menulis velocity;
-- pelepasan clutch gradual memakai actuator clutch internal GTA;
-- clutch mentok melakukan hard-disconnect tanpa menghapus logical gear pilihan;
-- dump clutch, bog, dan stall memakai RPM, rasio/handling yang tervalidasi,
-  lalu fallback data native per kendaraan bila optional pointer tidak tersedia;
-- shift manual tanpa clutch tetap masuk, tetapi menghasilkan clash, torque cut,
-  shock, synchronizer wear/resistance, dan risiko over-rev + skid pulse saat
-  salah downshift;
-- clutch punya kapasitas torsi, overload slip, heat fade, serta judder di bite
-  point; release pelan tanpa gas memakai idle governor, sedangkan dump tanpa
-  gas tetap dapat stall dan idle take-off menyerah pada tanjakan;
-- free-rev punya rev-hang berbasis inertia, pengereman darurat tanpa clutch bisa
-  stall, dan overrun memakai fuel cut;
-- automatic D melakukan shift santai, sedangkan S menahan RPM, lebih cepat
-  kickdown, memberi downshift blip, dan memakai sport pedal map;
-- automatic memodelkan TCC lockup, kickdown delay, temperatur ATF/limp mode,
-  neutral-drop damage, DSG ignition cut, brake-boost stall, dan safety-neutral;
-- L2/L1 membatasi gear tertinggi; LShift maju di gate selector dan LCtrl kembali;
-- Pizza Boy diprofilkan sebagai scooter CVT gas-rem; seluruh Faggio tetap
-  sequential. Kendaraan utility single-speed memakai automatic dan EV dikunci
-  ke automatic;
-- selector automatic punya brake interlock serta lockout P/R saat kendaraan
-  masih bergerak ke arah yang salah;
-- TCS dan ABS memakai telemetry `CWheel`, bukan estimasi RPM palsu;
-- engine/transmission upgrade native memengaruhi stall resistance, durability,
-  quickshift, powershift, dan shift penalty;
-- launch control opsional memakai soft throttle cut tanpa menulis RPM;
-- temperatur rem, brake fade, clutch heat, dan brake-throttle override dapat
-  dituning lewat GUI.
-- stall manual memakai RPM mesin aktual dan cutoff terpisah; gas+rem di gear 1
-  tidak lagi dianggap stall selama power-brake/burnout aktif;
-- kalibrasi rasio memvalidasi seluruh ratio set dan flat velocity. Add-on
-  vehicle yang datanya tidak koheren memakai kurva adaptif dari top speed
-  native, dengan baseline mobil enam gigi sekitar 43-45 km/h di gigi 1 dan
-  84-89 km/h di gigi 2 untuk mobil 240-250 km/h;
-- speedometer assetless native memiliki tiga layout mobil dan tiga layout
-  motor, pilihan unit/accent/posisi/scale, serta telemetry drivetrain lengkap;
-- service bay Los Santos Customs, Beeker's, dan Benny's dapat melakukan servis
-  oli, rebuild gearbox/clutch/ATF, dan tuning drivetrain/pedal/assist.
+> [!IMPORTANT]
+> **PERSYARATAN SISTEM MINIMAL**
+> - **Grand Theft Auto V:** Enhanced Edition (Minimal Build **1.0.1013.20** atau lebih baru)
+> - **ScriptHookV:** Versi terbaru yang kompatibel
+> - **OS:** Windows 10/11 (64-bit)
 
-Sprint 2 menambahkan audio mekanikal randomized berbasis XAudio2, limiter dan
-headroom, refuel native dengan pom/jerigen, serta oil-life dan servis beranimasi.
+---
 
-## Struktur
+## 🔥 Fitur Utama (v1.1)
+
+### 🕹️ Mode Transmisi Super Dinamis
+- **Manual Sequential:** Oper gigi layaknya mobil balap sungguhan. Lengkap dengan mekanisme kopling, *engine stall*, dan *money shift* (over-rev).
+- **Automatic (P-R-N-D-S-L2-L1):** Sistem *Automatic* modern dengan simulasi *Torque Converter Lockup*, *kickdown delay*, *safety-neutral*, dan *DSG Ignition Cut*.
+- **Native Vanilla Off:** Matikan mod kapan saja dan kendaraan kembali ke mode arcade GTA bawaan.
+
+### ⚙️ Fisika & Mekanik Realistis
+- **Clutch Simulation:** Simulasi pedal kopling dengan kurva *bite point*. Plat kopling bisa *fade/slip* karena panas (heat fade), serta kapasitas torsi yang dinamis!
+- **True Engine Stall:** Mesin mati kalau lu salah lepas kopling, RPM terlalu rendah, terguling, atau menerjang genangan air terlalu dalam.
+- **Creep & Rev-Hang:** Mobil otomatis merayap (creep) saat di gigi D. Lepas gas di posisi Netral? Ada inertia *rev-hang* khas mesin sungguhan.
+- **TCS, ABS, ESC & Launch Control:** Menggunakan data telemetri aktual roda
+  (`CWheel`), predictive slip-rate, ABS pulse, selective-yaw ESC, rollover
+  mitigation, dan launch control progressive soft-cut.
+- **Weight & Drivetrain Flex:** Estimasi massa berbasis kelas/dimensi,
+  driveline wind-up, mount compliance, dan suspension load-transfer pitch.
+
+### 🎮 LSC Integration & Wear System
+- **Upgrade Dinamis:** Beli upgrade Transmisi/Engine di Los Santos Customs (LSC) akan memengaruhi *stall resistance*, ketahanan *synchro*, penalti perpindahan gigi, hingga kapabilitas *powershift*.
+- **Melar Workshop:** Enam pedal map per model, clutch/flywheel/transmission
+  package, creep/cruise, drivetrain mount, dan kalibrasi assist. Paket Race
+  membuka quick/powershift mobil maupun motor dengan wear nyaris nol.
+- **Maintenance Bay:** Sistem umur oli (*oil-life*), bengkel servis untuk *rebuild* gearbox/kopling, dan pengisian bensin (*refuel*) interaktif.
+
+### 🎵 Custom XAudio2 Mechanical Sounds
+Audio native GTA V itu membosankan. Melar Transmission punya audio engine sendiri:
+- Memuat file `.wav` eksternal secara acak untuk transisi *shift* (Slow, Normal, Harsh).
+- Suara *Gear Grind*, blow-off/flutter, *Clutch Slip*, *Gearbox Clunk*,
+  engine lug, ABS/TCS/launch cut, drivetrain flex, dan selector.
+- *Limiter* dan *Headroom* independen untuk pengalaman audio yang imersif dan tidak pecah.
+
+### 🖥️ Native HUD & Telemetry
+Speedometer/tachometer assetless memiliki sembilan layout plus Auto Dynamic
+yang berbeda untuk mobil dan motor, icon state on/off, pilihan unit/accent,
+log assist, serta overlay kondisi drivetrain.
+
+---
+
+## 📁 Struktur Kode (Modular Architecture)
+Sistem sudah dirapikan menggunakan arsitektur modular yang super bersih (*Orchestrator-Controller*) untuk mempermudah pengembangan lanjutan:
 
 ```text
 src/
-├─ Audio/                loader WAV, random bank, limiter/headroom XAudio2
-├─ Core/                 input, config, menu, renderer, logger
-├─ Memory/               AOB scanner, resolver, wrapper memory, kalibrasi
-├─ Script/               orkestrasi per-frame
-└─ Vehicle/
-   ├─ Engine/            inertia, pedal, load/stall, turbo, fuel, TCS, launch
-   ├─ Gears/             manual sequential, automatic PRNDS, gearbox health
-   ├─ Clutch/            kurva pedal, slip/heat, actuator drivetrain
-   ├─ Brakes/            ABS berbasis roda dan parking brake
-   ├─ Maintenance/       refuel, oil life, dan interaksi servis
-   ├─ VehicleData.*      facade memory per kendaraan
-   ├─ VehicleProfile.*   EV, utility, scooter CVT, dan motor sequential
-   ├─ LightsLogic.*
-   └─ TelemetryLogger.*
+├─ Audio/                🎵 XAudio2 loader, random bank, shift sounds limiter
+├─ Core/                 ⚙️ Config parser, Menu, Logger, Renderer
+├─ Memory/               🧠 AOB Scanners, Resolvers, Memory Wrappers, Kalibrasi rasio
+├─ Script/               🎮 Orchestrator utama & Event Bus Controllers
+├─ UI/                   🖥️ Speedometer & HUD Renderer khusus
+└─ Vehicle/              🏎️ Simulasi Core Fisika:
+   ├─ Engine/            Inertia, Stall, Launch Control, Fuel System, Turbo
+   ├─ Gearbox/
+   │  ├─ Automatic/      PRNDS, adaptive map, TCC/ATF
+   │  ├─ Manual/         Manual/sequential shift path
+   │  └─ Core/           Handling profile, ratio, health, synchro
+   ├─ Clutch/            Heat/Slip simulation, Pedal curves
+   ├─ Brakes/            ABS & Parking Brake berbasis CWheel
+   ├─ Maintenance/       Workshop tuning, Oil-life, Refuel System
+   └─ Physics/           Mass estimate, drivetrain flex, suspension pitch
 ```
+*Dokumentasi detail arsitektur tersedia di [docs/architecture.md](docs/architecture.md).*
 
-Detail desain ada di [docs/architecture.md](docs/architecture.md), perilaku
-drivetrain di [docs/drivetrain.md](docs/drivetrain.md), dan daftar memory field
-di [docs/memory-offsets.md](docs/memory-offsets.md). Seluruh opsi GUI/INI
-dijelaskan di [docs/configuration.md](docs/configuration.md).
+---
 
-## Build
+## 🛠️ Cara Instalasi & Build
 
-1. Siapkan Visual Studio dengan workload Desktop development with C++.
-2. Buka `melar-transmission.vcxproj`.
-3. Pilih `Release | x64`.
-4. Build project.
-5. Salin seluruh isi `bundle/` ke folder GTA V yang sudah memuat ScriptHookV.
+### Instalasi untuk Pemain (User):
+1. Pastikan **ScriptHookV** sudah terinstall.
+2. Salin seluruh isi folder `bundle/` (termasuk `melar-transmission.asi` dan folder `melar-transmission/`) ke direktori root instalasi GTA V lu.
 
-Sesudah mengganti ASI, cek awal `melar-transmission.log`. Build sprint ini wajib
-mencetak `Runtime=melar-transmission-r25-refine` dan path file yang benar-benar dimuat. Kalau
-baris itu tidak ada, GTA masih memakai salinan ASI lama.
+### Untuk Developer (Build from Source):
+1. Buka Visual Studio (Workload: *Desktop development with C++*).
+2. Buka solusi `melar-transmission.slnx`.
+3. Set konfigurasi ke `Release | x64`.
+4. Build Project (Ctrl+Shift+B).
+5. File ASI akan di-generate di folder `x64/Release/melar-transmission.asi`.
 
-Artefak yang sudah diverifikasi pada sprint ini:
+> [!TIP]
+> Sesudah mengganti ASI, buka `melar-transmission.log`. Pastikan startup
+> mencetak versi `1.1.0` dan path ASI yang benar.
 
-```text
-x64/Release/melar-transmission.asi
-```
+---
 
-## Konfigurasi penting
+## ⚙️ Konfigurasi Penting (`melar-transmission.ini`)
+Mod ini bisa lu *tweak* segila mungkin via INI file. Beberapa pengaturan krusial:
 
 ```ini
 [Transmission]
-Mode=2
-
-[Controls]
-ShiftUp=160
-ShiftDown=162
-ClutchKey=88
-
-[Analog]
-Preset=0
-ThrottleAttack=0.080
-ThrottleRelease=0.280
-BrakeAttack=0.070
-BrakeRelease=0.180
-ClutchAttack=0.045
-ClutchRelease=0.060
+Mode=2                     ; 0=Mati, 1=Auto PRND, 2=Manual Sequential
 
 [Engine]
-LaunchControl=0
-LaunchControlRPM=0.72
-IdleCreep=1
-StallEnabled=1
-LugStallRPM=1500
-StallCutoffRPM=950
-LugStallDelay=2.20
-WaterStallDelay=2.50
-RolloverStallDelay=7.00
-RevHangDuration=0.50
-HardBrakeStall=1
-FuelCutoffEngineBrake=1
+StallEnabled=1             ; Mesin bisa mati
+LugStallRPM=1500           ; Titik RPM mulai ngos-ngosan
+RevHangDuration=0.50       ; Durasi RPM turun (inertia)
 
 [Automatic]
-DUpRPM=0.50
-DDownRPM=0.22
-SUpRPM=0.84
-SDownRPM=0.34
-SportTorqueBoost=0.10
-DKeyboardThrottle=1.00
-KickdownDelay=0.65
-TCC=1
-FluidOverheat=1
-NeutralDropDamage=1
-BrakeBoostStall=1
-
-[Audio]
-Enabled=1
-NativeLayers=1
+KickdownDelay=0.65         ; Delay respons gas pol di gigi Auto
+SportTorqueBoost=0.10      ; Tenaga ekstra di mode S (Sport)
 
 [Maintenance]
-FuelEnabled=1
-FuelBlips=1
-
-[Speedometer]
-Enabled=1
-CarStyle=0
-BikeStyle=0
-Units=0
-Accent=0
-Detailed=1
-
-[Workshop]
-Enabled=1
-Radius=14.0
+FuelEnabled=1              ; Bensin bisa habis
 ```
+*Panduan semua opsi tersedia lengkap di [docs/configuration.md](docs/configuration.md).*
 
-`Mode=0` melepas kontrol drivetrain ke GTA, `Mode=1` mengaktifkan automatic
-P-R-N-D-S-L2-L1, dan `Mode=2` mengaktifkan manual sequential. Kendaraan
-listrik, scooter CVT, dan utility single-speed selalu memakai automatic.
+---
 
-Input throttle dan brake keyboard dibentuk menjadi pedal virtual dengan
-attack, release, dan curve terpisah. RPM tersambung
-berasal dari rasio dan road speed; throttle hanya memengaruhi seberapa cepat
-kendaraan mencapai road RPM itu. Roda dan vehicle speed tidak pernah ditulis.
-`ClutchAttack` dan `ClutchRelease` membentuk travel clutch digital. S di gear
-maju/netral diblok dari reverse axis GTA sehingga fungsinya tetap rem.
+## 🛡️ Keselamatan Memori (Anti-Crash)
+Melar Transmission nggak nulis ke memori secara brutal.
+- *Write* hanya terjadi pada 5 signature offset yang tervalidasi penuh.
+- Jika script gagal mendeteksi data add-on mobil, mod akan **beradaptasi otomatis** menghitung kurva gigi ideal berdasarkan *top speed* aslinya.
+- TCS/ABS otomatis me-*disable* diri jika struktur roda (`CWheel`) dari memori tidak berhasil di-*resolve*.
+- **Fail-Safe:** Matikan mod (Mode=0) kapan saja. Operasi *byte-patch* (`JNE` ke `JMP`) otomatis dikembalikan ke aslinya. *No crash, no hassle.*
 
-Suara tuas automatic hanya diputar ketika selector berpindah P-R-N-D-S-L.
-D1-D2-D3 memakai bank shift slow, normal, atau harsh berdasarkan load/RPM.
-Pom bensin tersedia sebagai blip short-range dan dapat dimatikan dari menu.
-
-## Batas keselamatan memory
-
-Write hanya dilakukan pada offset yang punya pola atau relasi layout
-terverifikasi. TCS/ABS otomatis tidak mengintervensi bila `CWheel` tidak
-ter-resolve. Cluster engine memakai `Clutch=RPM+0xC` dan
-`EngineThrottle=RPM+0x10`; field throttle ini bukan pedal input. Saat mode
-transmisi aktif, RPM dan engine-throttle dapat ditulis untuk menjaga
-sinkronisasi poros. Native gearbox override r20 hanya mengganti opcode branch
-`JNE` menjadi `JMP` lewat write satu byte; body instruksi tidak ditimpa.
-Toggle `Native Gearbox Override` dapat mematikannya secara runtime dan
-merestore byte asli untuk diagnosis fail-open.
-saat mod Off, keluar kendaraan, atau unload.
+---
+<div align="center">
+  <i>"Karena menyetir di Los Santos bukan sekadar menekan tombol W."</i><br>
+  <b>— Melar Transmission</b>
+</div>
