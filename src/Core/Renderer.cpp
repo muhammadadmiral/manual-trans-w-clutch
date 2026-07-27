@@ -516,10 +516,22 @@ void DrawSpeedometer(const SpeedometerData &data) {
         gearText = std::to_string(data.gear);
     }
 
-    if (!data.motorcycle && style == 0) {
-        DrawTextOverlay("GT DRIVE", left + 0.013f * scale,
-                        top + 0.027f * scale, 0.25f * scale,
-                        130, 145, 160, opacity, 0, false, false);
+    const float maximumShownSpeed =
+        Config::SpeedometerUnits == 1 ? 200.0f : 320.0f;
+    const float speedFraction =
+        std::clamp(shownSpeed / maximumShownSpeed, 0.0f, 1.0f);
+    char maxSpeedText[12]{};
+    sprintf_s(maxSpeedText, "%d",
+              static_cast<int>(maximumShownSpeed));
+    char maxRpmText[12]{};
+    sprintf_s(maxRpmText, "%.0f",
+              std::max(6.0f, data.redlineRPM / 1000.0f));
+
+    if (style == 0) {
+        DrawTextOverlay(data.motorcycle ? "RACE DIGITAL" : "GT DIGITAL",
+                        left + 0.013f * scale, top + 0.027f * scale,
+                        0.25f * scale, 130, 145, 160, opacity,
+                        0, false, false);
         DrawTextOverlay(speedText, left + 0.012f * scale,
                         top + 0.043f * scale, 0.86f * scale,
                         245, 248, 252, opacity, 2, true, false);
@@ -533,81 +545,90 @@ void DrawSpeedometer(const SpeedometerData &data) {
         DrawTextOverlay(gearText.c_str(), left + width - 0.052f * scale,
                         top + 0.045f * scale, 0.80f * scale,
                         ar, ag, ab, opacity, 2, true, true);
-    } else if (!data.motorcycle && style == 1) {
-        DrawTextOverlay("CLASSIC", x, top + 0.028f * scale,
-                        0.25f * scale, ar, ag, ab, opacity, 0, false, true);
-        DrawTextOverlay(speedText, left + width * 0.31f,
-                        top + 0.050f * scale, 0.72f * scale,
-                        244, 232, 207, opacity, 2, true, true);
-        DrawTextOverlay(unit, left + width * 0.31f,
-                        top + 0.088f * scale, 0.24f * scale,
-                        175, 158, 132, opacity, 0, false, true);
+    } else if (style == 1) {
+        // Fully analog: two procedural dials, no texture dictionary.
+        const float dialY = top + 0.079f * scale;
+        const float dialRadiusX = 0.052f * scale /
+                                  std::max(1.25f, safe.aspect);
+        const float dialRadiusY = 0.052f * scale;
+        const float leftDialX = left + width * 0.29f;
+        const float rightDialX = left + width * 0.71f;
+        DrawAnalogDial(leftDialX, dialY, dialRadiusX, dialRadiusY,
+                       speedFraction, unit, "0", maxSpeedText,
+                       accent, opacity, scale);
+        DrawAnalogDial(rightDialX, dialY, dialRadiusX, dialRadiusY,
+                       std::clamp(rpm, 0.0f, 1.0f),
+                       data.electric ? "POWER" : "RPM x1000",
+                       "0", data.electric ? "100" : maxRpmText,
+                       accent, opacity, scale);
+        GRAPHICS::DRAW_RECT(x, top + 0.139f * scale,
+                            0.052f * scale, 0.025f * scale,
+                            28, 25, 21, opacity, 0);
+        DrawTextOverlay(gearText.c_str(), x, top + 0.126f * scale,
+                        0.42f * scale, ar, ag, ab, opacity,
+                        2, true, true);
+    } else if (style == 2) {
+        // Most cars use this: digital speed/gear plus an analog power dial.
+        DrawTextOverlay(data.motorcycle ? "SPORT BIKE" : "SPORT HYBRID",
+                        left + 0.014f * scale, top + 0.021f * scale,
+                        0.24f * scale, ar, ag, ab, opacity,
+                        0, false, false);
+        DrawTextOverlay(speedText, left + width * 0.25f,
+                        top + 0.048f * scale, 0.76f * scale,
+                        245, 248, 252, opacity, 2, true, true);
+        DrawTextOverlay(unit, left + width * 0.25f,
+                        top + 0.093f * scale, 0.23f * scale,
+                        145, 160, 175, opacity, 0, false, true);
+        DrawTextOverlay(gearText.c_str(), left + width * 0.50f,
+                        top + 0.058f * scale, 0.85f * scale,
+                        ar, ag, ab, opacity, 2, true, true);
+        DrawAnalogDial(
+            left + width * 0.78f, top + 0.078f * scale,
+            0.046f * scale / std::max(1.25f, safe.aspect),
+            0.046f * scale, std::clamp(rpm, 0.0f, 1.0f),
+            data.electric ? "POWER" : "RPM", "0",
+            data.electric ? "100" : maxRpmText,
+            accent, opacity, scale);
+    } else if (style == 3) {
+        // Retro hybrid: analog speed with a compact electromechanical window.
+        DrawTextOverlay("RETRO TOURING", x, top + 0.017f * scale,
+                        0.23f * scale, 184, 164, 128, opacity,
+                        0, false, true);
+        DrawAnalogDial(
+            left + width * 0.32f, top + 0.083f * scale,
+            0.050f * scale / std::max(1.25f, safe.aspect),
+            0.050f * scale, speedFraction, unit, "0", maxSpeedText,
+            accent, opacity, scale);
+        GRAPHICS::DRAW_RECT(left + width * 0.73f,
+                            top + 0.079f * scale,
+                            0.093f * scale, 0.082f * scale,
+                            31, 29, 23, opacity, 0);
         DrawTextOverlay(gearText.c_str(), left + width * 0.73f,
-                        top + 0.047f * scale, 0.78f * scale,
+                        top + 0.044f * scale, 0.70f * scale,
                         ar, ag, ab, opacity, 2, true, true);
         DrawTextOverlay(rpmText, left + width * 0.73f,
-                        top + 0.090f * scale, 0.23f * scale,
-                        175, 158, 132, opacity, 0, false, true);
-    } else if (!data.motorcycle) {
-        DrawTextOverlay("TRACK", left + 0.014f * scale,
-                        top + 0.029f * scale, 0.26f * scale,
-                        ar, ag, ab, opacity, 0, false, false);
-        DrawTextOverlay(gearText.c_str(), x,
-                        top + 0.038f * scale, 1.08f * scale,
-                        ar, ag, ab, opacity, 2, true, true);
-        DrawTextOverlay(speedText, left + 0.016f * scale,
-                        top + 0.071f * scale, 0.55f * scale,
-                        245, 248, 252, opacity, 2, true, false);
-        DrawTextOverlay(unit, left + 0.019f * scale,
-                        top + 0.103f * scale, 0.23f * scale,
-                        145, 160, 175, opacity, 0, false, false);
-        DrawTextOverlay(rpmText, left + width - 0.083f * scale,
-                        top + 0.081f * scale, 0.27f * scale,
-                        205, 215, 225, opacity, 0, false, true);
-    } else if (style == 0) {
-        DrawTextOverlay("RACE DASH", left + 0.014f * scale,
-                        top + 0.029f * scale, 0.24f * scale,
-                        ar, ag, ab, opacity, 0, false, false);
-        DrawTextOverlay(gearText.c_str(), x,
-                        top + 0.037f * scale, 1.05f * scale,
-                        ar, ag, ab, opacity, 2, true, true);
-        DrawTextOverlay(speedText, left + 0.014f * scale,
-                        top + 0.074f * scale, 0.52f * scale,
-                        245, 248, 252, opacity, 2, true, false);
-        DrawTextOverlay(unit, left + 0.016f * scale,
-                        top + 0.104f * scale, 0.22f * scale,
-                        145, 160, 175, opacity, 0, false, false);
-    } else if (style == 1) {
-        DrawTextOverlay("NAKED", x, top + 0.028f * scale,
-                        0.24f * scale, ar, ag, ab, opacity, 0, false, true);
-        DrawTextOverlay(speedText, left + width * 0.35f,
-                        top + 0.053f * scale, 0.68f * scale,
-                        245, 248, 252, opacity, 2, true, true);
-        DrawTextOverlay(gearText.c_str(), left + width * 0.76f,
-                        top + 0.050f * scale, 0.75f * scale,
-                        ar, ag, ab, opacity, 2, true, true);
-        DrawTextOverlay(rpmText, x, top + 0.100f * scale,
-                        0.25f * scale, 165, 180, 195, opacity,
-                        0, false, true);
+                        top + 0.098f * scale, 0.22f * scale,
+                        190, 174, 145, opacity, 0, false, true);
     } else {
-        DrawTextOverlay("TOURING", left + 0.014f * scale,
-                        top + 0.029f * scale, 0.24f * scale,
-                        ar, ag, ab, opacity, 0, false, false);
-        DrawTextOverlay(speedText, left + width * 0.28f,
-                        top + 0.050f * scale, 0.75f * scale,
-                        245, 248, 252, opacity, 2, true, true);
-        DrawTextOverlay(unit, left + width * 0.28f,
-                        top + 0.090f * scale, 0.23f * scale,
-                        145, 160, 175, opacity, 0, false, true);
-        DrawTextOverlay(gearText.c_str(), left + width * 0.72f,
-                        top + 0.047f * scale, 0.82f * scale,
+        // Thin full-digital layout for players who want minimum obstruction.
+        DrawTextOverlay(speedText, left + 0.012f * scale,
+                        top + 0.038f * scale, 0.70f * scale,
+                        245, 248, 252, opacity, 2, true, false);
+        DrawTextOverlay(unit, left + 0.090f * scale,
+                        top + 0.068f * scale, 0.22f * scale,
+                        145, 160, 175, opacity, 0, false, false);
+        DrawTextOverlay(gearText.c_str(), left + width - 0.040f * scale,
+                        top + 0.035f * scale, 0.72f * scale,
                         ar, ag, ab, opacity, 2, true, true);
+        DrawTextOverlay(rpmText, left + width - 0.076f * scale,
+                        top + 0.078f * scale, 0.21f * scale,
+                        165, 180, 195, opacity, 0, false, true);
     }
 
     if (!Config::SpeedometerDetailed)
         return;
 
-    const float detailTop = top + 0.122f * scale;
+    const float detailTop = top + (mainHeight + 0.006f) * scale;
     GRAPHICS::DRAW_RECT(x, detailTop - 0.004f * scale, width,
                         0.002f * scale, 45, 53, 62, opacity, 0);
     char lineOne[128]{};
@@ -638,7 +659,9 @@ void DrawSpeedometer(const SpeedometerData &data) {
     std::string lamps;
     if (data.tcsActive) lamps += "~y~TCS ";
     if (data.absActive) lamps += "~y~ABS ";
+    if (data.escActive) lamps += "~y~ESC ";
     if (data.launchControl) lamps += "~b~LC ";
+    if (data.rollWarning) lamps += "~r~ROLL ";
     if (data.parkingBrake) lamps += "~o~PARK ";
     if (data.burnout) lamps += "~r~BURNOUT ";
     if (data.oilLife < 0.18f) lamps += "~r~SERVICE OIL ";
