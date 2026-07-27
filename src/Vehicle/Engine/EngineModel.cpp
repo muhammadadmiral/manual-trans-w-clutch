@@ -705,15 +705,27 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
       // telemetry membaca wheelspin, target penuh kembali berasal dari roda.
       target = std::max(
           target, s_state.idleRPM + std::pow(pedal, 0.75f) * 0.10f);
+    } else {
+      // v1.1: Kopling sudah engaged penuh, bukan automatic, bukan power brake.
+      // Biarkan GTA menghitung RPM secara native; mod tidak perlu menimpa.
+      // Ini menghilangkan efek RPM "kaku" dan throttle yang terasa rusak.
+      s_state.controlledRPM = rpm;
+      s_state.connectedRPMTarget = s_state.wheelRPM;
+      s_state.expectedRPM = rpm;
+      data.SetThrottle(pedal);
+      data.SetThrottlePedal(pedal);
+      goto rpm_done;
     }
 
     target = std::clamp(target, s_state.idleRPM, 1.08f);
     s_state.connectedRPMTarget = target;
 
     const float inertiaScale = std::clamp(s_state.inertia, 0.30f, 3.0f);
+    // v1.1: Response ditingkatkan signifikan agar RPM tidak laggy saat
+    // kopling setengah-engage (misal saat shifting).
     const float response =
-        automaticMode ? 7.0f / std::sqrt(inertiaScale)
-                      : 11.0f / std::sqrt(inertiaScale);
+        automaticMode ? 12.0f / std::sqrt(inertiaScale)
+                      : 18.0f / std::sqrt(inertiaScale);
     const float alpha = 1.0f - std::exp(-response * dt);
     s_state.controlledRPM +=
         (target - s_state.controlledRPM) * Clamp01(alpha);
@@ -733,6 +745,7 @@ bool Update(Vehicle vehicle, VehicleData &data, int gear, int maxGear,
     s_state.rpmOwned = false;
     s_state.controlledRPM = rpm;
   }
+  rpm_done:
   s_state.previousRPM = rpm;
   s_state.previousThrottle = Clamp01(throttle);
 
