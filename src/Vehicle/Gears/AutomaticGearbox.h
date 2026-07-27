@@ -42,6 +42,12 @@ struct State {
   float brakeBoostTime = 0.0f;
   float torqueManagement = 0.0f;
   float sportBlip = 0.0f;
+  float handlingDriveForce = 0.30f;
+  float handlingClutchRate = 2.0f;
+  float shiftTimingScale = 1.0f;
+  DWORD disengageDurationMs = 80;
+  DWORD synchronizeDurationMs = 105;
+  DWORD engageDurationMs = 230;
   ShiftPhase shiftPhase = ShiftPhase::Engaged;
   bool kickdown = false;
   bool rpmRecovery = false;

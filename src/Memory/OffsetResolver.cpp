@@ -205,11 +205,16 @@ void OffsetResolver::EnrichOptionalOffsets(VehicleOffsets &offsets) {
   if (addr != 0) {
     offsets.HandlingPtr =
         ResolveRipDisplacement(addr, enhancedHandlingPattern ? 7 : 0x16);
-    if (offsets.HandlingPtr != 0) {
-      offsets.DriveInertia = 0x54;
-      offsets.DriveForce = 0x60;
-      offsets.DriveMaxFlatVel = 0x64;
-    }
+  }
+  if (offsets.HandlingPtr != 0) {
+    // Stable CHandlingData layout. This also enriches an older INI that
+    // already has a validated handling pointer but predates these fields.
+    offsets.DriveInertia = 0x54;
+    offsets.ClutchChangeRateScaleUpShift = 0x58;
+    offsets.ClutchChangeRateScaleDownShift = 0x5C;
+    offsets.DriveForce = 0x60;
+    offsets.DriveMaxFlatVel = 0x64;
+    offsets.InitialDriveMaxFlatVel = 0x68;
   }
 
   // fThrottleP shares the group following steering input in CVehicle.

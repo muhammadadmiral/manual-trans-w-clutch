@@ -2,6 +2,7 @@
 // HUDController.cpp — All HUD rendering extracted from MainScript.cpp 974–1074.
 // =============================================================================
 #include "HUDController.h"
+#include "DriveAssistController.h"
 
 #include "../../Core/Config.h"
 #include "../../Core/InputHandler.h"
@@ -12,9 +13,7 @@
 #include "../../Vehicle/Clutch/ClutchSystem.h"
 #include "../../Vehicle/Engine/EngineModel.h"
 #include "../../Vehicle/Engine/FuelSystem.h"
-#include "../../Vehicle/Engine/LaunchControl.h"
 #include "../../Vehicle/Engine/PedalModel.h"
-#include "../../Vehicle/Engine/TractionControl.h"
 #include "../../Vehicle/Engine/TurboSystem.h"
 #include "../../Vehicle/Gears/AutomaticGearbox.h"
 #include "../../Vehicle/Gears/GearboxSystem.h"
@@ -34,7 +33,8 @@ void Update(Vehicle veh, VehicleData& data,
             float speedKmH, float rpm,
             bool isEngineOn, bool engineStarting,
             bool automaticMode, int activeSignal,
-            int grindWarningTimer) {
+            int grindWarningTimer,
+            const DriveAssistController& assist) {
 
     // ── Gear HUD ──────────────────────────────────────────────────────────
     if (Config::GearHudEnabled && !Config::SpeedometerEnabled &&
@@ -79,10 +79,14 @@ void Update(Vehicle veh, VehicleData& data,
         cluster.engineOn       = isEngineOn;
         cluster.engineStarting = engineStarting;
         cluster.parkingBrake   = ParkingBrake::IsEngaged();
-        cluster.tcsActive      = TractionControl::IsTCSActive();
-        cluster.absActive      = BrakeSystem::IsABSActive();
-        cluster.launchControl  = LaunchControl::IsActive();
+        cluster.tcsActive      = assist.GetState().tcsActive;
+        cluster.absActive      = assist.GetState().absActive;
+        cluster.escActive      = assist.GetState().escActive;
+        cluster.rollWarning    = assist.GetState().rollWarning;
+        cluster.launchControl  = assist.GetState().lcArmed;
         cluster.burnout        = engineState.burnoutActive;
+        cluster.vehicleClass   = VEHICLE::GET_VEHICLE_CLASS(veh);
+        cluster.modelHash      = static_cast<std::uint32_t>(model);
         Renderer::DrawSpeedometer(cluster);
     }
 
@@ -109,14 +113,16 @@ void Update(Vehicle veh, VehicleData& data,
             FuelSystem::GetFuelLevel(), FuelSystem::GetOilTemperature(),
             MaintenanceSystem::GetState().oilLife,
             GearboxSystem::GetHealth(), ClutchSystem::GetHeat(),
-            ParkingBrake::IsEngaged(), BrakeSystem::IsABSActive(),
+            ParkingBrake::IsEngaged(), assist.GetState().absActive,
             EngineModel::GetEngineBrake());
 
         // ── Warning labels ────────────────────────────────────────────────
         std::string warnings;
-        if (TractionControl::IsTCSActive()) warnings += "~y~TCS ";
-        if (BrakeSystem::IsABSActive()) warnings += "~y~ABS ";
-        if (LaunchControl::IsActive()) warnings += "~b~LC ";
+        if (assist.GetState().tcsActive) warnings += "~y~TCS ";
+        if (assist.GetState().absActive) warnings += "~y~ABS ";
+        if (assist.GetState().escActive) warnings += "~y~ESC ";
+        if (assist.GetState().lcArmed) warnings += "~b~LC ";
+        if (assist.GetState().rollWarning) warnings += "~r~ROLLOVER ";
         if (PedalModel::IsBrakeOverrideActive()) warnings += "~r~BTO ";
         if (ClutchSystem::IsDumpActive()) warnings += "~r~CLUTCH DUMP ";
         if (GearboxSystem::GetState().moneyShift) warnings += "~r~OVERREV ";

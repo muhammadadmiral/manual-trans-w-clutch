@@ -23,11 +23,13 @@
 #include "../Vehicle/VehicleProfile.h"
 
 #include "VehicleBlackboard.h"
+#include "DrivingEventBus.h"
 #include "Controllers/VehicleSessionController.h"
 #include "Controllers/EngineController.h"
 #include "Controllers/SignalController.h"
 #include "Controllers/CalibrationController.h"
 #include "Controllers/TransmissionController.h"
+#include "Controllers/DriveAssistController.h"
 #include "Controllers/DiagnosticsController.h"
 #include "Controllers/HUDController.h"
 
@@ -109,6 +111,8 @@ void ScriptMain() {
     LOG_INFO(Script, "VehicleData::Initialize OK. Reading config...");
 
     Config::ReadConfig(g_pluginModule);
+    DrivingEventBus::Reset();
+    DiagnosticsController::Initialize();
     AudioEngine::Initialize(g_pluginModule);
     ModLogger::SetMinLevel(Config::DebugOverlay ? ModLogger::Level::Verbose
                                                 : ModLogger::Level::Info);
@@ -121,10 +125,12 @@ void ScriptMain() {
     SignalController         signalCtrl;
     CalibrationController    calibCtrl;
     TransmissionController   transCtrl;
+    DriveAssistController    assistCtrl;
 
     // ── Main loop ─────────────────────────────────────────────────────────────
     while (true) {
         scriptWait(0);
+        DrivingEventBus::FlushFrame();
 
         // Force re-calibrate from menu
         if (Config::ForceRecalibrate) {
@@ -153,10 +159,16 @@ void ScriptMain() {
         // ── Not in a vehicle ──────────────────────────────────────────────────
         if (!PED::IS_PED_IN_ANY_VEHICLE(playerPed, FALSE)) {
             GearboxPatches::SetActive(false);
+            const bool hadSession = sessionCtrl.GetActiveVehicle() != 0;
             sessionCtrl.Reset();
             engineCtrl.Reset();
             signalCtrl.Reset();
             transCtrl.Reset();
+            if (hadSession) {
+                assistCtrl.Reset();
+                DiagnosticsController::Reset();
+                DrivingEventBus::ClearPending();
+            }
             InputHandler::ResetEdges();
             Menu::Draw();
             continue;
@@ -165,10 +177,16 @@ void ScriptMain() {
         const Vehicle vehicle = PED::GET_VEHICLE_PED_IS_IN(playerPed, FALSE);
         if (!IsValidVehicle(vehicle) || !IsPlayerDriving(playerPed, vehicle)) {
             GearboxPatches::SetActive(false);
+            const bool hadSession = sessionCtrl.GetActiveVehicle() != 0;
             sessionCtrl.Reset();
             engineCtrl.Reset();
             signalCtrl.Reset();
             transCtrl.Reset();
+            if (hadSession) {
+                assistCtrl.Reset();
+                DiagnosticsController::Reset();
+                DrivingEventBus::ClearPending();
+            }
             InputHandler::ResetEdges();
             Menu::Draw();
             continue;
@@ -177,6 +195,9 @@ void ScriptMain() {
         // ── In valid vehicle ──────────────────────────────────────────────────
         const int maxDriveGear = VEHICLE::GET_VEHICLE_HIGH_GEAR(vehicle);
         
+        const bool isEngineOn =
+            VEHICLE::GET_IS_VEHICLE_ENGINE_RUNNING(vehicle) != FALSE;
+
         // 1. Populate Blackboard
         g_frame.Populate(vehicle, playerPed, maxDriveGear);
 
@@ -186,10 +207,14 @@ void ScriptMain() {
             signalCtrl.Reset();
             calibCtrl.ResetLayout();
             transCtrl.Reset();
+            assistCtrl.Reset();
             DiagnosticsController::Reset();
+            engineCtrl.Initialize(
+                vehicle, g_frame.profile, Config::RequireColdStart,
+                isEngineOn);
         }
 
-        const bool isEngineOn = VEHICLE::GET_IS_VEHICLE_ENGINE_RUNNING(vehicle);
+        InputHandler::Update(transCtrl.GetManualGear());
         const float smoothThrottle = InputHandler::GetSmoothedThrottle();
 
         VehicleData data(vehicle);
@@ -205,18 +230,20 @@ void ScriptMain() {
         }
 
         // 4. Update core logic
-        engineCtrl.Update(vehicle, g_frame.profile, isEngineOn);
+        engineCtrl.Update(vehicle, g_frame.profile, isEngineOn,
+                          transCtrl.GetManualGear());
         signalCtrl.Update(vehicle);
 
         const bool workshopOpen = WorkshopIntegration::Update(vehicle);
 
         // 5. Run Drivetrain physics loop
         transCtrl.Update(vehicle, data, g_frame.profile, engineCtrl.IsOn(), workshopOpen,
-                         g_frame.vehicleSpeed, g_frame.forwardSpeed, maxDriveGear);
+                         g_frame.vehicleSpeed, g_frame.forwardSpeed,
+                         maxDriveGear, assistCtrl);
 
         // 6. Handle drivetrain stall request
         if (transCtrl.ConsumedStallEvent()) {
-            engineCtrl.ForceStall();
+            engineCtrl.ForceStall(vehicle, "drivetrain");
         }
 
         // 7. Telemetry & Diagnostics
@@ -224,7 +251,8 @@ void ScriptMain() {
             vehicle, data, g_frame.profile, transCtrl.GetManualGear(),
             transCtrl.GetMode(), transCtrl.GetDriveThrottle(), transCtrl.GetBrake(),
             transCtrl.GetSimulatedClutch(), g_frame.speedKmH, g_frame.forwardSpeed,
-            engineCtrl.IsOn(), engineCtrl.IsStarting(), transCtrl.GetMode() == 1
+            engineCtrl.IsOn(), engineCtrl.IsStarting(), transCtrl.GetMode() == 1,
+            assistCtrl
         );
 
         // 8. Render HUD
@@ -233,7 +261,7 @@ void ScriptMain() {
             transCtrl.GetMode(), transCtrl.GetSimulatedClutch(), transCtrl.GetDriveThrottle(),
             transCtrl.GetBrake(), g_frame.speedKmH, g_frame.rpm, engineCtrl.IsOn(),
             engineCtrl.IsStarting(), transCtrl.GetMode() == 1, signalCtrl.GetActiveSignal(),
-            transCtrl.GetGrindWarningTimer()
+            transCtrl.GetGrindWarningTimer(), assistCtrl
         );
 
         Menu::Draw();

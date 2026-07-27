@@ -3,8 +3,10 @@
 // Extracted from MainScript.cpp baris 884–972. Enhanced with fault registry.
 // =============================================================================
 #include "DiagnosticsController.h"
+#include "DriveAssistController.h"
 
 #include "../../Core/Config.h"
+#include "../../Core/InputHandler.h"
 #include "../../Core/ModLogger.h"
 #include "../../Memory/GearboxPatches.h"
 #include "../../Vehicle/Brakes/BrakeSystem.h"
@@ -13,16 +15,46 @@
 #include "../../Vehicle/Engine/TractionControl.h"
 #include "../../Vehicle/Gears/AutomaticGearbox.h"
 #include "../../Vehicle/Gears/GearboxSystem.h"
+#include "../../Vehicle/Engine/FuelSystem.h"
+#include "../../Vehicle/Engine/TurboSystem.h"
+#include "../../Vehicle/TelemetryLogger.h"
+#include "../DrivingEventBus.h"
 
 #include <algorithm>
+#include <string>
 
 namespace DiagnosticsController {
 
 static DWORD s_lastStatusLog = 0;
 static std::vector<std::string> s_faults;
+static ULONGLONG s_telemetryEligibleSince = 0;
+static ULONGLONG s_telemetryIneligibleSince = 0;
+
+void Initialize() {
+    using Event = DrivingEventBus::Event;
+    DrivingEventBus::Subscribe(Event::MoneyShift, [] {
+        RecordFault("money_shift");
+    });
+    DrivingEventBus::Subscribe(Event::ClutchOverheat, [] {
+        RecordFault("clutch_overheat");
+    });
+    DrivingEventBus::Subscribe(Event::EngineStall, [] {
+        RecordFault("engine_stall");
+    });
+    DrivingEventBus::Subscribe(Event::WaterIngestion, [] {
+        RecordFault("water_ingestion");
+    });
+    DrivingEventBus::Subscribe(Event::RolloverWarning, [] {
+        RecordFault("rollover_risk");
+    });
+}
 
 void Reset() {
     s_lastStatusLog = 0;
+    s_telemetryEligibleSince = 0;
+    s_telemetryIneligibleSince = 0;
+    if (TelemetryLogger::IsLogging())
+        TelemetryLogger::StopSession();
     s_faults.clear();
 }
 
@@ -45,7 +77,48 @@ void Update(Vehicle veh, VehicleData& data,
             int manualGear, int transmissionMode,
             float driveThrottle, float absBrake, float simulatedClutch,
             float speedKmH, float forwardSpeed,
-            bool isEngineOn, bool engineStarting, bool automaticMode) {
+            bool isEngineOn, bool engineStarting, bool automaticMode,
+            const DriveAssistController& assist) {
+
+    const ULONGLONG now = GetTickCount64();
+    const bool telemetryEligible =
+        isEngineOn && manualGear > 2 && speedKmH > 40.0f;
+    if (telemetryEligible) {
+        s_telemetryIneligibleSince = 0;
+        if (!s_telemetryEligibleSince)
+            s_telemetryEligibleSince = now;
+        if (!TelemetryLogger::IsLogging() &&
+            now - s_telemetryEligibleSince >= 2000) {
+            TelemetryLogger::StartSession(
+                "drive_" + std::to_string(veh) + "_" +
+                std::to_string(now));
+            LOG_INFO(Diag, "Telemetry auto-start vehicle=%d speed=%.1f",
+                     veh, speedKmH);
+        }
+    } else {
+        s_telemetryEligibleSince = 0;
+        const bool shouldStop =
+            !isEngineOn || manualGear <= 1 || speedKmH < 20.0f;
+        if (TelemetryLogger::IsLogging() && shouldStop) {
+            if (!s_telemetryIneligibleSince)
+                s_telemetryIneligibleSince = now;
+            if (now - s_telemetryIneligibleSince >= 5000) {
+                TelemetryLogger::StopSession();
+                s_telemetryIneligibleSince = 0;
+                LOG_INFO(Diag, "Telemetry auto-stop vehicle=%d", veh);
+            }
+        }
+    }
+
+    if (TelemetryLogger::IsLogging()) {
+        TelemetryLogger::LogFrame(
+            veh, data, speedKmH, data.GetRPM(), driveThrottle, absBrake,
+            simulatedClutch, manualGear, InputHandler::GetSmoothedSteer(),
+            assist.GetState().tcsActive ? 1.0f : 0.0f,
+            assist.GetState().absActive ? 1.0f : 0.0f,
+            TurboSystem::GetBoostPressure(),
+            FuelSystem::GetOilTemperature());
+    }
 
     if (GetTickCount() - s_lastStatusLog < 1000)
         return;
@@ -97,7 +170,8 @@ void Update(Vehicle veh, VehicleData& data,
     LOG_INFO(Physics,
              "CLUTCH_GEARBOX: Engage=%.3f Demand=%.3f Cap=%.3f "
              "OSlip=%.3f Heat=%.3f Judder=%.3f Clash=%.3f Shock=%.3f "
-             "SyncWear=%.3f ResistMs=%u Reject=%d Money=%d WheelLock=%.3f",
+             "SyncWear=%.3f ResistMs=%u Reject=%d Money=%d WheelLock=%.3f "
+             "DriveForce=%.3f ClutchRate=%.2f BiteRate=%.2f/s",
              clutchState.engagement, clutchState.torqueDemand,
              clutchState.torqueCapacity, clutchState.overloadSlip,
              clutchState.heat, clutchState.judder,
@@ -106,18 +180,31 @@ void Update(Vehicle veh, VehicleData& data,
              static_cast<unsigned>(gearboxState.resistanceDelayMs),
              gearboxState.shiftRejected ? 1 : 0,
              gearboxState.moneyShift ? 1 : 0,
-             GearboxSystem::GetWheelLockBrake());
+             GearboxSystem::GetWheelLockBrake(),
+             clutchState.handlingDriveForce,
+             clutchState.handlingClutchRate,
+             clutchState.biteRatePerSecond);
     LOG_INFO(Physics,
              "ASSISTS: TCSEn=%d TCSReady=%d TCSWheels=%d Slip=%.3f "
              "Cut=%.3f Active=%d ABSEn=%d ABSReady=%d ABSWheels=%d "
-             "ABSSlip=%.3f ABSLevel=%.3f Active=%d",
+             "ABSSlip=%.3f ABSLevel=%.3f Active=%d "
+             "ESC=%d ESCLevel=%.3f SlipAngle=%.2f LatA=%.2f "
+             "Yaw=%.3f/%.3f Roll=%.1f Warn=%d",
              tcsState.enabled ? 1 : 0, tcsState.wheelDataValid ? 1 : 0,
              tcsState.validWheelCount, tcsState.slipRatio,
              tcsState.cutLevel, TractionControl::IsTCSActive() ? 1 : 0,
              absState.absEnabled ? 1 : 0,
              absState.wheelDataValid ? 1 : 0, absState.validWheelCount,
              absState.wheelSlip, absState.absLevel,
-             BrakeSystem::IsABSActive() ? 1 : 0);
+             assist.GetState().absActive ? 1 : 0,
+             assist.GetState().escActive ? 1 : 0,
+             assist.GetState().stabilityError,
+             assist.GetState().slipAngleDeg,
+             assist.GetState().lateralAcceleration,
+             assist.GetState().yawRate,
+             assist.GetState().desiredYawRate,
+             assist.GetState().rollAngleDeg,
+             assist.GetState().rollWarning ? 1 : 0);
     if (automaticMode) {
         LOG_INFO(Gear,
                  "AUTO: Phase=%s Current=%d Pending=%d Hydraulic=%.3f "
@@ -134,6 +221,15 @@ void Update(Vehicle veh, VehicleData& data,
                  autoState.neutralDrop ? 1 : 0, autoState.brakeBoostTime,
                  autoState.torqueManagement,
                  autoState.ignitionCut ? 1 : 0);
+        LOG_INFO(Gear,
+                 "AUTO_DYNAMICS: DriveForce=%.3f ClutchRate=%.2f "
+                 "TimingScale=%.2f Phases=%u/%u/%ums",
+                 autoState.handlingDriveForce,
+                 autoState.handlingClutchRate,
+                 autoState.shiftTimingScale,
+                 static_cast<unsigned>(autoState.disengageDurationMs),
+                 static_cast<unsigned>(autoState.synchronizeDurationMs),
+                 static_cast<unsigned>(autoState.engageDurationMs));
     }
 
     // v1.0: Auto-record faults from system states

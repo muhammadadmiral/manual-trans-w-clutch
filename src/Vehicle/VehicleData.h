@@ -64,10 +64,14 @@ public:
     float   GetThrottle()                const;
     float   GetThrottlePedal()           const;
     float   GetDriveInertia()            const;
+    float   GetClutchChangeRateScaleUpShift() const;
+    float   GetClutchChangeRateScaleDownShift() const;
     float   GetDriveMaxFlatVel()         const;
+    float   GetInitialDriveMaxFlatVel()  const;
     uint8_t GetWheelCount()              const;
     GameMemory::WheelTelemetry GetWheelTelemetry(uint8_t index) const;
     float   GetDriveForce()              const;
+    float   GetInitialDriveForce()       const;
     float   GetOriginalDriveForce()      const;
     float   GetFuelLevel()               const;
     uint8_t GetLightsBroken()            const;

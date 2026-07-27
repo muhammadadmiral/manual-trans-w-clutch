@@ -12,7 +12,12 @@
 
 using Vehicle = int;
 
+class DriveAssistController;
+
 namespace DiagnosticsController {
+
+// Register fault/event subscriptions once after DrivingEventBus::Reset().
+void Initialize();
 
 // Per-second status dump. Call every frame; internally throttles to 1x/sec.
 void Update(Vehicle veh, VehicleData& data,
@@ -20,7 +25,8 @@ void Update(Vehicle veh, VehicleData& data,
             int manualGear, int transmissionMode,
             float driveThrottle, float absBrake, float simulatedClutch,
             float speedKmH, float forwardSpeed,
-            bool isEngineOn, bool engineStarting, bool automaticMode);
+            bool isEngineOn, bool engineStarting, bool automaticMode,
+            const DriveAssistController& assist);
 
 // Record a named fault event (e.g., "money_shift", "clutch_overheat").
 void RecordFault(const char* faultCode);

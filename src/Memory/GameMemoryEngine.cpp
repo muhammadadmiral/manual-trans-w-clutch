@@ -29,11 +29,44 @@ float CHandlingData::GetDriveInertia() const {
   }
 }
 
+float CHandlingData::GetClutchChangeRateScaleUpShift() const {
+  if (!IsValid() || m_offsets->ClutchChangeRateScaleUpShift == 0)
+    return 0.0f;
+  __try {
+    return *reinterpret_cast<float *>(
+        m_address + m_offsets->ClutchChangeRateScaleUpShift);
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return 0.0f;
+  }
+}
+
+float CHandlingData::GetClutchChangeRateScaleDownShift() const {
+  if (!IsValid() || m_offsets->ClutchChangeRateScaleDownShift == 0)
+    return 0.0f;
+  __try {
+    return *reinterpret_cast<float *>(
+        m_address + m_offsets->ClutchChangeRateScaleDownShift);
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return 0.0f;
+  }
+}
+
 float CHandlingData::GetDriveMaxFlatVel() const {
   if (!IsValid() || m_offsets->DriveMaxFlatVel == 0)
     return 0.0f;
   __try {
     return *reinterpret_cast<float *>(m_address + m_offsets->DriveMaxFlatVel);
+  } __except (EXCEPTION_EXECUTE_HANDLER) {
+    return 0.0f;
+  }
+}
+
+float CHandlingData::GetInitialDriveMaxFlatVel() const {
+  if (!IsValid() || m_offsets->InitialDriveMaxFlatVel == 0)
+    return 0.0f;
+  __try {
+    return *reinterpret_cast<float *>(
+        m_address + m_offsets->InitialDriveMaxFlatVel);
   } __except (EXCEPTION_EXECUTE_HANDLER) {
     return 0.0f;
   }

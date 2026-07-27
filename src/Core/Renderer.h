@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 namespace Renderer {
 
 struct SpeedometerData {
@@ -28,8 +30,12 @@ struct SpeedometerData {
   bool parkingBrake = false;
   bool tcsActive = false;
   bool absActive = false;
+  bool escActive = false;
+  bool rollWarning = false;
   bool launchControl = false;
   bool burnout = false;
+  int vehicleClass = 0;
+  std::uint32_t modelHash = 0;
 };
 
 void ShowNotification(const char *message);

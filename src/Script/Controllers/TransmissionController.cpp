@@ -5,20 +5,18 @@
 // memory writes, and stall detection.
 // =============================================================================
 #include "TransmissionController.h"
+#include "DriveAssistController.h"
 
 #include "../../Core/Config.h"
 #include "../../Core/InputHandler.h"
 #include "../../Core/ModLogger.h"
 #include "../../Core/Renderer.h"
 #include "../../Memory/GearboxPatches.h"
-#include "../../Vehicle/Brakes/BrakeSystem.h"
 #include "../../Vehicle/Brakes/ParkingBrake.h"
 #include "../../Vehicle/Clutch/ClutchSystem.h"
 #include "../../Vehicle/Engine/EngineModel.h"
 #include "../../Vehicle/Engine/FuelSystem.h"
-#include "../../Vehicle/Engine/LaunchControl.h"
 #include "../../Vehicle/Engine/PedalModel.h"
-#include "../../Vehicle/Engine/TractionControl.h"
 #include "../../Vehicle/Engine/TurboSystem.h"
 #include "../../Vehicle/Gears/AutomaticGearbox.h"
 #include "../../Vehicle/Gears/GearboxSystem.h"
@@ -57,7 +55,8 @@ void TransmissionController::Update(
     Vehicle veh, VehicleData& data,
     VehicleProfile::Drivetrain profile,
     bool isEngineOn, bool workshopOpen,
-    float vehicleSpeed, float forwardSpeed, int maxGear) {
+    float vehicleSpeed, float forwardSpeed, int maxGear,
+    DriveAssistController& assist) {
 
     m_wasFirstFrame = false;
 
@@ -95,6 +94,7 @@ void TransmissionController::Update(
         ClutchSystem::Reset();
         EngineModel::Reset();
         PedalModel::Reset();
+        assist.Reset();
         m_manualGear = 0;
         m_automaticClutchUntil = 0;
         data.SetClutch(1.0f);
@@ -184,8 +184,9 @@ void TransmissionController::Update(
     m_simulatedClutch =
         automaticMode
             ? AutomaticGearbox::GetClutchDisengagement()
-            : ClutchSystem::UpdatePedal(clutch, rawThrottle, rpm, m_manualGear,
-                                        maxGear, isEngineOn);
+            : ClutchSystem::UpdatePedal(
+                  data, clutch, rawThrottle, rpm, m_manualGear,
+                  maxGear, isEngineOn);
     PedalModel::Update(rawThrottle, rawBrake, m_simulatedClutch, m_manualGear,
                        forwardSpeed, automaticMode, isEngineOn);
     float throttle = PedalModel::GetThrottle();
@@ -223,12 +224,11 @@ void TransmissionController::Update(
     GearboxSystem::Update(veh, data, m_manualGear, maxGear, m_simulatedClutch,
                           throttle, isEngineOn);
 
-    float tcsThrottle = throttle;
+    float assistedThrottle = throttle;
     m_absBrake = brake;
-    TractionControl::Update(veh, data, forwardSpeed, m_manualGear,
-                            m_simulatedClutch, tcsThrottle);
-    m_absBrake = BrakeSystem::UpdateABS(
-        veh, data, m_absBrake, forwardSpeed, m_manualGear < 0);
+    assist.Update(veh, data, m_manualGear, m_simulatedClutch,
+                  assistedThrottle, m_absBrake, forwardSpeed, isEngineOn,
+                  automaticMode);
     m_absBrake =
         std::max(m_absBrake, GearboxSystem::GetWheelLockBrake());
     if (Config::FuelCutoffEngineBrake && m_manualGear > 0 &&
@@ -239,15 +239,22 @@ void TransmissionController::Update(
     }
     if (automaticMode)
         AutomaticGearbox::SetTorqueManagement(
-            TractionControl::GetState().cutLevel);
+            assist.GetState().torqueIntervention);
     if (traceFrame)
         LOG_INFO(Script, "TRACE v1 stage=assists throttle=%.3f brake=%.3f",
-                 tcsThrottle, m_absBrake);
+                 assistedThrottle, m_absBrake);
 
-    if (TractionControl::IsTCSActive())
-        LOG_VERBOSE(Physics, "TCS active — throttle limited to %.3f", tcsThrottle);
-    if (BrakeSystem::IsABSActive())
+    if (assist.GetState().tcsActive)
+        LOG_VERBOSE(Physics, "TCS active — throttle limited to %.3f",
+                    assistedThrottle);
+    if (assist.GetState().absActive)
         LOG_VERBOSE(Physics, "ABS active — brake limited to %.3f", m_absBrake);
+    if (assist.GetState().escActive)
+        LOG_VERBOSE(Physics,
+                    "ESC active — slip=%.2fdeg yaw=%.3f target=%.3f",
+                    assist.GetState().slipAngleDeg,
+                    assist.GetState().yawRate,
+                    assist.GetState().desiredYawRate);
 
     const float turboMul =
         TurboSystem::Update(veh, data, rpm, throttle, isEngineOn);
@@ -260,7 +267,7 @@ void TransmissionController::Update(
 
     m_driveThrottle =
         automaticMode && AutomaticGearbox::IsSport()
-            ? std::pow(std::clamp(tcsThrottle, 0.0f, 1.0f),
+            ? std::pow(std::clamp(assistedThrottle, 0.0f, 1.0f),
                        1.0f - std::clamp(Config::AutomaticSTorqueBoost,
                                          0.0f, 0.50f))
             : tcsThrottle;
@@ -316,9 +323,6 @@ void TransmissionController::Update(
                        MaintenanceSystem::GetPowerFactor(),
                    0.0f, 4.50f);
     VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(veh, m_powerMultiplier);
-
-    LaunchControl::Update(data, m_manualGear, m_simulatedClutch, throttle,
-                          m_absBrake, forwardSpeed, isEngineOn, automaticMode);
 
     // ── Stall detection ───────────────────────────────────────────────────
     const bool shiftStall = GearboxSystem::ConsumeStallRequest();

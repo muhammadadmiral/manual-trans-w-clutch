@@ -65,7 +65,10 @@ public:
 
   float GetDriveForce() const;
   float GetDriveInertia() const;
+  float GetClutchChangeRateScaleUpShift() const;
+  float GetClutchChangeRateScaleDownShift() const;
   float GetDriveMaxFlatVel() const;
+  float GetInitialDriveMaxFlatVel() const;
   void SetDriveForce(float force);
 
 private:

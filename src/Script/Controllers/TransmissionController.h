@@ -11,12 +11,15 @@
 
 using Vehicle = int;
 
+class DriveAssistController;
+
 class TransmissionController {
 public:
     void Update(Vehicle veh, VehicleData& data,
                 VehicleProfile::Drivetrain profile,
                 bool isEngineOn, bool workshopOpen,
-                float vehicleSpeed, float forwardSpeed, int maxGear);
+                float vehicleSpeed, float forwardSpeed, int maxGear,
+                DriveAssistController& assist);
     void Reset();
 
     // ── Queries ───────────────────────────────────────────────────────────

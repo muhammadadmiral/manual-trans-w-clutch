@@ -9,6 +9,7 @@
 using Vehicle = int;
 
 class EngineController;
+class DriveAssistController;
 
 namespace HUDController {
 
@@ -20,6 +21,7 @@ void Update(Vehicle veh, VehicleData& data,
             float speedKmH, float rpm,
             bool isEngineOn, bool engineStarting,
             bool automaticMode, int activeSignal,
-            int grindWarningTimer);
+            int grindWarningTimer,
+            const DriveAssistController& assist);
 
 } // namespace HUDController

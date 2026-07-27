@@ -2,6 +2,7 @@
 #include "../VehicleData.h"
 #include "../VehicleUpgrades.h"
 #include "../../Core/Config.h"
+#include "../../Script/DrivingEventBus.h"
 #include "../../../sdk/inc/natives.h"
 #include <algorithm>
 #include <cmath>
@@ -9,6 +10,7 @@
 namespace ClutchSystem {
 
 static State s_state;
+static bool s_overheatPublished = false;
 
 static float Clamp01(float value) {
   return std::clamp(value, 0.0f, 1.0f);
@@ -21,6 +23,7 @@ static float SmoothStep(float value) {
 
 void Reset() {
   s_state = State{};
+  s_overheatPublished = false;
 }
 
 void ServiceClutch() {
@@ -33,8 +36,8 @@ void ServiceClutch() {
   s_state.overloaded = false;
 }
 
-float UpdatePedal(float rawPedal, float throttle, float rpm, int gear,
-                  int maxGear, bool engineOn) {
+float UpdatePedal(VehicleData &data, float rawPedal, float throttle,
+                  float rpm, int gear, int maxGear, bool engineOn) {
   const float freePlayEnd =
       std::clamp(Config::ClutchBiteStart, 0.02f, 0.80f);
   const float fullyOpenAt =
@@ -42,10 +45,34 @@ float UpdatePedal(float rawPedal, float throttle, float rpm, int gear,
 
   const float travel =
       (Clamp01(rawPedal) - freePlayEnd) / (fullyOpenAt - freePlayEnd);
-  float disengagement = SmoothStep(travel);
-  float engagement = 1.0f - disengagement;
-
   const float dt = std::clamp(MISC::GET_FRAME_TIME(), 0.0f, 0.05f);
+  const float targetDisengagement = SmoothStep(travel);
+  float clutchRate = data.GetClutchChangeRateScaleUpShift();
+  if (clutchRate <= 0.0f)
+    clutchRate = 2.0f;
+  float driveForce = data.GetInitialDriveForce();
+  if (driveForce <= 0.0f)
+    driveForce = 0.30f;
+  const float rateFactor =
+      std::sqrt(std::clamp(clutchRate, 0.20f, 20.0f) / 2.0f);
+  const float torqueFactor =
+      std::sqrt(std::clamp(driveForce, 0.05f, 1.50f) / 0.30f);
+  const float biteRate =
+      std::clamp(9.0f * rateFactor / torqueFactor, 3.0f, 28.0f);
+  const bool opening =
+      targetDisengagement > s_state.actuatorDisengagement;
+  const float responseRate = opening ? biteRate * 1.65f : biteRate;
+  const float response =
+      dt > 0.0f ? 1.0f - std::exp(-responseRate * dt) : 1.0f;
+  s_state.actuatorDisengagement +=
+      (targetDisengagement - s_state.actuatorDisengagement) *
+      Clamp01(response);
+  float disengagement = Clamp01(s_state.actuatorDisengagement);
+  float engagement = 1.0f - disengagement;
+  s_state.handlingDriveForce = driveForce;
+  s_state.handlingClutchRate = clutchRate;
+  s_state.biteRatePerSecond = biteRate;
+
   if (dt > 0.0001f) {
     s_state.releaseRate =
         (s_state.previousDisengagement - disengagement) / dt;
@@ -57,9 +84,16 @@ float UpdatePedal(float rawPedal, float throttle, float rpm, int gear,
       Clamp01((s_state.releaseRate - dumpRate) / dumpRate) *
       (0.35f + Clamp01(throttle) * 0.65f) * engagement;
   if (engineOn && freshDump > 0.05f) {
+    const bool wasDumpActive = s_state.dumpRemaining > 0.0f;
     s_state.dumpSeverity =
         std::max(s_state.dumpSeverity, freshDump);
     s_state.dumpRemaining = 0.16f;
+    if (!wasDumpActive) {
+      DrivingEventBus::EventData event{};
+      event.severity = s_state.dumpSeverity;
+      DrivingEventBus::Publish(
+          DrivingEventBus::Event::ClutchDump, event);
+    }
   } else if (s_state.dumpRemaining > 0.0f) {
     s_state.dumpRemaining =
         std::max(0.0f, s_state.dumpRemaining - dt);
@@ -126,6 +160,15 @@ float UpdatePedal(float rawPedal, float throttle, float rpm, int gear,
     s_state.heat -= std::max(0.0f, Config::ClutchCoolRate) * dt;
   }
   s_state.heat = Clamp01(s_state.heat);
+  if (s_state.heat > 0.85f && !s_overheatPublished) {
+    DrivingEventBus::EventData event{};
+    event.severity = s_state.heat;
+    DrivingEventBus::Publish(
+        DrivingEventBus::Event::ClutchOverheat, event);
+    s_overheatPublished = true;
+  } else if (s_state.heat < 0.72f) {
+    s_overheatPublished = false;
+  }
 
   const float fadeStart =
       std::clamp(Config::ClutchFadeStart, 0.50f, 0.99f);

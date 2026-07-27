@@ -11,7 +11,11 @@ struct State {
   float heat = 0.0f;
   float nativeActuator = 1.0f;
   float previousDisengagement = 0.0f;
+  float actuatorDisengagement = 0.0f;
   float releaseRate = 0.0f;
+  float handlingDriveForce = 0.30f;
+  float handlingClutchRate = 2.0f;
+  float biteRatePerSecond = 9.0f;
   float dumpSeverity = 0.0f;
   float dumpRemaining = 0.0f;
   float overloadSlip = 0.0f;
@@ -27,8 +31,8 @@ void Reset();
 void ServiceClutch();
 
 // rawPedal: 0 dilepas, 1 diinjak penuh.
-float UpdatePedal(float rawPedal, float throttle, float rpm, int gear,
-                  int maxGear, bool engineOn);
+float UpdatePedal(VehicleData &data, float rawPedal, float throttle,
+                  float rpm, int gear, int maxGear, bool engineOn);
 
 // Logical gear tetap kepasang; hard-open memakai carrier gear 1 di GearLogic.
 void ApplyToVehicle(VehicleData &data, int gear, float speedMps);

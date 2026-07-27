@@ -45,6 +45,13 @@ extern float TcsMaxCut;
 extern bool AbsEnabled;
 extern float AbsSlipTarget;
 extern float AbsMaxRelease;
+extern bool EscEnabled;
+extern float EscMinSpeedKmH;
+extern float EscSlipAngleThresholdDeg;
+extern float EscMaxThrottleCut;
+extern float EscBrakeStrength;
+extern bool RolloverAssist;
+extern float RolloverWarningAngleDeg;
 
 extern bool IdleCreep;
 extern float IdleCreepThrottle;

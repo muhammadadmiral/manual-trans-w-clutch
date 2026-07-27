@@ -3,6 +3,7 @@
 
 #include "../Core/Config.h"
 #include "../Core/ModLogger.h"
+#include "../Script/DrivingEventBus.h"
 #include "../../sdk/inc/natives.h"
 
 #include <xaudio2.h>
@@ -41,6 +42,7 @@ IXAudio2MasteringVoice *s_master = nullptr;
 std::array<IXAudio2SourceVoice *, 16> s_voices{};
 std::mt19937 s_rng{std::random_device{}()};
 bool s_ready = false;
+bool s_eventHandlersRegistered = false;
 
 Bank s_carShift;
 Bank s_carSoft;
@@ -286,6 +288,60 @@ bool Initialize(HMODULE module) {
             L"automatic_park_01.wav"});
 
   s_ready = true;
+  if (!s_eventHandlersRegistered) {
+    using Event = DrivingEventBus::Event;
+    using EventData = DrivingEventBus::EventData;
+    auto shiftHandler = [](bool upshift, const EventData &event) {
+      const ShiftCharacter character =
+          event.severity >= 0.70f
+              ? ShiftCharacter::Harsh
+              : (event.severity <= 0.25f ? ShiftCharacter::Slow
+                                         : ShiftCharacter::Normal);
+      if (!PlayShift(event.vehicle, upshift, character, event.quickShift)) {
+        AUDIO::PLAY_SOUND_FRONTEND(-1, "NAV_LEFT_RIGHT",
+                                   "HUD_FRONTEND_DEFAULT_SOUNDSET", TRUE);
+      }
+    };
+    DrivingEventBus::Subscribe(
+        Event::GearShiftUp,
+        [shiftHandler](const EventData &event) {
+          shiftHandler(true, event);
+        });
+    DrivingEventBus::Subscribe(
+        Event::GearShiftDown,
+        [shiftHandler](const EventData &event) {
+          shiftHandler(false, event);
+        });
+    DrivingEventBus::Subscribe(Event::GearGrind,
+        [](const EventData &event) {
+          if (PlayGearGrind(event.vehicle))
+            return;
+          const Hash model = ENTITY::GET_ENTITY_MODEL(event.vehicle);
+          if (VEHICLE::IS_THIS_MODEL_A_BIKE(model) ||
+              VEHICLE::IS_THIS_MODEL_A_QUADBIKE(model)) {
+            AUDIO::PLAY_SOUND_FROM_ENTITY(
+                -1, "NAV_UP_DOWN", event.vehicle,
+                "HUD_FREEMODE_SOUNDSET", FALSE, 0);
+          } else {
+            AUDIO::PLAY_SOUND_FROM_ENTITY(
+                -1, "BAR_OUT_OF_RANGE", event.vehicle,
+                "HUD_MINIGAME_SOUNDSET", FALSE, 0);
+          }
+        });
+    DrivingEventBus::Subscribe(Event::SelectorChanged,
+        [](const EventData &event) {
+          PlaySelector(event.vehicle);
+        });
+    DrivingEventBus::Subscribe(Event::ParkingBrakeEngaged,
+        [](const EventData &) {
+          PlayParkingBrake(true);
+        });
+    DrivingEventBus::Subscribe(Event::ParkingBrakeReleased,
+        [](const EventData &) {
+          PlayParkingBrake(false);
+        });
+    s_eventHandlersRegistered = true;
+  }
   Update();
   LOG_INFO(Audio, "Audio engine ready root=%ls voices=%zu", root.c_str(),
            s_voices.size());

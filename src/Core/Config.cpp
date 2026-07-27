@@ -48,6 +48,13 @@ float TcsMaxCut = 0.65f;
 bool AbsEnabled = true;
 float AbsSlipTarget = 0.16f;
 float AbsMaxRelease = 0.70f;
+bool EscEnabled = true;
+float EscMinSpeedKmH = 24.0f;
+float EscSlipAngleThresholdDeg = 7.5f;
+float EscMaxThrottleCut = 0.72f;
+float EscBrakeStrength = 0.38f;
+bool RolloverAssist = true;
+float RolloverWarningAngleDeg = 34.0f;
 
 bool IdleCreep = true;
 float IdleCreepThrottle = 0.14f;
@@ -462,6 +469,24 @@ void ReadConfig(HMODULE module) {
     AbsEnabled = GetPrivateProfileIntA("Assists", "ABS", 1, ini) != 0;
     AbsSlipTarget = ReadFloat("Assists", "ABSSlipTarget", 0.16f, ini);
     AbsMaxRelease = ReadFloat("Assists", "ABSMaxRelease", 0.70f, ini);
+    EscEnabled = GetPrivateProfileIntA("Assists", "ESC", 1, ini) != 0;
+    EscMinSpeedKmH = std::clamp(
+        ReadFloat("Assists", "ESCMinSpeedKmH", 24.0f, ini),
+        5.0f, 80.0f);
+    EscSlipAngleThresholdDeg = std::clamp(
+        ReadFloat("Assists", "ESCSlipAngleDeg", 7.5f, ini),
+        2.0f, 20.0f);
+    EscMaxThrottleCut = std::clamp(
+        ReadFloat("Assists", "ESCMaxThrottleCut", 0.72f, ini),
+        0.0f, 1.0f);
+    EscBrakeStrength = std::clamp(
+        ReadFloat("Assists", "ESCBrakeStrength", 0.38f, ini),
+        0.0f, 0.80f);
+    RolloverAssist =
+        GetPrivateProfileIntA("Assists", "RolloverAssist", 1, ini) != 0;
+    RolloverWarningAngleDeg = std::clamp(
+        ReadFloat("Assists", "RolloverWarningAngleDeg", 34.0f, ini),
+        15.0f, 75.0f);
 
     GearClash = GetPrivateProfileIntA("Gearbox", "ClashEnabled", 1, ini) != 0;
     GearGrindDamage = ReadFloat("Gearbox", "GrindDamage", 0.04f, ini);
@@ -525,11 +550,11 @@ void ReadConfig(HMODULE module) {
     SpeedometerCarStyle = std::clamp(
         static_cast<int>(
             GetPrivateProfileIntA("Speedometer", "CarStyle", 0, ini)),
-        0, 2);
+        0, 5);
     SpeedometerBikeStyle = std::clamp(
         static_cast<int>(
             GetPrivateProfileIntA("Speedometer", "BikeStyle", 0, ini)),
-        0, 2);
+        0, 5);
     SpeedometerUnits = std::clamp(
         static_cast<int>(
             GetPrivateProfileIntA("Speedometer", "Units", 0, ini)),
@@ -585,11 +610,11 @@ void ReadConfig(HMODULE module) {
 
     // Auto-create if the file doesn't exist yet
     if (GetFileAttributesA(ini) == INVALID_FILE_ATTRIBUTES ||
-        drivetrainSchema < 10 || migratedFromLegacy) {
+        drivetrainSchema < 11 || migratedFromLegacy) {
         SaveConfig(module);
         char currentIni[MAX_PATH]{};
         if (BuildIniPath(module, currentIni))
-            WriteInt("Internal", "DrivetrainSchema", 10, currentIni);
+            WriteInt("Internal", "DrivetrainSchema", 11, currentIni);
     }
 }
 
@@ -703,6 +728,15 @@ void SaveConfig(HMODULE module) {
     WriteInt("Assists", "ABS", AbsEnabled ? 1 : 0, ini);
     WriteFloat("Assists", "ABSSlipTarget", AbsSlipTarget, ini);
     WriteFloat("Assists", "ABSMaxRelease", AbsMaxRelease, ini);
+    WriteInt("Assists", "ESC", EscEnabled ? 1 : 0, ini);
+    WriteFloat("Assists", "ESCMinSpeedKmH", EscMinSpeedKmH, ini);
+    WriteFloat("Assists", "ESCSlipAngleDeg",
+               EscSlipAngleThresholdDeg, ini);
+    WriteFloat("Assists", "ESCMaxThrottleCut", EscMaxThrottleCut, ini);
+    WriteFloat("Assists", "ESCBrakeStrength", EscBrakeStrength, ini);
+    WriteInt("Assists", "RolloverAssist", RolloverAssist ? 1 : 0, ini);
+    WriteFloat("Assists", "RolloverWarningAngleDeg",
+               RolloverWarningAngleDeg, ini);
 
     WriteInt("Gearbox", "ClashEnabled", GearClash ? 1 : 0, ini);
     WriteFloat("Gearbox", "GrindDamage", GearGrindDamage, ini);

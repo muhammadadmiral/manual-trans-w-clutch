@@ -2,7 +2,7 @@
 #include "../../../sdk/inc/natives.h"
 #include "../../Core/ModLogger.h"
 #include "../../Core/Config.h"
-#include "../../Audio/AudioEngine.h"
+#include "../../Script/DrivingEventBus.h"
 #include "../VehicleData.h"
 #include "GearboxSystem.h"
 #include <algorithm>
@@ -18,17 +18,9 @@ static int s_pendingGear = 0;
 static DWORD s_pendingAt = 0;
 
 void PlayGearGrindSound(Vehicle vehicle) {
-  if (AudioEngine::PlayGearGrind(vehicle))
-    return;
-  const Hash model = ENTITY::GET_ENTITY_MODEL(vehicle);
-  if (VEHICLE::IS_THIS_MODEL_A_BIKE(model) ||
-      VEHICLE::IS_THIS_MODEL_A_QUADBIKE(model)) {
-    AUDIO::PLAY_SOUND_FROM_ENTITY(-1, "NAV_UP_DOWN", vehicle,
-                                  "HUD_FREEMODE_SOUNDSET", 0, 0);
-  } else {
-    AUDIO::PLAY_SOUND_FROM_ENTITY(-1, "BAR_OUT_OF_RANGE", vehicle,
-                                  "HUD_MINIGAME_SOUNDSET", 0, 0);
-  }
+  DrivingEventBus::EventData event{};
+  event.vehicle = vehicle;
+  DrivingEventBus::Publish(DrivingEventBus::Event::GearGrind, event);
 }
 
 void PlayGearShiftSound(Vehicle vehicle, int fromGear, int toGear,
@@ -40,14 +32,16 @@ void PlayGearShiftSound(Vehicle vehicle, int fromGear, int toGear,
                      (throttle > 0.82f && clutch < 0.42f);
   const bool slow = !harsh &&
                     (clutch > 0.70f || throttle < 0.22f);
-  const auto character =
-      harsh ? AudioEngine::ShiftCharacter::Harsh
-            : (slow ? AudioEngine::ShiftCharacter::Slow
-                    : AudioEngine::ShiftCharacter::Normal);
-  if (AudioEngine::PlayShift(vehicle, upshift, character, shift.quickShift))
-    return;
-  AUDIO::PLAY_SOUND_FRONTEND(-1, "NAV_LEFT_RIGHT",
-                             "HUD_FRONTEND_DEFAULT_SOUNDSET", 1);
+  DrivingEventBus::EventData event{};
+  event.vehicle = vehicle;
+  event.fromGear = fromGear;
+  event.toGear = toGear;
+  event.severity = harsh ? 0.90f : (slow ? 0.15f : 0.45f);
+  event.quickShift = shift.quickShift;
+  DrivingEventBus::Publish(
+      upshift ? DrivingEventBus::Event::GearShiftUp
+              : DrivingEventBus::Event::GearShiftDown,
+      event);
 }
 
 void Reset(int defaultGear) {

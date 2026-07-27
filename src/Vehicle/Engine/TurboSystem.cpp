@@ -5,6 +5,7 @@
 #include "TurboSystem.h"
 #include "../VehicleData.h"
 #include "../../Core/Config.h"
+#include "../../Script/DrivingEventBus.h"
 #include "../../../sdk/inc/natives.h"
 #include <algorithm>
 
@@ -54,6 +55,11 @@ float Update(Vehicle vehicle, VehicleData &data, float rpm, float throttle, bool
     if (diff > 0.3f && throttle < 0.1f && !s_state.blowOffLatched) {
       if (Config::AudioNativeLayers)
       AUDIO::PLAY_SOUND_FROM_ENTITY(-1, "TURBO_BLOW_OFF", vehicle, "0", 0, 0);
+      DrivingEventBus::EventData event{};
+      event.vehicle = vehicle;
+      event.severity = std::clamp(diff, 0.0f, 1.0f);
+      DrivingEventBus::Publish(
+          DrivingEventBus::Event::TurboBlowoff, event);
       s_state.blowOffLatched = true;
     }
     s_state.spool -= dt * (throttle < 0.1f ? 2.8f : 1.2f);

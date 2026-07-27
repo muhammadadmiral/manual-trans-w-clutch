@@ -4,7 +4,7 @@
 #include "../VehicleData.h"
 #include "../../Core/Config.h"
 #include "../../Core/ModLogger.h"
-#include "../../Audio/AudioEngine.h"
+#include "../../Script/DrivingEventBus.h"
 #include "../../../sdk/inc/natives.h"
 #include <algorithm>
 #include <cmath>
@@ -73,12 +73,52 @@ static bool DownshiftIsSafe(Vehicle vehicle, VehicleData &data,
   return projectedRPM < 0.98f;
 }
 
+static void ConfigureShiftTiming(VehicleData &data, bool upshift,
+                                 bool sport) {
+  float clutchRate =
+      upshift ? data.GetClutchChangeRateScaleUpShift()
+              : data.GetClutchChangeRateScaleDownShift();
+  if (clutchRate <= 0.0f)
+    clutchRate = 2.0f;
+  float driveForce = data.GetInitialDriveForce();
+  if (driveForce <= 0.0f)
+    driveForce = 0.30f;
+
+  // handling.meta's clutch value is a rate scale: larger means quicker.
+  // More drive force needs a slightly longer re-engagement to keep the
+  // driveline impulse comparable. Square roots keep extreme modded handling
+  // values from producing either instant or multi-second shifts.
+  const float rateFactor =
+      std::sqrt(std::clamp(clutchRate, 0.20f, 20.0f) / 2.0f);
+  const float torqueFactor =
+      std::sqrt(std::clamp(driveForce, 0.05f, 1.50f) / 0.30f);
+  const float timingScale =
+      std::clamp(torqueFactor / rateFactor, 0.45f, 1.90f);
+
+  const float disengageBase = sport ? 55.0f : 80.0f;
+  const float synchronizeBase = sport ? 70.0f : 105.0f;
+  const float engageBase = sport ? 150.0f : 230.0f;
+  s_state.handlingDriveForce = driveForce;
+  s_state.handlingClutchRate = clutchRate;
+  s_state.shiftTimingScale = timingScale;
+  s_state.disengageDurationMs = static_cast<DWORD>(
+      std::clamp(disengageBase * timingScale, 35.0f, 155.0f));
+  s_state.synchronizeDurationMs = static_cast<DWORD>(
+      std::clamp(synchronizeBase * std::sqrt(timingScale),
+                 45.0f, 180.0f));
+  s_state.engageDurationMs = static_cast<DWORD>(
+      std::clamp(engageBase * timingScale, 75.0f, 430.0f));
+}
+
 void Reset(Selector initialSelector) {
   s_state = State{};
   s_state.selector = initialSelector;
   s_state.lastShiftTime = GetTickCount();
   s_state.phaseStartedAt = s_state.lastShiftTime;
   s_state.fluidTemperature = 0.18f;
+  s_state.disengageDurationMs = 80;
+  s_state.synchronizeDurationMs = 105;
+  s_state.engageDurationMs = 230;
 }
 
 void ServiceTransmission() {
@@ -115,7 +155,12 @@ void UpdateSelector(Vehicle vehicle, bool selectorUp, bool selectorDown,
 
   const Selector previous = s_state.selector;
   s_state.selector = target;
-  AudioEngine::PlaySelector(vehicle);
+  DrivingEventBus::EventData selectorEvent{};
+  selectorEvent.vehicle = vehicle;
+  selectorEvent.fromGear = static_cast<int>(previous);
+  selectorEvent.toGear = static_cast<int>(target);
+  DrivingEventBus::Publish(
+      DrivingEventBus::Event::SelectorChanged, selectorEvent);
   s_state.neutralDrop = false;
   if (Config::AutomaticNeutralDropDamage &&
       previous == Selector::Neutral && IsDriveSelector(target) &&
@@ -241,9 +286,9 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
 
   if (s_state.shiftPhase != ShiftPhase::Engaged) {
     const DWORD phaseElapsed = now - s_state.phaseStartedAt;
-    const DWORD disengageMs = sport ? 55 : 80;
-    const DWORD synchronizeMs = sport ? 70 : 105;
-    const DWORD engageMs = sport ? 150 : 230;
+    const DWORD disengageMs = s_state.disengageDurationMs;
+    const DWORD synchronizeMs = s_state.synchronizeDurationMs;
+    const DWORD engageMs = s_state.engageDurationMs;
 
     if (s_state.shiftPhase == ShiftPhase::Disengaging) {
       const float progress =
@@ -440,22 +485,31 @@ int Update(Vehicle vehicle, VehicleData &data, int maxGear, float throttle,
     s_state.shiftPhase = ShiftPhase::Disengaging;
     s_state.phaseStartedAt = now;
     s_state.lastShiftDirection = direction;
+    ConfigureShiftTiming(data, direction > 0, sport);
     GearboxSystem::NotifyAutomaticShift(data, previous, targetGear, sport);
     const bool harsh =
         s_state.kickdown || nativeLimiterPressure ||
         (throttle > 0.84f && rpm > 0.66f);
     const bool slow =
         !harsh && !sport && throttle < 0.45f && rpm < 0.54f;
-    const auto character =
-        harsh ? AudioEngine::ShiftCharacter::Harsh
-              : (slow ? AudioEngine::ShiftCharacter::Slow
-                      : AudioEngine::ShiftCharacter::Normal);
-    AudioEngine::PlayShift(vehicle, targetGear > previous, character);
+    DrivingEventBus::EventData shiftEvent{};
+    shiftEvent.vehicle = vehicle;
+    shiftEvent.fromGear = previous;
+    shiftEvent.toGear = targetGear;
+    shiftEvent.severity = harsh ? 0.90f : (slow ? 0.15f : 0.45f);
+    DrivingEventBus::Publish(
+        targetGear > previous
+            ? DrivingEventBus::Event::GearShiftUp
+            : DrivingEventBus::Event::GearShiftDown,
+        shiftEvent);
     LOG_INFO(Gear,
              "Automatic %s shift start: %d -> %d roadRPM=%.3f "
-             "targetRPM=%.3f nativeRPM=%.3f throttle=%.3f",
+             "targetRPM=%.3f nativeRPM=%.3f throttle=%.3f "
+             "handlingRate=%.2f driveForce=%.3f timing=%.2f",
              sport ? "S" : "D", previous, targetGear, rpm,
-             s_state.shiftTargetRPM, nativeRPM, throttle);
+             s_state.shiftTargetRPM, nativeRPM, throttle,
+             s_state.handlingClutchRate, s_state.handlingDriveForce,
+             s_state.shiftTimingScale);
   }
 
   (void)vehicle;

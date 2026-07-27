@@ -2,6 +2,7 @@
 #include "../VehicleData.h"
 #include "../VehicleUpgrades.h"
 #include "../../Core/Config.h"
+#include "../../Script/DrivingEventBus.h"
 #include "../../../sdk/inc/natives.h"
 #include <algorithm>
 #include <cmath>
@@ -202,6 +203,16 @@ void NotifyShift(Vehicle vehicle, VehicleData &data, int fromGear, int toGear,
       0.0f, 1.0f);
   if (s_state.moneyShift)
     s_state.clashSeverity = 1.0f;
+  if (s_state.moneyShift) {
+    DrivingEventBus::EventData event{};
+    event.vehicle = vehicle;
+    event.fromGear = fromGear;
+    event.toGear = toGear;
+    event.severity =
+        std::clamp(s_state.moneyShiftSeverity, 0.0f, 1.0f);
+    DrivingEventBus::Publish(
+        DrivingEventBus::Event::MoneyShift, event);
+  }
   s_state.clashActive = Config::GearClash && s_state.clashSeverity > 0.05f;
   s_state.shockRemaining =
       s_state.clashActive ? 0.10f + 0.14f * s_state.clashSeverity : 0.0f;

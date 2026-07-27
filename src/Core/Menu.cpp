@@ -295,7 +295,7 @@ void Menu::Initialize() {
   menus.push_back(clutchMenu);
 
   Submenu assists;
-  assists.title = "ABS / TCS";
+  assists.title = "DRIVE ASSISTS";
   assists.items.push_back(
       MenuItem("TCS", MenuItem::Bool, &Config::TcsEnabled));
   assists.items.push_back(MenuItem("TCS Slip Target", MenuItem::Float,
@@ -312,6 +312,25 @@ void Menu::Initialize() {
   assists.items.push_back(MenuItem("ABS Max Release", MenuItem::Float,
                                    &Config::AbsMaxRelease,
                                    0.01f, 0.00f, 1.00f));
+  assists.items.push_back(
+      MenuItem("ESC", MenuItem::Bool, &Config::EscEnabled));
+  assists.items.push_back(MenuItem("ESC Min Speed", MenuItem::Float,
+                                   &Config::EscMinSpeedKmH,
+                                   1.0f, 5.0f, 80.0f));
+  assists.items.push_back(MenuItem("ESC Slip Angle", MenuItem::Float,
+                                   &Config::EscSlipAngleThresholdDeg,
+                                   0.5f, 2.0f, 20.0f));
+  assists.items.push_back(MenuItem("ESC Throttle Cut", MenuItem::Float,
+                                   &Config::EscMaxThrottleCut,
+                                   0.01f, 0.0f, 1.0f));
+  assists.items.push_back(MenuItem("ESC Brake Force", MenuItem::Float,
+                                   &Config::EscBrakeStrength,
+                                   0.01f, 0.0f, 0.8f));
+  assists.items.push_back(MenuItem(
+      "Rollover Assist", MenuItem::Bool, &Config::RolloverAssist));
+  assists.items.push_back(MenuItem("Rollover Angle", MenuItem::Float,
+                                   &Config::RolloverWarningAngleDeg,
+                                   1.0f, 15.0f, 75.0f));
   assists.items.push_back(MenuItem(
       "Brake Fade", MenuItem::Bool, &Config::BrakeFadeEnabled));
   assists.items.push_back(MenuItem("Brake Heat Rate", MenuItem::Float,
@@ -469,10 +488,12 @@ void Menu::Initialize() {
                &Config::SpeedometerEnabled));
   speedometer.items.push_back(MenuItem(
       "Car Layout", MenuItem::IntChoice, &Config::SpeedometerCarStyle,
-      0, 2, {"GT DIGITAL", "CLASSIC", "TRACK"}));
+      0, 5, {"FULL DIGITAL", "TWIN ANALOG", "SPORT HYBRID",
+             "RETRO HYBRID", "MINIMAL DIGITAL", "AUTO DYNAMIC"}));
   speedometer.items.push_back(MenuItem(
       "Bike Layout", MenuItem::IntChoice, &Config::SpeedometerBikeStyle,
-      0, 2, {"RACE DASH", "NAKED", "TOURING"}));
+      0, 5, {"FULL DIGITAL", "ROUND ANALOG", "SPORT HYBRID",
+             "RETRO HYBRID", "MINIMAL DIGITAL", "AUTO DYNAMIC"}));
   speedometer.items.push_back(MenuItem(
       "Units", MenuItem::IntChoice, &Config::SpeedometerUnits,
       0, 1, {"KM/H", "MPH"}));

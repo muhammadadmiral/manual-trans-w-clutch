@@ -206,7 +206,13 @@ bool VehicleData::LoadOffsetsFromIni(HMODULE pluginModule, VehicleOffsets& resul
         out.ThrottlePedal         = ReadHexOffset(iniPath, section, "ThrottlePedal");
         out.HandlingPtr           = ReadHexOffset(iniPath, section, "HandlingPtr");
         out.DriveInertia          = ReadHexOffset(iniPath, section, "DriveInertia");
+        out.ClutchChangeRateScaleUpShift =
+            ReadHexOffset(iniPath, section, "ClutchChangeRateScaleUpShift");
+        out.ClutchChangeRateScaleDownShift =
+            ReadHexOffset(iniPath, section, "ClutchChangeRateScaleDownShift");
         out.DriveMaxFlatVel       = ReadHexOffset(iniPath, section, "DriveMaxFlatVel");
+        out.InitialDriveMaxFlatVel =
+            ReadHexOffset(iniPath, section, "InitialDriveMaxFlatVel");
         out.TransmissionDriveMaxFlatVel =
             ReadHexOffset(iniPath, section, "TransmissionDriveMaxFlatVel");
         out.TransmissionDriveForce =
@@ -300,7 +306,13 @@ void VehicleData::SaveOffsetsToIni(HMODULE pluginModule,
         write(section, "ThrottlePedal",          offsets.ThrottlePedal);
         write(section, "HandlingPtr",             offsets.HandlingPtr);
         write(section, "DriveInertia",            offsets.DriveInertia);
+        write(section, "ClutchChangeRateScaleUpShift",
+              offsets.ClutchChangeRateScaleUpShift);
+        write(section, "ClutchChangeRateScaleDownShift",
+              offsets.ClutchChangeRateScaleDownShift);
         write(section, "DriveMaxFlatVel",         offsets.DriveMaxFlatVel);
+        write(section, "InitialDriveMaxFlatVel",
+              offsets.InitialDriveMaxFlatVel);
         write(section, "TransmissionDriveMaxFlatVel",
               offsets.TransmissionDriveMaxFlatVel);
         write(section, "TransmissionDriveForce",
@@ -513,6 +525,26 @@ float VehicleData::GetDriveInertia() const {
     return h.IsValid() ? h.GetDriveInertia() : 0.0f;
 }
 
+float VehicleData::GetClutchChangeRateScaleUpShift() const {
+    if (!m_isValid) return 0.0f;
+    const auto h = m_vehicle.GetHandlingData();
+    const float value =
+        h.IsValid() ? h.GetClutchChangeRateScaleUpShift() : 0.0f;
+    return std::isfinite(value) && value >= 0.05f && value <= 100.0f
+               ? value
+               : 0.0f;
+}
+
+float VehicleData::GetClutchChangeRateScaleDownShift() const {
+    if (!m_isValid) return 0.0f;
+    const auto h = m_vehicle.GetHandlingData();
+    const float value =
+        h.IsValid() ? h.GetClutchChangeRateScaleDownShift() : 0.0f;
+    return std::isfinite(value) && value >= 0.05f && value <= 100.0f
+               ? value
+               : 0.0f;
+}
+
 float VehicleData::GetDriveMaxFlatVel() const {
     if (!m_isValid) return 0.0f;
     const float runtimeValue = m_vehicle.GetTransmissionDriveMaxFlatVel();
@@ -521,6 +553,16 @@ float VehicleData::GetDriveMaxFlatVel() const {
         return runtimeValue;
     auto h = m_vehicle.GetHandlingData();
     return h.IsValid() ? h.GetDriveMaxFlatVel() : 0.0f;
+}
+
+float VehicleData::GetInitialDriveMaxFlatVel() const {
+    if (!m_isValid) return 0.0f;
+    const auto h = m_vehicle.GetHandlingData();
+    const float value =
+        h.IsValid() ? h.GetInitialDriveMaxFlatVel() : 0.0f;
+    return std::isfinite(value) && value > 1.0f && value < 1000.0f
+               ? value
+               : 0.0f;
 }
 
 uint8_t VehicleData::GetWheelCount() const {
@@ -535,6 +577,13 @@ VehicleData::GetWheelTelemetry(uint8_t index) const {
 
 float VehicleData::GetOriginalDriveForce() const {
     return m_originalDriveForce;
+}
+
+float VehicleData::GetInitialDriveForce() const {
+    const float value = GetDriveForce();
+    return std::isfinite(value) && value >= 0.01f && value <= 5.0f
+               ? value
+               : 0.0f;
 }
 
 float VehicleData::GetGearRatio(uint8_t gear) const {

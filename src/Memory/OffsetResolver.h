@@ -17,7 +17,10 @@ struct VehicleOffsets {
   uint32_t ThrottlePedal = 0;
   uint32_t HandlingPtr = 0;
   uint32_t DriveInertia = 0;
+  uint32_t ClutchChangeRateScaleUpShift = 0;
+  uint32_t ClutchChangeRateScaleDownShift = 0;
   uint32_t DriveMaxFlatVel = 0;
+  uint32_t InitialDriveMaxFlatVel = 0;
   uint32_t DriveForce = 0;
   uint32_t TransmissionDriveMaxFlatVel = 0;
   uint32_t TransmissionDriveForce = 0;

@@ -11,6 +11,7 @@
 #include "../../Core/Renderer.h"
 #include "../../Vehicle/Gears/AutomaticGearbox.h"
 #include "../../Vehicle/VehicleProfile.h"
+#include "../DrivingEventBus.h"
 #include "../../../sdk/inc/natives.h"
 
 #include <algorithm>
@@ -79,6 +80,10 @@ void EngineController::Update(Vehicle veh,
                 if (profile == VehicleProfile::Drivetrain::Electric) {
                     m_state = State::Running;
                     VEHICLE::SET_VEHICLE_ENGINE_ON(veh, TRUE, TRUE, TRUE);
+                    DrivingEventBus::EventData event{};
+                    event.vehicle = veh;
+                    DrivingEventBus::Publish(
+                        DrivingEventBus::Event::EngineStart, event);
                     LOG_INFO(Script, "EV power -> READY");
                 } else {
                     const ULONGLONG now = GetTickCount64();
@@ -107,6 +112,10 @@ void EngineController::Update(Vehicle veh,
         const ULONGLONG crankMs = GetTickCount64() - m_engineStartTick;
         if (actualEngineOn && crankMs >= m_starterRequiredMs) {
             m_state = State::Running;
+            DrivingEventBus::EventData event{};
+            event.vehicle = veh;
+            DrivingEventBus::Publish(
+                DrivingEventBus::Event::EngineStart, event);
             LOG_INFO(Script, "Starter completed in %llums", crankMs);
         } else if (crankMs > m_starterRequiredMs + 2050) {
             m_state = actualEngineOn ? State::Running : State::Off;
@@ -136,5 +145,8 @@ void EngineController::ForceStall(Vehicle veh, const char* reason) {
     m_state = State::Stalled;
     VEHICLE::SET_VEHICLE_CHEAT_POWER_INCREASE(veh, 0.0f);
     VEHICLE::SET_VEHICLE_ENGINE_ON(veh, FALSE, TRUE, TRUE);
+    DrivingEventBus::EventData event{};
+    event.vehicle = veh;
+    DrivingEventBus::Publish(DrivingEventBus::Event::EngineStall, event);
     LOG_WARN(Physics, "Engine stall forced: %s", reason);
 }
